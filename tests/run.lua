@@ -698,6 +698,7 @@ local function fixture(options)
             self.shown = false
         end
         function object:IsShown() return self.shown end
+        function object:IsProtected() return self.protected == true end
         function object:SetPoint(...)
             if state.combat and self.protected then error("SetPoint in combat") end
             self.points[#self.points + 1] = {...}
@@ -2162,6 +2163,21 @@ test("a landed Polymorph marks the mob with the moon and shows the bar on its un
     state.emit("UNIT_HEALTH", "nameplate3")
     equal(bar.shown, false, "gone when the mob dies")
 end)
+test("a Polymorph cast on the mob under the mouse is tracked and marked", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    state.units.mouseover = {name = "Defias Pillager", guid = "mob-7", level = 20}
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-m", POLYMORPH)
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-m", POLYMORPH)
+    local bar = state.env.MageToolsForeverPolymorphBar
+    equal(bar.shown, true, "tracked")
+    equal(bar.name.text, "Defias Pillager")
+    equal(state.marks["mob-7"], 5, "the moon, through mouseover")
+    equal(bar.container.unit, "none", "the bar never binds to mouseover")
+    state.units.nameplate5 = state.units.mouseover
+    state.units.mouseover = nil
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate5")
+    equal(bar.container.unit, "nameplate5", "it finds the mob on its nameplate")
+end)
 test("a Polymorph that lands in combat still gets the moon, on your target", function()
     local state = mage({known = {[POLYMORPH] = true}})
     sheepTarget(state)
@@ -2482,6 +2498,49 @@ test("every MTF frame snaps, not only the buff reminders; Shift-drag moves a sna
     equal(select(2, centerOf(state, polymorph)), ny - (cy - math.floor(my + 0.5)))
 end)
 
+test("a Shift-dragged group that snaps to another frame keeps its spacing", function()
+    local state = mage({known = {[3561] = true, [118] = true}})
+    state.slash("unlock")
+    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
+    local icon = reminderIcon(state, "intellect")
+    dropBy(state, conjure, conjure, 300, 300)
+    local cx, cy = centerOf(state, conjure)
+    dropBy(state, portals, portals, cx + conjure.width / 2 + 20 + portals.width / 2, cy)
+    local gapX = select(1, centerOf(state, portals)) - cx
+    -- Drop the group a little off the spot under the buff reminder, so it snaps.
+    local ix, iy = state.absCenter(icon)
+    local iconHalf = icon.height * icon:GetEffectiveScale() / 2
+    local barHalfH = conjure.height * conjure:GetEffectiveScale() / 2
+    local spotX, spotY = ix, iy - iconHalf - 20 - barHalfH
+    state.shift = true
+    dropBy(state, conjure, conjure, spotX + 6, spotY - 5)
+    local nx, ny = centerOf(state, conjure)
+    equal(nx, math.floor(spotX + 0.5), "the group snapped")
+    equal(ny, math.floor(spotY + 0.5))
+    equal(select(1, centerOf(state, portals)) - nx, gapX, "the portal bar kept its place beside it")
+end)
+test("a drop after combat began waits, then snaps and saves the group when combat ends", function()
+    local state = mage({known = {[3561] = true}})
+    state.slash("unlock")
+    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
+    dropBy(state, conjure, conjure, 300, 300)
+    local cx, cy = centerOf(state, conjure)
+    dropBy(state, portals, portals, cx + conjure.width / 2 + 20 + portals.width / 2, cy)
+    local gapX = select(1, centerOf(state, portals)) - cx
+    local saved = state.mtf.db.portals.position
+    state.shift = true
+    conjure.scripts.OnDragStart(conjure)
+    conjure:ClearAllPoints()
+    conjure:SetPoint("CENTER", nil, "BOTTOMLEFT", 500 / conjure:GetEffectiveScale(), 500 / conjure:GetEffectiveScale())
+    state.combat = true
+    conjure.scripts.OnDragStop(conjure)
+    equal(state.mtf.db.portals.position, saved, "nothing saved in combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(state.mtf.db.portals.position.relativePoint, "BOTTOMLEFT", "saved once combat ends")
+    equal(select(1, centerOf(state, portals)) - select(1, centerOf(state, conjure)), gapX, "the group kept together")
+    equal(conjure.moving, false, "stopped moving")
+end)
 test("reminder icons start in a row 20 apart, and a drop near another snaps beside it", function()
     local state = mage()
     state.slash("unlock")
