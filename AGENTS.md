@@ -280,18 +280,27 @@ frameworks without agreement.
   `SetDurationText`; a dim line behind it shows a broken Polymorph. The mob
   comes from your own cast events: `UNIT_SPELLCAST_SENT` names the target,
   matched to a unit for its GUID; on `UNIT_SPELLCAST_SUCCEEDED` the bar binds
-  to the mob's nameplate, else target, focus, or mouseover, rebinding on
-  target, focus, and nameplate changes. It forgets the mob when it dies
-  (`UNIT_HEALTH`), after the longest Polymorph (50 s) plus 5 s, or on the
-  next Polymorph. MTF never reads the aura; a resist cannot be seen (the
+  to the mob through your focus, then target, then its nameplate (never
+  mouseover, which follows the pointer), rebinding on target, focus, and
+  nameplate changes; a mob's nameplate token can change as it leaves plate
+  range and comes back, its GUID does not. It forgets the mob when it dies
+  (`UNIT_HEALTH` through any unit showing it, by GUID), after the longest
+  Polymorph (50 s) plus 5 s, or on the next Polymorph. MTF never reads the aura; a resist cannot be seen (the
   combat log is closed), so a successful cast counts as landed.
 - On cast start (`UNIT_SPELLCAST_SENT`, author-approved), the group message
   "Sheeping %T; you spank it, you tank it" (the author's classic line, no
   credit), raid or party only, at most once per 3 s; switch and text on the
   Announce page.
-- When the cast succeeds, the moon raid marker (index 5) via `SetRaidTarget`,
-  skipped when the mob already has the moon; switch on the Polymorph page, on by
-  default. In a raid only leaders and assistants can mark.
+- When the cast succeeds, the moon raid marker (index 5) via `SetRaidTarget`;
+  switch on the Polymorph page, on by default. In a raid only leaders and
+  assistants can mark. SetRaidTarget toggles: a unit that already has the marker loses it (the
+  pinned /tm source; its "!" prefix skips an equal marker). GetRaidTargetIndex
+  is secret to AddOn code in combat, so the mark is skipped when the index is
+  readable and equal, or, unreadable, when this AddOn marked that mob (by GUID)
+  already. The mark goes on your target or focus when it is the mob, as
+  TankHelper marks `TARGET`. A player's own `/tm` macro would clash in combat
+  (the AddOn cannot see that mark), so the README says to turn the AddOn's
+  marking off when using one.
 - "! Polymorph" (author-approved, after the author's own, `polymorph.macro`):
   once you know Polymorph, `#showtooltip`, `/focus [@mouseover,harm,nodead]
   [nocombat,harm,nodead]`, `/cast [@focus,harm,nodead] Polymorph`. It does not
