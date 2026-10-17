@@ -486,7 +486,13 @@ local function OnCastSucceeded(castGUID)
         local unit = FindCastUnit(cast.target)
         guid = unit and ReadGUID(unit)
     end
+    -- A Polymorph cast on the mob under the mouse counts: mouseover checks the
+    -- cast and takes the moon, though the bar never binds to it; the bar finds
+    -- the mob when it becomes your focus, target, or a nameplate.
     local unit = FindUnit(guid)
+    if not unit and guid and ReadGUID("mouseover") == guid then
+        unit = "mouseover"
+    end
     if not unit or not UnitCanAttack("player", unit) then
         return
     end

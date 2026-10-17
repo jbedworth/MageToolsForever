@@ -285,7 +285,9 @@ frameworks without agreement.
   nameplate changes; a mob's nameplate token can change as it leaves plate
   range and comes back, its GUID does not. It forgets the mob when it dies
   (`UNIT_HEALTH` through any unit showing it, by GUID), after the longest
-  Polymorph (50 s) plus 5 s, or on the next Polymorph. MTF never reads the aura; a resist cannot be seen (the
+  Polymorph (50 s) plus 5 s, or on the next Polymorph. A cast on the mob
+  under the mouse counts (mouseover checks the cast and takes the moon); the
+  bar binds once the mob is your focus, target, or a nameplate. MTF never reads the aura; a resist cannot be seen (the
   combat log is closed), so a successful cast counts as landed.
 - On cast start (`UNIT_SPELLCAST_SENT`, author-approved), the group message
   "Sheeping %T; you spank it, you tank it" (the author's classic line, no
@@ -363,8 +365,9 @@ frameworks without agreement.
   group (the others anchored to the dragged frame for the drag; every
   center read before any moves, so the snap applies once), which snaps as
   one. Positions save as centers from UIParent's bottom left; resizing keeps
-  the center. A reset in combat says once that MTF frames move back after
-  combat.
+  the center. A drop after combat began waits: the group stays together and
+  snaps and saves on `PLAYER_REGEN_ENABLED`. A reset in combat says once that
+  MTF frames move back after combat.
 
 ### Planned (pass 2, agreed)
 
