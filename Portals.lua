@@ -143,17 +143,13 @@ function MTF.ResetPortalsPosition()
     PlaceBar()
 end
 
+-- Dragging and snapping: Layout.lua.
 local function StartDrag()
-    if MTF.db.locked or InCombatLockdown() then
-        return
-    end
-    bar:StartMoving()
+    MTF.BeginDrag(bar)
 end
 
 local function StopDrag()
-    bar:StopMovingOrSizing()
-    local point, _, relativePoint, x, y = bar:GetPoint()
-    MTF.db.portals.position = {point = point, relativePoint = relativePoint, x = x, y = y}
+    MTF.EndDrag(bar)
 end
 
 local function CreateButton(index)
@@ -287,6 +283,7 @@ function MTF.InitializePortals()
     bar:SetScript("OnDragStart", StartDrag)
     bar:SetScript("OnDragStop", StopDrag)
     bar.mover = MTF.CreateMover(bar)
+    MTF.RegisterMovable(bar, function(position) MTF.db.portals.position = position end)
     MTF.portalBar = bar
     for index = 1, MAX_BUTTONS do
         portals.buttons[index] = CreateButton(index)

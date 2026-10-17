@@ -24,7 +24,7 @@ local function contains(actual, fragment, context)
     end
 end
 
-local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua", "Chimes.lua", "Options.lua"}
+local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Layout.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua", "Chimes.lua", "Options.lua"}
 local SPELLS = {
     [5504] = "Conjure Water", [5505] = "Conjure Water", [5506] = "Conjure Water", [6127] = "Conjure Water",
     [587] = "Conjure Food", [597] = "Conjure Food", [990] = "Conjure Food", [6129] = "Conjure Food",
@@ -940,7 +940,7 @@ test("a missing client API disables MTF with one message naming it", function()
     equal(state.categories["Mage Tools Forever"], nil, "no settings page")
 end)
 test("a mixed install of old and new files is reported at login", function()
-    local state = fixture({files = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua",
+    local state = fixture({files = {"Commands.lua", "Core.lua", "Layout.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua",
         "Options.lua"}})
     equal(state.mtf.available, false)
     contains(state.last(), "missing InitializeChimes")
@@ -1618,7 +1618,7 @@ test("the absorb number can be hidden, and the break sound turned on", function(
     equal(state.mtf.ShieldDisplay.frame.text.text, "")
     equal(state.auraSoundCount, nil)
     state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(true)
-    equal(state.auraSoundCount, 40, "every rank of the seven known shields")
+    equal(state.auraSoundCount, 30, "every rank of the five shields a Mage can get")
     equal(state.auraSounds[1].trigger, 2, "on removal")
     equal(state.auraSounds[1].info.spellID, ICE_BARRIER)
     state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(false)
@@ -1669,15 +1669,18 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(said[1], "shown by MageToolsForever")
     state.clear()
     state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v1, ShieldForever v1")
+    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v2 (running), ShieldForever v1 (running)")
     local text = table.concat(state.messages, "|")
     contains(text, "the absorb total shows above your character")
     equal(text:find("failed", 1, true), nil, "every debug step ran")
 end)
-test("a newer shield display in another AddOn takes over", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 2}}})
+test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
+    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 3}}})
+    equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
+    local other = state.copies.ShieldForever.ShieldDisplay
+    other.Initialize({settings = function() return other.Sanitize({}) end, report = function() end})
     equal(state.mtf.ShieldDisplay.IsOwner(), false)
-    equal(state.mtf.ShieldDisplay.frame, nil)
+    equal(state.mtf.ShieldDisplay.frame, nil, "MTF stood down")
     local found = false
     for _, message in ipairs(state.messages) do
         if message:find("The shield display is shown by ShieldForever", 1, true) then found = true end
@@ -1691,7 +1694,7 @@ test("an icon per shield, shown by Blizzard's aura display, each in its own spot
     local ring = state.mtf.ShieldDisplay.frame
     local container = ring.icons
     equal(container.unit, "player")
-    equal(#container.slots, 7, "one slot per known shield")
+    equal(#container.slots, 5, "one slot per shield a Mage can get")
     equal(container.slots[1].key, "icebarrier")
     equal(container.slots[1].filter, "HELPFUL")
     equal(container.slots[1].ids[13033], true, "a set of every Ice Barrier rank, as the container requires")
@@ -1701,8 +1704,9 @@ test("an icon per shield, shown by Blizzard's aura display, each in its own spot
     equal(barrier.points[1][4], -51, "first of five spots (102 px wide), centered under the number")
     equal(ward.points[1][4] - barrier.points[1][4], 42, "Mana Shield's spot between them")
     equal(frost.points[1][4] - ward.points[1][4], 21)
-    equal(ring.iconButtons.sacrifice.points[1][4], ring.iconButtons.powerwordshield.points[1][4],
-        "other shields share the last spot")
+    equal(ring.iconButtons.powerwordshield.points[1][4] - frost.points[1][4], 21,
+        "Power Word: Shield in the last spot")
+    equal(ring.iconButtons.sacrifice, nil, "no Warlock shields on a Mage")
 end)
 test("Mana Shield drains with time in the inner crescent; absorb shields stay in the outer one", function()
     local state = mage()
@@ -2340,6 +2344,48 @@ local function drop(state, icon, x, y)
     icon:SetPoint("CENTER", nil, "BOTTOMLEFT", x / icon:GetEffectiveScale(), y / icon:GetEffectiveScale())
     icon.scripts.OnDragStop(icon)
 end
+
+-- Drags a frame by a handle (a child that takes the drag) and drops it at x, y.
+local function dropBy(state, frame, handle, x, y)
+    handle.scripts.OnDragStart(handle)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", nil, "BOTTOMLEFT", x / frame:GetEffectiveScale(), y / frame:GetEffectiveScale())
+    handle.scripts.OnDragStop(handle)
+end
+
+local function centerOf(state, frame)
+    local x, y = state.absCenter(frame)
+    return math.floor(x + 0.5), math.floor(y + 0.5)
+end
+
+test("every MTF frame snaps, not only the buff reminders; Shift-drag moves a snapped group", function()
+    local state = mage({known = {[3561] = true, [118] = true}})
+    state.slash("unlock")
+    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
+    local polymorph = state.env.MageToolsForeverPolymorph
+    dropBy(state, conjure, conjure, 300, 300)
+    local cx, cy = centerOf(state, conjure)
+    -- The portal bar, dropped near the conjure bar's right side, snaps 20 past it, tops aligned.
+    local px = cx + conjure.width / 2 + 20 + portals.width / 2
+    local py = cy + conjure.height / 2 - portals.height / 2
+    dropBy(state, portals, portals, px + 7, py - 5)
+    equal(select(1, centerOf(state, portals)), math.floor(px + 0.5))
+    equal(select(2, centerOf(state, portals)), math.floor(py + 0.5))
+    -- The Polymorph bar under the conjure bar, lefts aligned.
+    local mx = cx - conjure.width / 2 + polymorph.width / 2
+    local my = cy - conjure.height / 2 - 20 - polymorph.height / 2
+    dropBy(state, polymorph, polymorph, mx + 4, my + 6)
+    equal(select(1, centerOf(state, polymorph)), math.floor(mx + 0.5))
+    equal(select(2, centerOf(state, polymorph)), math.floor(my + 0.5))
+    equal(state.mtf.db.polymorph.position.relativePoint, "BOTTOMLEFT", "saved")
+    -- Shift-drag the conjure bar: the portal and Polymorph bars come along.
+    local portalX = select(1, centerOf(state, portals)) - cx
+    state.shift = true
+    dropBy(state, conjure, conjure, 600, 600)
+    local nx, ny = centerOf(state, conjure)
+    equal(select(1, centerOf(state, portals)) - nx, portalX, "the group kept its spacing")
+    equal(select(2, centerOf(state, polymorph)), ny - (cy - math.floor(my + 0.5)))
+end)
 
 test("reminder icons start in a row 20 apart, and a drop near another snaps beside it", function()
     local state = mage()

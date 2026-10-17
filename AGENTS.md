@@ -105,11 +105,22 @@ frameworks without agreement.
   defaults (`ShieldDisplay.Sanitize`). Core adapts it for MTF
   (`MTF.InitializeShield` and friends); the ring texture path follows the
   host's folder, so each host ships Textures/ShieldArc.tga.
-- Duplicates reconcile to one ring: each copy registers `{version, addon}` in
-  the global `ShieldForeverRegistry` as its file loads (before any
-  `PLAYER_LOGIN`); the newest `VERSION`, then the first registered, owns the
-  ring; the others draw nothing and say once which AddOn shows it. Bump
-  `VERSION` with every behavior change so the newest copy wins.
+- Duplicates reconcile to one ring: each copy registers in the global
+  `ShieldForeverRegistry` as its file loads (before any `PLAYER_LOGIN`), and
+  takes part only once its AddOn calls `Initialize` (MTF stays off on a
+  Warlock, WTF on a Mage), so login order never decides. Among the copies
+  taking part, the newest `VERSION`, then the first registered, draws the
+  ring; a copy that was drawing stands down when a newer one joins (protocol
+  2: each copy's start and stop are in the registry); the others draw
+  nothing and say once which AddOn shows it. Version 1 copies elect among
+  every registered copy. WTF ships the same file: keep both copies identical
+  and bump `VERSION` in both with every behavior change.
+- The icon row holds the player's own class's shields (`class` on each
+  entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
+  Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
+  Warlock's Shadow Ward, Sacrifice, Power Word: Shield. Break sounds cover
+  the same shields. Any other absorb fills the crescent in the other-shield
+  color without an icon; Paladin bubbles are immunities with no absorb.
 - A segmented crescent (white, tinted per shield) to the right of your
   character, filled from the bottom by a vertical StatusBar with your
   remaining absorb from any source, against the shield's size as it landed
@@ -312,14 +323,18 @@ frameworks without agreement.
   asked for in combat wait for `PLAYER_REGEN_ENABLED`. Each icon has its own position and size (50-200%, mouse
   wheel while unlocked, 10% steps), saved per character, and joins the one
   frame lock; `/mtf reset` restores places and sizes (a row, 20 apart).
-- Magnetic icons (author-approved): an icon dropped within 24 UIParent units
-  of a spot beside another shown icon (right, left, above, or below, centers
-  aligned, edges 20 apart, sizes taken into account) snaps there. Icons that
-  far apart and aligned (within 1.5) are snapped; Shift-dragging one moves its
-  whole snapped group (the others are anchored to it for the drag, then each
-  saved on its own), and the group snaps as one to icons outside it. Positions
-  save as the center from UIParent's bottom left; resizing keeps the center. A reset in combat says
-  once that MTF frames move back after combat.
+- Magnetic frames (author-approved, Layout.lua, the same as WTF's): every
+  movable MTF frame (the conjure, portal, and Polymorph bars and the buff
+  reminders; the shield display drags itself) registers a save function.
+  While unlocked, a frame dropped within 24 UIParent units of a spot beside
+  another shown frame snaps there, 20 apart, lined up by tops, centers, or
+  bottoms (lefts, centers, or rights when stacked), whichever is nearest.
+  Frames that far apart and overlapping are snapped; Shift-drag moves the
+  group (the others anchored to the dragged frame for the drag; every
+  center read before any moves, so the snap applies once), which snaps as
+  one. Positions save as centers from UIParent's bottom left; resizing keeps
+  the center. A reset in combat says once that MTF frames move back after
+  combat.
 
 ### Planned (pass 2, agreed)
 
@@ -329,7 +344,7 @@ frameworks without agreement.
 
 ## Project structure
 
-- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
+- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, loaded in that order, plus
   Textures/ShieldArc.tga and Textures/ShieldArcInner.tga. Shield.lua is the
   shared component above; keep it free of MTF references. Commands parses `/mtf`; Core owns saved settings and
@@ -428,7 +443,7 @@ frameworks without agreement.
 - Every release needs a `## <version>` section in CHANGELOG.md with player-facing
   changes; the builder puts it at the top of release-notes.md and fails
   without it.
-- Package only MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
+- Package only MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga, and
   Textures/ShieldArcInner.tga under the top-level `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
