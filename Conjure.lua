@@ -350,6 +350,23 @@ local function WriteMacro(name, body)
     end
 end
 
+-- For the other modules' macros (Polymorph): the same writer and slot check.
+-- Out of combat only.
+function MTF.CharacterMacrosAvailable()
+    return macros.available == true
+end
+
+function MTF.WriteCharacterMacro(name, body)
+    WriteMacro(name, body)
+end
+
+function MTF.DeleteCharacterMacro(name)
+    local index = GetMacroIndexByName(name)
+    if index > 0 then
+        DeleteMacro(index)
+    end
+end
+
 -- Macros change only out of combat; ApplyActions runs then.
 local function UpdateMacros(createRanks)
     if not MTF.db.conjure.macros or not macros.available then

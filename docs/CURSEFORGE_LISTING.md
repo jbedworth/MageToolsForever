@@ -66,7 +66,7 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 ### Polymorph bar
 - The sheeped mob's name and your Polymorph's time left, following the mob as you change target. If it breaks early, the bar empties so you see it.
 - As you start casting in a group: *"Sheeping Defias Pillager; you spank it, you tank it."* When it lands, the mob gets the moon marker.
-- Click the bar to sheep the same mob again; MTF targets it, casts, and returns you to your target.
+- Click the bar to sheep your focus again. A "! Polymorph" macro focuses the mob under your mouse and sheeps it.
 
 ### Buff reminders
 - An icon with a pulsing gold border for each buff you are missing out of combat: Arcane Intellect (also for group members who use mana, never warriors or rogues), your armor, and optionally Dampen or Amplify Magic.

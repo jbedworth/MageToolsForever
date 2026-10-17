@@ -133,6 +133,9 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       drags and resizes with the mouse wheel, and `/mtf reset` restores them;
       a drop near another icon snaps 20 apart and aligned, also with
       different sizes; Shift-drag moves the snapped group, a plain drag one icon.
+- [ ] "! Polymorph" on a bar: hovering a mob and pressing it focuses and
+      sheeps it, with the moon; the bar keeps its timer while you fight
+      another mob; a bar click sheeps the focus again.
 - [ ] Polymorph out of combat, click the bar to recast (it lands in combat),
       then click again in combat: each click recasts. A size change in combat
       applies after it.

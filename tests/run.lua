@@ -2209,8 +2209,8 @@ test("clicking the bar re-sheeps the mob by name and goes back to your target", 
     sheepTarget(state)
     castPolymorph(state)
     equal(holder.attributes.type1, "macro")
-    equal(holder.attributes.macrotext1, "/cleartarget\n/targetexact Defias Pillager\n"
-        .. "/cast [@target,harm,nodead] Polymorph\n/targetlasttarget")
+    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Pillager\n/cast [@target,harm,nodead] Polymorph\n/targetlasttarget")
     -- In combat the click cannot change; it follows after combat.
     state.combat = true
     sheepTarget(state, "Defias Bandit", "mob-2")
@@ -2221,8 +2221,8 @@ test("clicking the bar re-sheeps the mob by name and goes back to your target", 
     contains(holder.attributes.macrotext1, "Defias Pillager")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
-    equal(holder.attributes.macrotext1, "/cleartarget\n/targetexact Defias Bandit\n"
-        .. "/cast [@target,harm,nodead] Polymorph: Pig\n/targetlasttarget", "the same Polymorph you cast")
+    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph: Pig\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Bandit\n/cast [@target,harm,nodead] Polymorph: Pig\n/targetlasttarget", "the same Polymorph you cast")
 end)
 test("a Polymorph begun before combat sets the click before it lands in combat", function()
     local state = mage({known = {[POLYMORPH] = true}})
@@ -2231,8 +2231,8 @@ test("a Polymorph begun before combat sets the click before it lands in combat",
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-118", POLYMORPH)
     state.combat = true
     state.cast(POLYMORPH)
-    equal(holder.attributes.macrotext1, "/cleartarget\n/targetexact Defias Pillager\n"
-        .. "/cast [@target,harm,nodead] Polymorph\n/targetlasttarget", "ready for the whole fight")
+    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Pillager\n/cast [@target,harm,nodead] Polymorph\n/targetlasttarget", "ready for the whole fight")
     equal(state.env.MageToolsForeverPolymorphBar.shown, true)
 end)
 test("the click is there when the client knows Polymorph by its own spell ID", function()
@@ -2272,6 +2272,30 @@ test("a Polymorph that fails out of combat gives the click back to the sheep tha
     contains(holder.attributes.macrotext1, "Defias Bandit", "set as the cast starts")
     state.emit("UNIT_SPELLCAST_INTERRUPTED", "player", "cast-fail", POLYMORPH)
     contains(holder.attributes.macrotext1, "Defias Pillager", "back to the sheep that is up")
+end)
+test("\"! Polymorph\" focuses the mob and sheeps your focus, once you know Polymorph", function()
+    local state = mage()
+    equal(macroBody(state, "! Polymorph"), nil, "not before you learn Polymorph")
+    state.known[POLYMORPH] = true
+    state.emit("SPELLS_CHANGED")
+    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
+        .. "[nocombat,harm,nodead]\n/cast [@focus,harm,nodead] Polymorph")
+    state.settings.MTF_POLYMORPH_MACRO:SetValue(false)
+    equal(macroBody(state, "! Polymorph"), nil, "turning it off deletes it")
+end)
+test("the Polymorph bar follows your focus first, so it does not go blank when the plate drops", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(state)
+    state.units.nameplate4 = state.units.target
+    state.units.focus = state.units.target
+    castPolymorph(state)
+    local bar = state.env.MageToolsForeverPolymorphBar
+    equal(bar.container.unit, "focus")
+    state.units.target = {name = "Defias Bandit", guid = "mob-2", level = 20}
+    state.units.nameplate4 = nil
+    state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate4")
+    state.emit("PLAYER_TARGET_CHANGED")
+    equal(bar.container.unit, "focus", "still bound while you fight another mob")
 end)
 test("unlocked, the Polymorph bar shows a sample to drag", function()
     local state = mage()

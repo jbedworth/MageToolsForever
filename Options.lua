@@ -120,6 +120,10 @@ end
 
 local function AddPolymorphPage(parent)
     local page = Settings.RegisterVerticalLayoutSubcategory(parent, POLYMORPH_TITLE)
+    Flag(page, "MTF_POLYMORPH_MACRO", "Keep the Polymorph macro", "polymorph", "macro", true,
+        "Keep \"! Polymorph\" in your character macros for your action bars, once you know Polymorph: it focuses "
+            .. "the hostile mob under your mouse (or your target, out of combat) and sheeps your focus, which the "
+            .. "bar's click recasts on. Turning this off deletes it.", function() MTF.ApplyPolymorphMacro() end)
     Flag(page, "MTF_POLYMORPH_MARK", "Mark the sheep with the moon", "polymorph", "mark", true,
         "When your Polymorph cast succeeds, put the moon raid marker on the mob. In a raid the game "
             .. "lets only the leader and assistants mark.")
