@@ -2180,6 +2180,24 @@ test("clicking the bar re-sheeps the mob by name and goes back to your target", 
     equal(holder.attributes.macrotext1, "/cleartarget\n/targetexact Defias Bandit\n"
         .. "/cast [@target,harm,nodead] Polymorph: Pig\n/targetlasttarget", "the same Polymorph you cast")
 end)
+test("a Polymorph begun before combat sets the click before it lands in combat", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    sheepTarget(state)
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-118", POLYMORPH)
+    state.combat = true
+    state.cast(POLYMORPH)
+    equal(holder.attributes.macrotext1, "/cleartarget\n/targetexact Defias Pillager\n"
+        .. "/cast [@target,harm,nodead] Polymorph\n/targetlasttarget", "ready for the whole fight")
+    equal(state.env.MageToolsForeverPolymorphBar.shown, true)
+end)
+test("the click is there when the client knows Polymorph by its own spell ID", function()
+    local state = mage({spellbook = {{spellID = 900118, name = "Polymorph"}}, known = {[900118] = true}})
+    equal(state.env.MageToolsForeverPolymorph.shown, true, "known by its spellbook ID")
+    state.clear()
+    state.slash("debug_polymorph")
+    contains(state.messages[1], "known=true")
+end)
 test("unlocked, the Polymorph bar shows a sample to drag", function()
     local state = mage()
     state.slash("unlock")
