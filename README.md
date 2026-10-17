@@ -1,0 +1,214 @@
+# Mage Tools Forever
+
+Quality-of-life tools for Mages in World of Warcraft: Forever (beta). Each tool
+has its own switch on the main settings page and its own settings page in
+**Options → AddOns → Mage Tools Forever**, or type `/mtf`. Settings are saved
+per character.
+
+## Conjure
+
+A small bar with **Water**, **Food**, **Food & Water**, and **Mana Gem**
+buttons. **Bar size** on the Conjure settings page shrinks or grows it
+(50-150%); see [Moving frames](#moving-frames) to put it where you want.
+
+**Water and food**
+
+| Click | Friendly player targeted | No one targeted |
+|---|---|---|
+| Right | Conjures the best rank *they* can use | Conjures your best rank |
+| Left | Trades them your **share stack size** of the best they can use, or all you have of it if less | Eats or drinks your best |
+| Middle | Eats or drinks your own best | Same |
+
+- **Share stack size** (Conjure settings, 1 to 20, default 10): how much one
+  left-click trade gives. It never gives more, so the rest stays for the next
+  party member. As you click, MTF makes one stack of exactly that much, using
+  no extra bag space where it can: it tops up a smaller stack you already
+  have, or merges small ones. Only when all you carry is bigger stacks does
+  it need one free bag slot to split into, and then it tells you. It puts
+  the stack into the trade window and whispers the player (at most once
+  every 30 seconds per player; see [Announce](#announce)). Click Food after Water to add both to the same trade. You press
+  **Trade** yourself.
+- **Someone opens a trade with you?** While the trade window is open the
+  buttons serve your trade partner, whoever you have targeted: left-click
+  puts their share straight into the window, and right-click conjures what
+  they can use.
+- With none they can use, MTF tells you to conjure some first.
+- One cast doesn't make a full stack: right-click again until you have enough.
+  The button shows how many of the item it would use or give you carry.
+
+**Food & Water**, the third button, does both at once:
+
+- **Left-click** with a friend targeted (or a trade open) trades them a share
+  of water **and** food in one click, with one whisper. With no one targeted,
+  it eats and drinks your best.
+- **Right-click** conjures water, then food, in turn: the game allows one
+  spell per click.
+- **Middle-click** always eats and drinks your own best.
+
+**Mana gems**
+
+- Left- or middle-click uses your best mana gem; right-click conjures the best
+  rank you don't carry (you can carry one of each).
+- Before you learn Conjure Mana Agate (level 28), the button is greyed out and
+  tells you when it comes.
+
+**Macros for your action bars:** MTF keeps **! Water**, **! Food**,
+**! Food & Water**, and **! Mana Gem** in your character macros (each once you know its spell). Drag
+them from the Macros window to a bar: left-click eats, drinks, or uses;
+right-click conjures, also in combat. Turn **Keep conjure macros** off to
+remove them. (On Forever, `/click` macros do not press AddOn buttons, so these
+use the game's own `/use` and `/cast`.)
+
+The game lets the buttons change only out of combat, so a target or bag change
+in combat updates them when combat ends.
+
+## Portals
+
+A small bar with a button for each teleport and portal you know, teleports
+first, showing how many Runes of Teleportation or Runes of Portals you carry.
+The count is only information: MTF never stops a cast because it is zero, and
+the game decides. The buttons work in combat; a spell you learn in combat
+joins the bar when combat ends. When you open a portal in a group, MTF tells
+your raid or party where it goes, and when you teleport yourself, you emote
+it ("Dyre summons powerful arcane energies to whisk themselves away to
+Ironforge.") at your next key press or click, since the game allows emotes
+only then. **Bar size** is on the Portals settings
+page.
+
+## Polymorph bar
+
+A bar with your Polymorph's time left and the sheeped mob's name, in the same
+style as Warlock Tools Forever's DoT bars. It follows the mob when you change
+target, and if the Polymorph breaks early, the bar empties so you see it.
+
+- As you start casting in a group, MTF tells your party or raid: "Sheeping
+  Defias Pillager; you spank it, you tank it."
+- When the cast lands, MTF marks the mob with the moon. (In a raid, only the
+  leader and assistants can mark.)
+- **Click the bar** to sheep the same mob again: MTF targets it by name,
+  casts the same Polymorph, and goes back to your target. The game lets the
+  click change only out of combat, so after sheeping a different mob in
+  combat, the click catches up when combat ends. With several mobs of the same
+  name, it picks the nearest.
+- The marker switch and **Bar size** are on the Polymorph settings page.
+
+## Buff reminders
+
+An icon with a pulsing gold border for each buff you are missing, out of
+combat: **Arcane Intellect** (also for group members who use mana, with a
+count; the tooltip says who), your **armor** (Frost, Ice, or Mage Armor), and,
+if you turn it on, **Dampen or Amplify Magic**. Each icon disappears as soon as
+the buff is up, and they all hide in combat, when the game keeps buffs from
+AddOns.
+
+**Click an icon to cast the buff.** Arcane Intellect goes to you first, then
+to the first group member in range who lacks it; click again as each one
+lands until the icon goes away. With two or more missing, it casts Arcane
+Brilliance if you know it and carry Arcane Powder. Warriors and rogues are
+never counted or buffed. Armor recasts the armor you used last (or your best),
+and Dampen or Amplify Magic the same.
+
+Unlock frames to drag each icon where you want it and scroll over it to
+resize it. Icons are magnetic: drop one near another and it snaps beside it,
+20 pixels apart and lined up. Hold **Shift** while dragging to move a whole
+snapped group together.
+
+## Announce
+
+The Announce settings page holds every message MTF sends, each with its own
+switch and an editable text: the whispers for Water, Food, and Food & Water
+trades, the group messages for a portal and a Polymorph, and the teleport
+emote. `%C` is the
+count, `%I` the item, `%T` the player's full name, `%D` the portal's or
+teleport's city, and, in the emote, `%T` is you and `%Z` your zone when it is sent. Press Enter to keep
+an edit or Escape to undo it; **Defaults** restores the page.
+
+## Shield display
+
+A segmented crescent beside your character that fills with your remaining shield:
+**Ice Barrier** (blue), **Mana Shield** (purple), **Fire Ward** (orange),
+**Frost Ward** (pale blue), and shields others put on you, like a Priest's
+**Power Word: Shield**: full when the shield lands and draining as it absorbs,
+with the amount as a number below. It tracks live, also in
+combat, and drops away the moment the shield is used up.
+
+- With several shields up (say Ice Barrier, Mana Shield, and a ward), the
+  crescent shows their combined total, refilled as each one lands, and a row
+  of icons under the number shows which are up, each in its own spot; each
+  icon drops the moment its shield breaks or ends, also in combat.
+- Mana Shield spends your mana rather than adding to your absorb, so the game
+  leaves it out of the total. It gets its own thinner crescent, nested
+  inside, that drains with its time left and disappears when it breaks or
+  ends. Absorb shields drain only as they absorb, and drop when they break or
+  expire.
+- The shield display works for any shield, so other AddOns can ship it too.
+  If more than one does, you still see one ring, from the newest version.
+- **Display size** on the Shield settings page shrinks or grows it (50-150%).
+- While frames are unlocked (see [Moving frames](#moving-frames)) it shows a
+  full sample of every part to drag; locked (the default), it never blocks
+  clicks on the world.
+- Optional: a sound when a shield ends or breaks, also in combat.
+
+## Cooldown chimes
+
+A sound just before a spell is ready again, also in combat: **Blink**,
+**Frost Nova**, **Counterspell**, **Ice Block**, **Ice Barrier**, and
+**Evocation** by default; Cold Snap, the wards, Cone of Cold, Fire Blast,
+Presence of Mind, Arcane Power, and Combustion are off by default. Each spell
+has its own switch and its own sound, picked from a menu like the Cooldown
+Manager's sound picker: an Interface submenu of the game's sounds, the
+Cooldown Manager's 93 alert sounds in its own submenus (Animals, Devices,
+Impacts, Instruments, Short, Warcraft 2, Warcraft 3), and Text to Speech,
+which says the spell's name ("Blink ready"). Every spell starts on Talent ready. Pick how early it plays (default half a
+second) on the Cooldown Chimes settings page.
+
+The game hides cooldowns from AddOns in combat, so MTF times each one from your
+cast, using the real cooldown it read the last time you cast the spell out of
+combat. Cold Snap cancels the Frost chimes, since it makes them ready at once.
+
+## Moving frames
+
+All MTF frames move together. Tick **Unlock frames to move them** on the
+main MTF settings page, or type `/mtf unlock`: every MTF frame (the
+conjure, portal, and Polymorph bars, the buff reminders, and the shield
+display) gets a gold outline, and you can drag them; scroll over a buff
+reminder to resize it. Untick it, or
+type `/mtf lock`, to lock them again. `/mtf reset` puts them back in their
+default places and sizes. Everything starts locked.
+
+While unlocked, a faint grid covers the screen, with red lines through its
+center, so you can line frames up. Turn off **Show a grid while unlocked** on
+the main settings page if you'd rather not see it.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/mtf` or `/mtf options` | Open the settings |
+| `/mtf conjure` | Show the food, water, and gems you carry, and the share size |
+| `/mtf unlock` | Unlock every MTF frame, so you can drag them |
+| `/mtf lock` | Lock them again where they are |
+| `/mtf reset` | Move the MTF frames back to their default places |
+| `/mtf debug_conjure` | Diagnostics: each conjure rank as the client knows it, macros, recent trades |
+| `/mtf debug_shield` | Diagnostics: the absorb APIs and the shields MTF tracks |
+| `/mtf debug_chimes` | Diagnostics: each chime spell, its cooldown, and the sound |
+| `/mtf debug_portals` | Diagnostics: each teleport and portal as the client knows it, and your runes |
+| `/mtf debug_polymorph` | Diagnostics: the Polymorph IDs, the sheeped mob, the click, and the marker |
+| `/mtf debug_reminders` | Diagnostics: each buff reminder and who lacks the buff |
+| `/mtf debug_click` | Diagnostics: what each conjure button does for each mouse button |
+
+`/magetools` works the same, in case another AddOn uses `/mtf`.
+
+## Compatibility
+
+Beta: tested on the Forever beta client 1.60.1. MTF keeps working on later beta
+builds; if a client update removes an API it needs, it turns that feature off
+with one chat message. Spell and item IDs are Classic's; `/mtf debug_conjure`
+shows what your client knows.
+
+WowUp users (2.24.0 or later): install from the repository URL; GitHub releases
+carry the Forever metadata WowUp needs.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
