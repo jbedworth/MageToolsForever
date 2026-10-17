@@ -170,15 +170,19 @@ end
 local function Layout()
     local settings = MTF.db.polymorph
     local sample = not MTF.db.locked
-    holder:SetScale(settings.scale / 100)
-    bar:SetScale(settings.scale / 100)
     bar.mover:SetShown(sample)
     if not settings.enabled then
         bar:Hide()
         return
     end
     if sheep.guid then
-        bar.name:SetText(sheep.mobName)
+        -- In combat the click cannot follow a new mob: say whom it sheeps.
+        local click = holder.mobName
+        if click and click ~= sheep.mobName then
+            bar.name:SetText(sheep.mobName .. "  |cff999999(click: " .. click .. ")|r")
+        else
+            bar.name:SetText(sheep.mobName)
+        end
         bar:Show()
     elseif sample then
         bar.name:SetText(SAMPLE_NAME)
@@ -196,6 +200,12 @@ local function ApplyClick()
     end
     sheep.clickDirty = false
     local settings = MTF.db.polymorph
+    -- The holder is secure: it changes only here, out of combat. A secure
+    -- change in combat is blocked, and in client a Polymorph that landed in
+    -- combat once rescaled it there, after which its clicks failed. The bar
+    -- scales with it, so they never drift apart.
+    holder:SetScale(settings.scale / 100)
+    bar:SetScale(settings.scale / 100)
     local name, spell = sheep.clickName, sheep.clickSpell
     if name and spell then
         -- A missing mob leaves no target, so nothing else gets sheeped.
@@ -209,6 +219,7 @@ local function ApplyClick()
     holder.mobName, holder.spellName = name, spell
     -- Shown while unlocked even before you learn Polymorph, so it can be placed.
     holder:SetShown(settings.enabled and (KnowsPolymorph() or not MTF.db.locked))
+    Layout()
 end
 
 local function Forget()
@@ -219,7 +230,7 @@ local function Forget()
 end
 
 local function Track(guid, mobName, spellName)
-    sheep.guid, sheep.mobName = guid, mobName
+    sheep.guid, sheep.mobName, sheep.spellName = guid, mobName, spellName
     sheep.clickName, sheep.clickSpell = mobName, spellName
     local token = {}
     sheep.token = token
@@ -386,6 +397,7 @@ local function OnCastSent(target, castGUID, spellID)
     -- now, while the game still allows it.
     if not InCombatLockdown() then
         sheep.clickName, sheep.clickSpell = target, C_Spell.GetSpellName(spellID)
+        sheep.casts[castGUID].setClick = true
         ApplyClick()
     end
 end
@@ -443,7 +455,15 @@ events:SetScript("OnEvent", function(_, event, unit, first, second, third)
         OnCastSucceeded(first)
     elseif event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED" then
         if not MTF.IsSecret(first) then
+            local cast = sheep.casts[first]
             sheep.casts[first] = nil
+            -- A cast that never landed gives the click back to the sheep that
+            -- is up, or clears it.
+            if cast and cast.setClick then
+                sheep.clickName = sheep.mobName
+                sheep.clickSpell = sheep.mobName and sheep.spellName or nil
+                ApplyClick()
+            end
         end
     elseif event == "UNIT_HEALTH" then
         if sheep.guid and bar.boundUnit == unit and IsDead(unit) then

@@ -618,7 +618,11 @@ local function fixture(options)
         function object:SetDesaturated(value) self.desaturated = value == true end
         function object:EnableMouse(value) self.mouse = value == true end
         function object:SetAlpha(value) self.alpha = value end
-        function object:SetScale(value) self.scale = value end
+        -- As in client, secure frames refuse layout changes in combat.
+        function object:SetScale(value)
+            if state.combat and self.protected then error("SetScale in combat") end
+            self.scale = value
+        end
         function object:GetEffectiveScale()
             local parentScale = 1
             if self.parent and self.parent.GetEffectiveScale then parentScale = self.parent:GetEffectiveScale() end
@@ -684,8 +688,14 @@ local function fixture(options)
             self.shown = false
         end
         function object:IsShown() return self.shown end
-        function object:SetPoint(...) self.points[#self.points + 1] = {...} end
-        function object:ClearAllPoints() self.points = {} end
+        function object:SetPoint(...)
+            if state.combat and self.protected then error("SetPoint in combat") end
+            self.points[#self.points + 1] = {...}
+        end
+        function object:ClearAllPoints()
+            if state.combat and self.protected then error("ClearAllPoints in combat") end
+            self.points = {}
+        end
         function object:GetPoint()
             -- As in client, a frame with no points returns nothing.
             local point = self.points[#self.points]
@@ -1618,7 +1628,7 @@ test("the absorb number can be hidden, and the break sound turned on", function(
     equal(state.mtf.ShieldDisplay.frame.text.text, "")
     equal(state.auraSoundCount, nil)
     state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(true)
-    equal(state.auraSoundCount, 30, "every rank of the five shields a Mage can get")
+    equal(state.auraSoundCount, 33, "every rank of the six shields a Mage can get")
     equal(state.auraSounds[1].trigger, 2, "on removal")
     equal(state.auraSounds[1].info.spellID, ICE_BARRIER)
     state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(false)
@@ -1669,13 +1679,13 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(said[1], "shown by MageToolsForever")
     state.clear()
     state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v2 (running), ShieldForever v1 (running)")
+    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v3 (running), ShieldForever v1 (running)")
     local text = table.concat(state.messages, "|")
     contains(text, "the absorb total shows above your character")
     equal(text:find("failed", 1, true), nil, "every debug step ran")
 end)
 test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 3}}})
+    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 4}}})
     equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
     local other = state.copies.ShieldForever.ShieldDisplay
     other.Initialize({settings = function() return other.Sanitize({}) end, report = function() end})
@@ -1694,14 +1704,14 @@ test("an icon per shield, shown by Blizzard's aura display, each in its own spot
     local ring = state.mtf.ShieldDisplay.frame
     local container = ring.icons
     equal(container.unit, "player")
-    equal(#container.slots, 5, "one slot per shield a Mage can get")
+    equal(#container.slots, 6, "one slot per shield a Mage can get, Blessing of Protection included")
     equal(container.slots[1].key, "icebarrier")
     equal(container.slots[1].filter, "HELPFUL")
     equal(container.slots[1].ids[13033], true, "a set of every Ice Barrier rank, as the container requires")
     equal(container.slots[1].ids[4], nil, "not a list")
     -- The engine's shown state is secret, so each icon is placed once, in its spot.
     local barrier, ward, frost = ring.iconButtons.icebarrier, ring.iconButtons.fireward, ring.iconButtons.frostward
-    equal(barrier.points[1][4], -51, "first of five spots (102 px wide), centered under the number")
+    equal(barrier.points[1][4], -61.5, "first of six spots (123 px wide), centered under the number")
     equal(ward.points[1][4] - barrier.points[1][4], 42, "Mana Shield's spot between them")
     equal(frost.points[1][4] - ward.points[1][4], 21)
     equal(ring.iconButtons.powerwordshield.points[1][4] - frost.points[1][4], 21,
@@ -2177,7 +2187,8 @@ test("clicking the bar re-sheeps the mob by name and goes back to your target", 
     sheepTarget(state, "Defias Bandit", "mob-2")
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Bandit", "cast-28272", 28272)
     state.cast(28272)
-    equal(state.env.MageToolsForeverPolymorphBar.name.text, "Defias Bandit", "the bar shows in combat")
+    equal(state.env.MageToolsForeverPolymorphBar.name.text, "Defias Bandit  |cff999999(click: Defias Pillager)|r",
+        "the bar shows in combat, and says whom its click still sheeps")
     contains(holder.attributes.macrotext1, "Defias Pillager")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
@@ -2201,6 +2212,37 @@ test("the click is there when the client knows Polymorph by its own spell ID", f
     state.clear()
     state.slash("debug_polymorph")
     contains(state.messages[1], "known=true")
+end)
+test("a recast from the bar that lands in combat leaves the click working", function()
+    -- In client: the first click recast fine, and every click after failed,
+    -- because the landing recast rescaled the secure holder in combat.
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    sheepTarget(state)
+    castPolymorph(state)
+    local macro = holder.attributes.macrotext1
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-again", POLYMORPH)
+    state.combat = true
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-again", POLYMORPH)
+    state.emit("PLAYER_TARGET_CHANGED")
+    state.settings.MTF_POLYMORPH_SCALE:SetValue(80)
+    equal(holder.attributes.macrotext1, macro, "the click still sheeps the mob")
+    equal(holder.scale, 1, "nothing secure changed in combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(holder.scale, 0.8, "the size applies after combat")
+    equal(state.env.MageToolsForeverPolymorphBar.scale, 0.8, "the bar with it")
+end)
+test("a Polymorph that fails out of combat gives the click back to the sheep that is up", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    sheepTarget(state)
+    castPolymorph(state)
+    sheepTarget(state, "Defias Bandit", "mob-2")
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Bandit", "cast-fail", POLYMORPH)
+    contains(holder.attributes.macrotext1, "Defias Bandit", "set as the cast starts")
+    state.emit("UNIT_SPELLCAST_INTERRUPTED", "player", "cast-fail", POLYMORPH)
+    contains(holder.attributes.macrotext1, "Defias Pillager", "back to the sheep that is up")
 end)
 test("unlocked, the Polymorph bar shows a sample to drag", function()
     local state = mage()

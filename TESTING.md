@@ -133,6 +133,11 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       drags and resizes with the mouse wheel, and `/mtf reset` restores them;
       a drop near another icon snaps 20 apart and aligned, also with
       different sizes; Shift-drag moves the snapped group, a plain drag one icon.
+- [ ] Polymorph out of combat, click the bar to recast (it lands in combat),
+      then click again in combat: each click recasts. A size change in combat
+      applies after it.
+- [ ] A Blessing of Protection from a Paladin, also in combat, draws the gold
+      innermost arc and its icon; `/mtf debug_shield` confirms the IDs.
 - [ ] The conjure, portal, and Polymorph bars snap to each other and to the
       buff reminders too; a Shift-dragged group keeps its spacing when it snaps.
 - [ ] With WTF also installed: on a Mage the shield display shows (MTF's), on
