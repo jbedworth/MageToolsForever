@@ -15,7 +15,7 @@
 
 ```sh
 .tools/luarocks-3.13.0-win32/win32/lua5.1/bin/lua5.1.exe tests/run.lua
-.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Conjure.lua Portals.lua Polymorph.lua Reminders.lua Shield.lua Chimes.lua Options.lua tests/run.lua
+.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Layout.lua Conjure.lua Portals.lua Polymorph.lua Reminders.lua Shield.lua Chimes.lua Options.lua tests/run.lua
 .tools/python-3.13.7/python.exe -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -133,6 +133,19 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       drags and resizes with the mouse wheel, and `/mtf reset` restores them;
       a drop near another icon snaps 20 apart and aligned, also with
       different sizes; Shift-drag moves the snapped group, a plain drag one icon.
+- [ ] "! Polymorph" on a bar: hovering a mob and pressing it focuses and
+      sheeps it, with the moon; the bar keeps its timer while you fight
+      another mob; a bar click sheeps the focus again.
+- [ ] Polymorph out of combat, click the bar to recast (it lands in combat),
+      then click again in combat: each click recasts. A size change in combat
+      applies after it.
+- [ ] A Blessing of Protection from a Paladin, also in combat, draws the gold
+      innermost arc and its icon; `/mtf debug_shield` confirms the IDs.
+- [ ] The conjure, portal, and Polymorph bars snap to each other and to the
+      buff reminders too; a Shift-dragged group keeps its spacing when it snaps.
+- [ ] With WTF also installed: on a Mage the shield display shows (MTF's), on
+      a Warlock it shows too (WTF's), each with only its class's shields and
+      Power Word: Shield in the icon row.
 - [ ] Announce page: switches and texts save, Enter keeps, Escape undoes,
       Defaults restores, the page scrolls, and each whisper uses its text.
 - [ ] Unlocked: the grid covers the screen under every frame, red lines

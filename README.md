@@ -85,12 +85,18 @@ target, and if the Polymorph breaks early, the bar empties so you see it.
   Defias Pillager; you spank it, you tank it."
 - When the cast lands, MTF marks the mob with the moon. (In a raid, only the
   leader and assistants can mark.)
-- **Click the bar** to sheep the same mob again: MTF targets it by name,
-  casts the same Polymorph, and goes back to your target. The game lets the
+- **"! Polymorph"** in your character macros (once you know Polymorph) focuses
+  the hostile mob under your mouse (or your target, out of combat) and sheeps
+  your focus. The bar follows your focus, so it keeps the timer while you fight
+  something else.
+- **Click the bar** to sheep your focus again; with no focus, MTF targets the
+  mob by name, casts the same Polymorph, and goes back to your target. The game lets the
   click change only out of combat, so after sheeping a different mob in
   combat, the click catches up when combat ends. With several mobs of the same
   name, it picks the nearest.
-- The marker switch and **Bar size** are on the Polymorph settings page.
+- The marker switch and **Bar size** are on the Polymorph settings page. If you
+  mark with your own `/tm` macro, turn MTF's marker off: the game toggles a
+  marker that is set twice, and in combat MTF cannot see yours.
 
 ## Buff reminders
 
@@ -109,9 +115,8 @@ never counted or buffed. Armor recasts the armor you used last (or your best),
 and Dampen or Amplify Magic the same.
 
 Unlock frames to drag each icon where you want it and scroll over it to
-resize it. Icons are magnetic: drop one near another and it snaps beside it,
-20 pixels apart and lined up. Hold **Shift** while dragging to move a whole
-snapped group together.
+resize it; like every MTF frame, they snap together (see
+[Moving frames](#moving-frames)).
 
 ## Announce
 
@@ -136,13 +141,16 @@ combat, and drops away the moment the shield is used up.
   crescent shows their combined total, refilled as each one lands, and a row
   of icons under the number shows which are up, each in its own spot; each
   icon drops the moment its shield breaks or ends, also in combat.
+- A Paladin's **Blessing of Protection** on you has no absorb either: it shows
+  as a gold arc innermost of all, draining with its time left.
 - Mana Shield spends your mana rather than adding to your absorb, so the game
   leaves it out of the total. It gets its own thinner crescent, nested
   inside, that drains with its time left and disappears when it breaks or
   ends. Absorb shields drain only as they absorb, and drop when they break or
   expire.
 - The shield display works for any shield, so other AddOns can ship it too.
-  If more than one does, you still see one ring, from the newest version.
+  If more than one does (Warlock Tools Forever ships it too), you still see one
+  ring, from the newest version among the AddOns running on your character.
 - **Display size** on the Shield settings page shrinks or grows it (50-150%).
 - While frames are unlocked (see [Moving frames](#moving-frames)) it shows a
   full sample of every part to drag; locked (the default), it never blocks
@@ -172,7 +180,9 @@ All MTF frames move together. Tick **Unlock frames to move them** on the
 main MTF settings page, or type `/mtf unlock`: every MTF frame (the
 conjure, portal, and Polymorph bars, the buff reminders, and the shield
 display) gets a gold outline, and you can drag them; scroll over a buff
-reminder to resize it. Untick it, or
+reminder to resize it. Frames are magnetic: drop one near another and it
+snaps beside it, 20 pixels apart and lined up. Hold **Shift** while dragging
+to move a whole snapped group together. Untick it, or
 type `/mtf lock`, to lock them again. `/mtf reset` puts them back in their
 default places and sizes. Everything starts locked.
 

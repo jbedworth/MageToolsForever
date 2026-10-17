@@ -105,11 +105,29 @@ frameworks without agreement.
   defaults (`ShieldDisplay.Sanitize`). Core adapts it for MTF
   (`MTF.InitializeShield` and friends); the ring texture path follows the
   host's folder, so each host ships Textures/ShieldArc.tga.
-- Duplicates reconcile to one ring: each copy registers `{version, addon}` in
-  the global `ShieldForeverRegistry` as its file loads (before any
-  `PLAYER_LOGIN`); the newest `VERSION`, then the first registered, owns the
-  ring; the others draw nothing and say once which AddOn shows it. Bump
-  `VERSION` with every behavior change so the newest copy wins.
+- Duplicates reconcile to one ring: each copy registers in the global
+  `ShieldForeverRegistry` as its file loads (before any `PLAYER_LOGIN`), and
+  takes part only once its AddOn calls `Initialize` (MTF stays off on a
+  Warlock, WTF on a Mage), so login order never decides. Among the copies
+  taking part, the newest `VERSION`, then the first registered, draws the
+  ring; a copy that was drawing stands down when a newer one joins (protocol
+  2: each copy's start and stop are in the registry); the others draw
+  nothing and say once which AddOn shows it. Version 1 copies elect among
+  every registered copy. WTF ships the same file: keep both copies identical
+  and bump `VERSION` in both with every behavior change.
+- Version 3: bubbles (Divine Shield, Divine Protection: Paladin; Blessing
+  of Protection: anyone) are timed, drawing a gold innermost crescent
+  (Textures/ShieldArcInnermost.tga) that drains with their time left
+  (Classic IDs; check on Forever). In combat the display stays shown, since
+  buffs others cast cannot be read: the outer crescent is invisible with no
+  absorb, and the engine shows each icon and timed crescent only while its
+  buff is up.
+- The icon row holds the player's own class's shields (`class` on each
+  entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
+  Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
+  Warlock's Shadow Ward, Sacrifice, Power Word: Shield. Break sounds cover
+  the same shields. Any other absorb fills the crescent in the other-shield
+  color without an icon; Paladin bubbles are immunities with no absorb.
 - A segmented crescent (white, tinted per shield) to the right of your
   character, filled from the bottom by a vertical StatusBar with your
   remaining absorb from any source, against the shield's size as it landed
@@ -262,27 +280,52 @@ frameworks without agreement.
   `SetDurationText`; a dim line behind it shows a broken Polymorph. The mob
   comes from your own cast events: `UNIT_SPELLCAST_SENT` names the target,
   matched to a unit for its GUID; on `UNIT_SPELLCAST_SUCCEEDED` the bar binds
-  to the mob's nameplate, else target, focus, or mouseover, rebinding on
-  target, focus, and nameplate changes. It forgets the mob when it dies
-  (`UNIT_HEALTH`), after the longest Polymorph (50 s) plus 5 s, or on the
-  next Polymorph. MTF never reads the aura; a resist cannot be seen (the
+  to the mob through your focus, then target, then its nameplate (never
+  mouseover, which follows the pointer), rebinding on target, focus, and
+  nameplate changes; a mob's nameplate token can change as it leaves plate
+  range and comes back, its GUID does not. It forgets the mob when it dies
+  (`UNIT_HEALTH` through any unit showing it, by GUID), after the longest
+  Polymorph (50 s) plus 5 s, or on the next Polymorph. A cast on the mob
+  under the mouse counts (mouseover checks the cast and takes the moon); the
+  bar binds once the mob is your focus, target, or a nameplate. MTF never reads the aura; a resist cannot be seen (the
   combat log is closed), so a successful cast counts as landed.
 - On cast start (`UNIT_SPELLCAST_SENT`, author-approved), the group message
   "Sheeping %T; you spank it, you tank it" (the author's classic line, no
   credit), raid or party only, at most once per 3 s; switch and text on the
   Announce page.
-- When the cast succeeds, the moon raid marker (index 5) via `SetRaidTarget`,
-  skipped when the mob already has the moon; switch on the Polymorph page, on by
-  default. In a raid only leaders and assistants can mark.
-- Click to re-sheep (author-approved, "if we can"): the bar sits on a secure
+- When the cast succeeds, the moon raid marker (index 5) via `SetRaidTarget`;
+  switch on the Polymorph page, on by default. In a raid only leaders and
+  assistants can mark. SetRaidTarget toggles: a unit that already has the marker loses it (the
+  pinned /tm source; its "!" prefix skips an equal marker). GetRaidTargetIndex
+  is secret to AddOn code in combat, so the mark is skipped when the index is
+  readable and equal, or, unreadable, when this AddOn marked that mob (by GUID)
+  already. The mark goes on your target or focus when it is the mob, as
+  TankHelper marks `TARGET`. A player's own `/tm` macro would clash in combat
+  (the AddOn cannot see that mark), so the README says to turn the AddOn's
+  marking off when using one.
+- "! Polymorph" (author-approved, after the author's own, `polymorph.macro`):
+  once you know Polymorph, `#showtooltip`, `/focus [@mouseover,harm,nodead]
+  [nocombat,harm,nodead]`, `/cast [@focus,harm,nodead] Polymorph`. It does not
+  `/tm`: MTF marks on landing, and a second mark would toggle it off.
+  The bar finds the sheep through your focus, then target, then its nameplate.
+- Click to re-sheep (author-approved, "if we can"; on your focus first since
+  the author's focus workflow: `/cast [@focus,harm,nodead] <spell>`,
+  `/stopmacro [@focus,exists]`, then by name): the bar sits on a secure
   button (`MageToolsForeverPolymorph`, the drag anchor); the visible bar is an
   ordinary frame anchored to it, so it shows and hides in combat. The macro is
   `/cleartarget`, `/targetexact <mob>`, `/cast [@target,harm,nodead]
   <the Polymorph you cast>`, `/targetlasttarget`: a missing mob leaves no
   target, so nothing else is sheeped. Attributes change only out of combat;
   a Polymorph begun in combat on another mob updates the click when combat
-  ends. `/targetexact` picks the nearest mob of that name, so same-named mobs
-  can be confused. Verify `/targetlasttarget` after `/cleartarget` in client.
+  ends, and until then the bar names the mob its click still sheeps. A cast
+  that fails out of combat gives the click back to the sheep that is up.
+  The holder (and the bar with it) is scaled only there too: in client, a
+  recast from the bar that landed in combat rescaled the secure holder, and
+  every click after failed. Tests make secure frames refuse SetScale,
+  SetPoint, ClearAllPoints, Show, Hide, and SetAttribute in combat, as the
+  client does. `/targetexact` picks the nearest mob of that name, so
+  same-named mobs can be confused. Verify `/targetlasttarget` after
+  `/cleartarget` in client.
 
 ### Buff reminders (built)
 
@@ -312,14 +355,19 @@ frameworks without agreement.
   asked for in combat wait for `PLAYER_REGEN_ENABLED`. Each icon has its own position and size (50-200%, mouse
   wheel while unlocked, 10% steps), saved per character, and joins the one
   frame lock; `/mtf reset` restores places and sizes (a row, 20 apart).
-- Magnetic icons (author-approved): an icon dropped within 24 UIParent units
-  of a spot beside another shown icon (right, left, above, or below, centers
-  aligned, edges 20 apart, sizes taken into account) snaps there. Icons that
-  far apart and aligned (within 1.5) are snapped; Shift-dragging one moves its
-  whole snapped group (the others are anchored to it for the drag, then each
-  saved on its own), and the group snaps as one to icons outside it. Positions
-  save as the center from UIParent's bottom left; resizing keeps the center. A reset in combat says
-  once that MTF frames move back after combat.
+- Magnetic frames (author-approved, Layout.lua, the same as WTF's): every
+  movable MTF frame (the conjure, portal, and Polymorph bars and the buff
+  reminders; the shield display drags itself) registers a save function.
+  While unlocked, a frame dropped within 24 UIParent units of a spot beside
+  another shown frame snaps there, 20 apart, lined up by tops, centers, or
+  bottoms (lefts, centers, or rights when stacked), whichever is nearest.
+  Frames that far apart and overlapping are snapped; Shift-drag moves the
+  group (the others anchored to the dragged frame for the drag; every
+  center read before any moves, so the snap applies once), which snaps as
+  one. Positions save as centers from UIParent's bottom left; resizing keeps
+  the center. A drop after combat began waits: the group stays together and
+  snaps and saves on `PLAYER_REGEN_ENABLED`. A reset in combat says once that
+  MTF frames move back after combat.
 
 ### Planned (pass 2, agreed)
 
@@ -329,9 +377,9 @@ frameworks without agreement.
 
 ## Project structure
 
-- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
+- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, loaded in that order, plus
-  Textures/ShieldArc.tga and Textures/ShieldArcInner.tga. Shield.lua is the
+  Textures/ShieldArc.tga, Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga. Shield.lua is the
   shared component above; keep it free of MTF references. Commands parses `/mtf`; Core owns saved settings and
   their defaults, the login banner, class and install checks, slash conflict
   reporting, the hardware-input hooks trade placement waits for, and startup;
@@ -353,8 +401,8 @@ frameworks without agreement.
   Bedworth, and the release builder requires that exact notice.
 - The TOC uses `## Category: Mage`; keep it identical to the CurseForge main
   category, because the in-game AddOn list groups by exact text.
-- The runtime assets are Textures/ShieldArc.tga and ShieldArcInner.tga;
-  regenerate both with scripts/build_arc.py. Add no other runtime assets
+- The runtime assets are Textures/ShieldArc.tga, ShieldArcInner.tga, and
+  ShieldArcInnermost.tga; regenerate them with scripts/build_arc.py. Add no other runtime assets
   without agreement.
 - Git origin: git@github.com:jbedworth/MageToolsForever.git. Inspect Git state
   before acting and preserve user work. Text is LF under .gitattributes.
@@ -428,9 +476,9 @@ frameworks without agreement.
 - Every release needs a `## <version>` section in CHANGELOG.md with player-facing
   changes; the builder puts it at the top of release-notes.md and fails
   without it.
-- Package only MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
-  Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga, and
-  Textures/ShieldArcInner.tga under the top-level `MageToolsForever/` folder, named
+- Package only MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
+  Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga,
+  Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga under the top-level `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
   `release.json` (flavor `forever`) attached for WowUp.
 - Publishing requires repository variables `ENABLE_GITHUB_RELEASES='true'` and,

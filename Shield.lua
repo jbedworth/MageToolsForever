@@ -24,8 +24,11 @@ local addonName, ns = ...
 -- the shield's length; out of combat your buffs are read too, so a shield that
 -- broke early hides then.
 --
--- Shields with no absorb amount (Mana Shield) drain with time in the inner
--- crescent instead (see `timed` below).
+-- Shields with no absorb amount drain with time instead (see `timed` below):
+-- Mana Shield in the inner crescent, and bubbles (Divine Shield, Divine
+-- Protection, Blessing of Protection: immunities with only a duration) in the
+-- innermost one (author-approved: concentric arcs where they can work, by
+-- time, since the client gives AddOns only the combined absorb).
 --
 -- Several shields can be up at once (Ice Barrier, Mana Shield, and a ward).
 -- The client gives AddOns only the combined absorb, so the crescent shows the
@@ -38,16 +41,22 @@ local addonName, ns = ...
 -- absorb points on Forever.
 --
 -- Several AddOns may ship this file. Each copy registers in the shared
--- ShieldForeverRegistry as its file loads, before any PLAYER_LOGIN; at login
--- the newest version wins, the first registered on a tie, and only that copy
--- draws the ring. The others stand down and say which AddOn shows it.
+-- ShieldForeverRegistry as its file loads, before any PLAYER_LOGIN. A copy
+-- takes part only once its AddOn initializes it (an AddOn may stay off, as
+-- MTF does on a Warlock), so login order never decides: among the copies
+-- taking part, the newest version draws the ring, the first registered on a
+-- tie. A copy that was drawing stands down when a newer one joins, and every
+-- other copy says which AddOn shows it. Version 1 copies elect among every
+-- registered copy, so a version 1 copy stands down for any newer one.
 
-local VERSION = 1
+local VERSION = 3
 local REGISTRY_NAME = "ShieldForeverRegistry"
 
 local ARC_TEXTURE = "Interface\\AddOns\\" .. addonName .. "\\Textures\\ShieldArc"
 -- The thinner crescent nested inside it, for shields that drain with time.
 local INNER_ARC_TEXTURE = ARC_TEXTURE .. "Inner"
+-- The innermost crescent, for bubbles.
+local INNERMOST_ARC_TEXTURE = ARC_TEXTURE .. "Innermost"
 local ARC_SIZE = 160
 -- The crescent sits in the right part of the square texture, so the frame
 -- centered a little right of your character puts it beside you.
@@ -86,26 +95,37 @@ local CONTAINER_TEMPLATE = "CustomAuraContainerTemplate"
 -- timed marks a shield with no absorb amount (Mana Shield: no points on its
 -- buff, not in the absorb total on Forever): it gets the inner crescent,
 -- draining with its time left (author-approved), instead of the absorb total.
+-- innermost puts a timed shield in the innermost crescent instead (bubbles).
 -- Known shields by name, so every rank counts: Classic IDs (confirmed on
 -- Forever for Mana Shield and Fire Ward), colors, lengths, and each one's spot
--- in the icon row. Shields from other players or classes share the last spot. ranks lists every Classic rank for the break sound, which needs
--- exact IDs. Paladins have no Classic absorb; any Forever adds shows as an
--- absorb MTF cannot name.
+-- in the icon row. class marks a shield only that class casts on itself;
+-- the others can come from anyone. Each player's row holds their own class's
+-- shields first, then the shared ones, one spot each. ranks lists every
+-- Classic rank for the break sound, which needs exact IDs. Any other absorb
+-- (a protection potion, a trinket, or one Forever adds) fills the crescent
+-- in the other-shield color without an icon. Bubble IDs are Classic's; check
+-- them on Forever with debug_shield.
 local SHIELDS = {
-    {key = "icebarrier", spot = 1, spell = 11426, color = {0.45, 0.78, 1}, seconds = 60,
+    {key = "icebarrier", class = "MAGE", spell = 11426, color = {0.45, 0.78, 1}, seconds = 60,
         ranks = {11426, 13031, 13032, 13033}},
-    {key = "manashield", spot = 2, timed = true, spell = 1463, color = {0.68, 0.45, 1}, seconds = 60,
+    {key = "manashield", class = "MAGE", timed = true, spell = 1463, color = {0.68, 0.45, 1}, seconds = 60,
         ranks = {1463, 8494, 8495, 10191, 10192, 10193}},
-    {key = "fireward", spot = 3, spell = 543, color = {1, 0.5, 0.15}, seconds = 30,
+    {key = "fireward", class = "MAGE", spell = 543, color = {1, 0.5, 0.15}, seconds = 30,
         ranks = {543, 8457, 8458, 10223, 10225}},
-    {key = "frostward", spot = 4, spell = 6143, color = {0.6, 0.92, 1}, seconds = 30,
+    {key = "frostward", class = "MAGE", spell = 6143, color = {0.6, 0.92, 1}, seconds = 30,
         ranks = {6143, 8461, 8462, 10177, 28609}},
-    {key = "powerwordshield", spot = 5, spell = 17, color = {1, 1, 0.85}, seconds = 30,
+    {key = "powerwordshield", spell = 17, color = {1, 1, 0.85}, seconds = 30,
         ranks = {17, 592, 600, 3747, 6065, 6066, 10898, 10899, 10900, 10901}},
-    {key = "shadowward", spot = 5, spell = 6229, color = {0.55, 0.3, 0.85}, seconds = 30,
+    {key = "shadowward", class = "WARLOCK", spell = 6229, color = {0.55, 0.3, 0.85}, seconds = 30,
         ranks = {6229, 11739, 11740, 28610}},
-    {key = "sacrifice", spot = 5, spell = 7812, color = {0.75, 0.4, 0.95}, seconds = 30,
+    {key = "sacrifice", class = "WARLOCK", spell = 7812, color = {0.75, 0.4, 0.95}, seconds = 30,
         ranks = {7812, 19438, 19440, 19441, 19442, 19443}},
+    {key = "divineshield", class = "PALADIN", timed = true, innermost = true, spell = 642,
+        color = {1, 0.85, 0.3}, seconds = 12, ranks = {642, 1020}},
+    {key = "divineprotection", class = "PALADIN", timed = true, innermost = true, spell = 498,
+        color = {1, 0.85, 0.3}, seconds = 8, ranks = {498, 5573}},
+    {key = "blessingofprotection", timed = true, innermost = true, spell = 1022,
+        color = {1, 0.85, 0.3}, seconds = 10, ranks = {1022, 5599, 10278}},
 }
 
 local ShieldDisplay = {}
@@ -116,7 +136,9 @@ if type(registry) ~= "table" then
     registry = {copies = {}}
     _G[REGISTRY_NAME] = registry
 end
-local copy = {version = VERSION, addon = addonName}
+-- protocol 2: the copy takes part once eligible, and start/stop let the
+-- copy that wins the election draw, or stand down for a newer one.
+local copy = {version = VERSION, addon = addonName, protocol = 2, eligible = false, active = false}
 registry.copies[#registry.copies + 1] = copy
 
 local host
@@ -124,11 +146,12 @@ local shield = {names = {}, ends = {}, latest = nil, otherEnds = nil, lastEnd = 
     deferred = false}
 local frame
 
--- The copy that draws the ring: the newest version, the first registered on a tie.
+-- The copy that draws the ring: among the copies taking part, the newest
+-- version, the first registered on a tie.
 local function Owner()
     local owner
     for _, entry in ipairs(registry.copies) do
-        if not owner or entry.version > owner.version then
+        if entry.eligible and (not owner or entry.version > owner.version) then
             owner = entry
         end
     end
@@ -261,7 +284,11 @@ function ShieldDisplay.Refresh()
     if frame.sample then
         frame.sample:SetShown(not settings.locked)
     end
-    if settings.enabled and (up or not settings.locked) then
+    -- In combat, buffs others cast on you cannot be read (Blessing of
+    -- Protection), so the display stays shown: the outer crescent's opacity
+    -- is the absorb, invisible with none, and the engine shows each icon and
+    -- timed crescent only while its buff is up.
+    if settings.enabled and (up or InCombatLockdown() or not settings.locked) then
         UpdateFill()
         frame:Show()
     else
@@ -398,7 +425,7 @@ function ShieldDisplay.ApplyBreakSound()
     end
     local trigger = Enum.UnitAuraSoundTrigger and Enum.UnitAuraSoundTrigger.Removed or 2
     for _, entry in ipairs(SHIELDS) do
-        for _, spellID in ipairs(entry.ranks) do
+        for _, spellID in ipairs(shield.spots[entry.key] and entry.ranks or {}) do
             shield.soundIDs[#shield.soundIDs + 1] = C_UnitAuras.AddAuraSound(trigger, {
                 spellID = spellID, unitToken = "player", outputChannel = "master",
                 throttleSeconds = BREAK_THROTTLE, soundFileName = BREAK_SOUND})
@@ -438,11 +465,23 @@ local function HasAuraContainer()
     return C_XMLUtil.GetTemplateInfo(CONTAINER_TEMPLATE) ~= nil
 end
 
--- The row's spots, centered under the number.
-local ICON_SPOTS = 5
+-- The row's spots, centered under the number: your class's shields first,
+-- then the ones anyone can put on you.
+local function AssignSpots()
+    local _, class = UnitClass("player")
+    shield.spots, shield.spotCount = {}, 0
+    for _, ownClass in ipairs({true, false}) do
+        for _, entry in ipairs(SHIELDS) do
+            if (entry.class ~= nil) == ownClass and (entry.class == nil or entry.class == class) then
+                shield.spotCount = shield.spotCount + 1
+                shield.spots[entry.key] = shield.spotCount
+            end
+        end
+    end
+end
 
 local function PlaceIcon(button, spot)
-    local width = ICON_SPOTS * ICON_SIZE + (ICON_SPOTS - 1) * ICON_GAP
+    local width = shield.spotCount * ICON_SIZE + (shield.spotCount - 1) * ICON_GAP
     button:ClearAllPoints()
     button:SetPoint("TOPLEFT", frame.text, "BOTTOM", -width / 2 + (spot - 1) * (ICON_SIZE + ICON_GAP), ICON_Y)
 end
@@ -481,25 +520,26 @@ local function IconInitializer(entry)
         frame.iconButtons[entry.key] = button
         NoMouse(button)
         if entry.timed then
+            local texture = entry.innermost and INNERMOST_ARC_TEXTURE or INNER_ARC_TEXTURE
             button:SetAllPoints(frame)
             local track = button:CreateTexture(nil, "BACKGROUND")
             track:SetAllPoints()
-            track:SetTexture(INNER_ARC_TEXTURE)
+            track:SetTexture(texture)
             track:SetVertexColor(0, 0, 0)
             track:SetAlpha(BACKGROUND_ALPHA)
             local bar = CreateFrame("StatusBar", nil, button)
             bar:SetAllPoints()
-            bar:SetStatusBarTexture(INNER_ARC_TEXTURE)
+            bar:SetStatusBarTexture(texture)
             bar:SetOrientation("VERTICAL")
             bar:SetStatusBarColor(entry.color[1], entry.color[2], entry.color[3])
             local direction = Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.RemainingTime
             button:SetDurationBar(bar, {direction = direction})
             frame.timedBars = frame.timedBars or {}
             frame.timedBars[entry.key] = bar
-            AddIcon(button, frame, entry.spot)
+            AddIcon(button, frame, shield.spots[entry.key])
         else
             button:SetSize(ICON_SIZE, ICON_SIZE)
-            PlaceIcon(button, entry.spot)
+            PlaceIcon(button, shield.spots[entry.key])
             local icon = button:CreateTexture(nil, "ARTWORK")
             icon:SetAllPoints()
             icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
@@ -523,16 +563,18 @@ local function CreateIcons()
     container:SetPoint("TOPLEFT", frame, "TOPLEFT")
     container:SetSize(1, 1)
     for _, entry in ipairs(SHIELDS) do
-        -- includeSpellIDs is a set, {[spellID] = true}, not a list: a list
-        -- matched nothing in client.
-        local ids = {}
-        for _, spellID in ipairs(entry.ranks) do
-            ids[spellID] = true
+        if shield.spots[entry.key] then
+            -- includeSpellIDs is a set, {[spellID] = true}, not a list: a list
+            -- matched nothing in client.
+            local ids = {}
+            for _, spellID in ipairs(entry.ranks) do
+                ids[spellID] = true
+            end
+            container:AddAuraSlot(entry.key, AURA_FILTER, {
+                candidateFilters = {includeSpellIDs = ids},
+                initializeFrame = IconInitializer(entry),
+            })
         end
-        container:AddAuraSlot(entry.key, AURA_FILTER, {
-            candidateFilters = {includeSpellIDs = ids},
-            initializeFrame = IconInitializer(entry),
-        })
     end
     container:SetUnit("player")
     container:UpdateAllAuras()
@@ -549,16 +591,20 @@ local function CreateSample()
     inner:SetTexture(INNER_ARC_TEXTURE)
     local purple = SHIELDS[2].color
     inner:SetVertexColor(purple[1], purple[2], purple[3])
-    local used = {}
+    local innermost = frame.sample:CreateTexture(nil, "ARTWORK")
+    innermost:SetAllPoints()
+    innermost:SetTexture(INNERMOST_ARC_TEXTURE)
+    local gold = SHIELDS[#SHIELDS].color
+    innermost:SetVertexColor(gold[1], gold[2], gold[3])
     for _, entry in ipairs(SHIELDS) do
-        if not used[entry.spot] then
-            used[entry.spot] = true
+        local spot = shield.spots[entry.key]
+        if spot then
             local icon = frame.sample:CreateTexture(nil, "ARTWORK")
             icon:SetSize(ICON_SIZE, ICON_SIZE)
             icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
             local texture = type(C_Spell.GetSpellTexture) == "function" and C_Spell.GetSpellTexture(entry.spell)
             icon:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
-            PlaceIcon(icon, entry.spot)
+            PlaceIcon(icon, spot)
         end
     end
     frame.sample:Hide()
@@ -623,8 +669,11 @@ events:SetScript("OnEvent", function(_, event, ...)
         UpdateFill()
     elseif event == "UNIT_AURA" or event == "PLAYER_ENTERING_WORLD" then
         CheckBuffs()
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        ShieldDisplay.Refresh()
     elseif event == "PLAYER_REGEN_ENABLED" then
         CheckBuffs()
+        ShieldDisplay.Refresh()
         if shield.deferred then
             ShieldDisplay.ApplyBreakSound()
         end
@@ -635,20 +684,13 @@ events:SetScript("OnEvent", function(_, event, ...)
     end
 end)
 
--- options: settings = function returning the host's saved settings table
--- (from ShieldDisplay.Sanitize); report = function(message) for chat;
--- unlockHint = optional text shown above the ring while it is unlocked.
-function ShieldDisplay.Initialize(options)
-    host = options
-    if not ShieldDisplay.IsOwner() then
-        host.report("The shield display is shown by " .. tostring(ShieldDisplay.OwnerAddOn())
-            .. "; use its settings for it.")
-        return
-    end
+-- Draws the ring: this copy won the election.
+local function Start()
     if not HasAbsorbAPI() then
         host.report("The shield display stays off: this client lacks UnitGetTotalAbsorbs or UnitHealthMax.")
         return
     end
+    AssignSpots()
     for _, entry in ipairs(SHIELDS) do
         local name = C_Spell.GetSpellName(entry.spell)
         if name then
@@ -662,11 +704,63 @@ function ShieldDisplay.Initialize(options)
         "UNIT_AURA"}) do
         events:RegisterUnitEvent(event, "player")
     end
-    for _, event in ipairs({"PLAYER_REGEN_ENABLED", "PLAYER_ENTERING_WORLD", "ADDON_RESTRICTION_STATE_CHANGED"}) do
+    for _, event in ipairs({"PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "PLAYER_ENTERING_WORLD",
+        "ADDON_RESTRICTION_STATE_CHANGED"}) do
         events:RegisterEvent(event)
     end
     CheckBuffs()
     ShieldDisplay.ApplyBreakSound()
+end
+
+-- Stands down for a newer copy that joined after this one started.
+local function Stop()
+    if HasAuraSounds() then
+        for _, id in ipairs(shield.soundIDs) do
+            C_UnitAuras.RemoveAuraSound(id)
+        end
+    end
+    shield.soundIDs = {}
+    events:UnregisterAllEvents()
+    if frame then
+        frame:Hide()
+    end
+    frame = nil
+    ShieldDisplay.frame = nil
+end
+
+-- Starts the winner, stops a copy that lost, and tells each standing-down
+-- copy's AddOn once which AddOn shows the display. Copies of protocol 2 run
+-- this for each other; version 1 copies decide for themselves.
+local function Elect()
+    local owner = Owner()
+    for _, entry in ipairs(registry.copies) do
+        if entry.protocol == 2 and entry.eligible then
+            if entry == owner and not entry.active then
+                entry.active = true
+                entry.start()
+            elseif entry ~= owner and entry.active then
+                entry.active = false
+                entry.stop()
+                entry.reported = false
+            end
+            if entry ~= owner and not entry.reported then
+                entry.reported = true
+                entry.report("The shield display is shown by " .. tostring(owner.addon)
+                    .. "; use its settings for it.")
+            end
+        end
+    end
+end
+
+-- options: settings = function returning the host's saved settings table
+-- (from ShieldDisplay.Sanitize); report = function(message) for chat;
+-- unlockHint = optional text shown above the ring while it is unlocked.
+-- An AddOn calls this only when it runs, so only running AddOns take part.
+function ShieldDisplay.Initialize(options)
+    host = options
+    copy.start, copy.stop, copy.report = Start, Stop, options.report
+    copy.eligible = true
+    Elect()
 end
 
 -- Debug: which absorb APIs exist and whether their values are secret, the
@@ -686,7 +780,7 @@ function ShieldDisplay.ReportDebug(report)
         type(UnitGetTotalAbsorbs), type(UnitHealthMax), type(AbbreviateNumbers), tostring(InCombatLockdown())))
     local copies = {}
     for _, entry in ipairs(registry.copies) do
-        copies[#copies + 1] = entry.addon .. " v" .. entry.version
+        copies[#copies + 1] = entry.addon .. " v" .. entry.version .. (entry.eligible and " (running)" or "")
     end
     Report(string.format("owner=%s copies=%s", tostring(ShieldDisplay.OwnerAddOn()), table.concat(copies, ", ")))
     Step("absorb", function()

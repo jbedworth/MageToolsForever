@@ -58,7 +58,8 @@ local REQUIRED_NAMESPACE = {
     "ParseCommand", "HandleCommand",
     "CheckConjureCapabilities", "InitializeConjure", "RefreshConjure", "ResetConjurePosition",
     "ApplyConjureMacros", "ReportConjureStatus", "ReportConjureDebug", "ReportClickDebug",
-    "AddInputHandler", "RunOnNextInput",
+    "CharacterMacrosAvailable", "WriteCharacterMacro", "DeleteCharacterMacro", "ApplyPolymorphMacro",
+    "AddInputHandler", "RunOnNextInput", "RegisterMovable", "BeginDrag", "EndDrag", "ScaleKeepingCenter",
     "InitializePortals", "RefreshPortals", "ResetPortalsPosition", "ReportPortalsDebug",
     "InitializePolymorph", "RefreshPolymorph", "ResetPolymorphPosition", "ReportPolymorphDebug",
     "InitializeReminders", "RefreshReminders", "ResetRemindersPosition", "ReportRemindersDebug",
@@ -377,6 +378,7 @@ function MTF.SanitizeDB(db)
         position = SanitizePosition(polymorph.position),
         scale = MTF.SanitizeScale(polymorph.scale),
         mark = polymorph.mark ~= false,
+        macro = polymorph.macro ~= false,
     }
     local reminders = type(db.reminders) == "table" and db.reminders or {}
     local reminderSpells = type(reminders.spells) == "table" and reminders.spells or {}
@@ -626,8 +628,8 @@ function MTF.SetFramesLocked(locked)
     if locked then
         MTF.Report("All MTF frames locked.")
     else
-        MTF.Report("All MTF frames unlocked: drag them where you want (scroll over a buff reminder to resize "
-            .. "it), then type /mtf lock.")
+        MTF.Report("All MTF frames unlocked: drag them where you want (Shift-drag moves a snapped group; "
+            .. "scroll over a buff reminder to resize it), then type /mtf lock.")
     end
 end
 

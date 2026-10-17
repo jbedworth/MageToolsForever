@@ -16,8 +16,10 @@ local _, MTF = ...
 -- the mob with the moon (author-approved). The combat log is closed to
 -- AddOns, so a resist cannot be seen; a successful cast counts as landed.
 --
--- Clicking the bar re-sheeps the mob: a secure macro targets it by name,
--- casts Polymorph, and goes back to your target. Secure attributes change only
+-- Clicking the bar re-sheeps your focus (author-approved: single-target
+-- control follows the focus, as the "! Polymorph" macro sets it), or, with no
+-- focus, targets the mob by name, casts Polymorph, and goes back to your
+-- target. Secure attributes change only
 -- out of combat, so the click is set as the cast starts (a pull's Polymorph
 -- starts before combat); one begun in combat on a different mob updates the
 -- click when combat ends. The secure button holds the bar's place; the
@@ -121,19 +123,22 @@ local function KnowsPolymorph()
     return false
 end
 
--- The unit showing this mob now: its nameplate, else target, focus, or mouseover.
+-- The unit showing this mob now: your focus (it stays on the mob when its
+-- nameplate drops), your target, else its nameplate (whose token can change
+-- as it leaves plate range and comes back; its GUID does not). Not mouseover:
+-- it changes with the pointer and has no event MTF rebinds on.
 local function FindUnit(guid)
     if not guid then
         return nil
     end
-    for index = 1, MAX_NAMEPLATE_UNITS do
-        local unit = "nameplate" .. index
-        if UnitExists(unit) and ReadGUID(unit) == guid then
+    for _, unit in ipairs({"focus", "target"}) do
+        if ReadGUID(unit) == guid then
             return unit
         end
     end
-    for _, unit in ipairs({"target", "focus", "mouseover"}) do
-        if ReadGUID(unit) == guid then
+    for index = 1, MAX_NAMEPLATE_UNITS do
+        local unit = "nameplate" .. index
+        if UnitExists(unit) and ReadGUID(unit) == guid then
             return unit
         end
     end
@@ -169,15 +174,19 @@ end
 local function Layout()
     local settings = MTF.db.polymorph
     local sample = not MTF.db.locked
-    holder:SetScale(settings.scale / 100)
-    bar:SetScale(settings.scale / 100)
     bar.mover:SetShown(sample)
     if not settings.enabled then
         bar:Hide()
         return
     end
     if sheep.guid then
-        bar.name:SetText(sheep.mobName)
+        -- In combat the click cannot follow a new mob: say whom it sheeps.
+        local click = holder.mobName
+        if click and click ~= sheep.mobName then
+            bar.name:SetText(sheep.mobName .. "  |cff999999(click: " .. click .. ")|r")
+        else
+            bar.name:SetText(sheep.mobName)
+        end
         bar:Show()
     elseif sample then
         bar.name:SetText(SAMPLE_NAME)
@@ -195,12 +204,19 @@ local function ApplyClick()
     end
     sheep.clickDirty = false
     local settings = MTF.db.polymorph
+    -- The holder is secure: it changes only here, out of combat. A secure
+    -- change in combat is blocked, and in client a Polymorph that landed in
+    -- combat once rescaled it there, after which its clicks failed. The bar
+    -- scales with it, so they never drift apart.
+    holder:SetScale(settings.scale / 100)
+    bar:SetScale(settings.scale / 100)
     local name, spell = sheep.clickName, sheep.clickSpell
     if name and spell then
         -- A missing mob leaves no target, so nothing else gets sheeped.
         holder:SetAttribute("type1", "macro")
-        holder:SetAttribute("macrotext1", "/cleartarget\n/targetexact " .. name .. "\n/cast [@target,harm,nodead] "
-            .. spell .. "\n/targetlasttarget")
+        holder:SetAttribute("macrotext1", "/cast [@focus,harm,nodead] " .. spell
+            .. "\n/stopmacro [@focus,exists]\n/cleartarget\n/targetexact " .. name
+            .. "\n/cast [@target,harm,nodead] " .. spell .. "\n/targetlasttarget")
     else
         holder:SetAttribute("type1", nil)
         holder:SetAttribute("macrotext1", nil)
@@ -208,6 +224,7 @@ local function ApplyClick()
     holder.mobName, holder.spellName = name, spell
     -- Shown while unlocked even before you learn Polymorph, so it can be placed.
     holder:SetShown(settings.enabled and (KnowsPolymorph() or not MTF.db.locked))
+    Layout()
 end
 
 local function Forget()
@@ -218,7 +235,7 @@ local function Forget()
 end
 
 local function Track(guid, mobName, spellName)
-    sheep.guid, sheep.mobName = guid, mobName
+    sheep.guid, sheep.mobName, sheep.spellName = guid, mobName, spellName
     sheep.clickName, sheep.clickSpell = mobName, spellName
     local token = {}
     sheep.token = token
@@ -235,24 +252,22 @@ end
 local function ShowTooltip(button)
     GameTooltip:SetOwner(button, "ANCHOR_TOP")
     if button.mobName then
-        GameTooltip:SetText("Click: " .. button.spellName .. " " .. button.mobName .. " again.", 1, 1, 1)
-        GameTooltip:AddLine("Targets it by name, then goes back to your target.", 0.7, 0.7, 0.7, true)
+        GameTooltip:SetText("Click: " .. button.spellName .. " your focus again.", 1, 1, 1)
+        GameTooltip:AddLine("With no focus, targets " .. button.mobName .. " by name, then goes back to your "
+            .. "target.", 0.7, 0.7, 0.7, true)
     else
         GameTooltip:SetText("Polymorph a mob, then click here to sheep it again.", 0.7, 0.7, 0.7)
     end
     GameTooltip:Show()
 end
 
+-- Dragging and snapping: Layout.lua. The holder moves; the bar rides on it.
 local function StartDrag()
-    if not MTF.db.locked and not InCombatLockdown() then
-        holder:StartMoving()
-    end
+    MTF.BeginDrag(holder)
 end
 
 local function StopDrag()
-    holder:StopMovingOrSizing()
-    local point, _, relativePoint, x, y = holder:GetPoint()
-    MTF.db.polymorph.position = {point = point, relativePoint = relativePoint, x = x, y = y}
+    MTF.EndDrag(holder)
 end
 
 local function Place()
@@ -302,6 +317,7 @@ local function CreateBar()
     holder:RegisterForDrag("LeftButton")
     holder:SetScript("OnDragStart", StartDrag)
     holder:SetScript("OnDragStop", StopDrag)
+    MTF.RegisterMovable(holder, function(position) MTF.db.polymorph.position = position end)
     holder:SetScript("OnEnter", ShowTooltip)
     holder:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- The bar sits on the holder and takes no mouse, so clicks reach the holder.
@@ -346,6 +362,42 @@ local function CreateBar()
     MTF.polymorphBar = bar
 end
 
+-- The macro -----------------------------------------------------------------------
+-- (author-approved, after the author's own): "! Polymorph" for your action
+-- bars, once you know Polymorph. It focuses the hostile mob under the mouse
+-- (or, out of combat, your target) and sheeps your focus, so the macro, the
+-- bar's click, and the moon agree on one mob. MTF marks the moon when the
+-- cast lands, so the macro does not /tm (a second mark would toggle it off).
+
+local MACRO_NAME = "! Polymorph"
+
+function MTF.PolymorphMacroBody()
+    local spell = C_Spell.GetSpellName(POLYMORPH_IDS[1])
+    if not spell then
+        return nil
+    end
+    return "#showtooltip " .. spell .. "\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n/cast "
+        .. "[@focus,harm,nodead] " .. spell
+end
+
+-- Out of combat only; turning the macro off deletes it.
+function MTF.ApplyPolymorphMacro()
+    if InCombatLockdown() then
+        sheep.macroDirty = true
+        return
+    end
+    sheep.macroDirty = false
+    if not MTF.CharacterMacrosAvailable() then
+        return
+    end
+    local body = MTF.PolymorphMacroBody()
+    if MTF.db.polymorph.macro and body and KnowsPolymorph() then
+        MTF.WriteCharacterMacro(MACRO_NAME, body)
+    elseif not MTF.db.polymorph.macro then
+        MTF.DeleteCharacterMacro(MACRO_NAME)
+    end
+end
+
 -- Casts --------------------------------------------------------------------------
 
 local function GroupChannel()
@@ -387,20 +439,37 @@ local function OnCastSent(target, castGUID, spellID)
     -- now, while the game still allows it.
     if not InCombatLockdown() then
         sheep.clickName, sheep.clickSpell = target, C_Spell.GetSpellName(spellID)
+        sheep.casts[castGUID].setClick = true
         ApplyClick()
     end
 end
 
-local function Mark(unit)
+-- The unit to mark: your target or focus when it is this mob (as TankHelper
+-- marks your target), else the unit that shows it. SetRaidTarget toggles: a
+-- unit that already has the marker loses it (the pinned /tm code's "!" prefix
+-- exists to skip that). GetRaidTargetIndex returns a secret to AddOn code in
+-- combat (pinned RaidMarkersDocumentation: SecretReturns), so MTF cannot
+-- always ask. It skips the mark when the index is readable and already
+-- equal, or, when it is not, when it marked this mob with it before.
+local function Mark(guid, unit)
     if not MTF.db.polymorph.mark or type(SetRaidTarget) ~= "function" then
         return
     end
+    for _, candidate in ipairs({"target", "focus"}) do
+        if ReadGUID(candidate) == guid then
+            unit = candidate
+            break
+        end
+    end
     local index = GetRaidTargetIndex(unit)
-    if MTF.IsSecret(index) or index == MOON then
+    local unreadable = MTF.IsSecret(index)
+    if (not unreadable and index == MOON) or (unreadable and sheep.markedGUID == guid) then
+        sheep.markedGUID = guid
         return
     end
     SetRaidTarget(unit, MOON)
-    sheep.lastMark = unit
+    sheep.markedGUID = guid
+    sheep.lastMark = unit .. (unreadable and " (marker unreadable)" or "")
 end
 
 local function OnCastSucceeded(castGUID)
@@ -417,11 +486,17 @@ local function OnCastSucceeded(castGUID)
         local unit = FindCastUnit(cast.target)
         guid = unit and ReadGUID(unit)
     end
+    -- A Polymorph cast on the mob under the mouse counts: mouseover checks the
+    -- cast and takes the moon, though the bar never binds to it; the bar finds
+    -- the mob when it becomes your focus, target, or a nameplate.
     local unit = FindUnit(guid)
+    if not unit and guid and ReadGUID("mouseover") == guid then
+        unit = "mouseover"
+    end
     if not unit or not UnitCanAttack("player", unit) then
         return
     end
-    Mark(unit)
+    Mark(guid, unit)
     Track(guid, cast.target, C_Spell.GetSpellName(cast.spellID))
 end
 
@@ -444,17 +519,30 @@ events:SetScript("OnEvent", function(_, event, unit, first, second, third)
         OnCastSucceeded(first)
     elseif event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED" then
         if not MTF.IsSecret(first) then
+            local cast = sheep.casts[first]
             sheep.casts[first] = nil
+            -- A cast that never landed gives the click back to the sheep that
+            -- is up, or clears it.
+            if cast and cast.setClick then
+                sheep.clickName = sheep.mobName
+                sheep.clickSpell = sheep.mobName and sheep.spellName or nil
+                ApplyClick()
+            end
         end
     elseif event == "UNIT_HEALTH" then
-        if sheep.guid and bar.boundUnit == unit and IsDead(unit) then
+        -- By GUID: the death can come through any unit that shows the mob.
+        if sheep.guid and ReadGUID(unit) == sheep.guid and IsDead(unit) then
             Forget()
         end
     elseif event == "SPELLS_CHANGED" then
         BuildSpellSet()
         bar.container:SetAuraSlotCandidateFilters("polymorph", {includeSpellIDs = sheep.ids})
         ApplyClick()
+        MTF.ApplyPolymorphMacro()
     elseif event == "PLAYER_REGEN_ENABLED" then
+        if sheep.macroDirty then
+            MTF.ApplyPolymorphMacro()
+        end
         if sheep.placeDirty then
             sheep.placeDirty = false
             Place()
@@ -476,6 +564,7 @@ function MTF.RefreshPolymorph()
     end
     Layout()
     ApplyClick()
+    MTF.ApplyPolymorphMacro()
 end
 
 function MTF.ResetPolymorphPosition()
@@ -509,6 +598,7 @@ function MTF.InitializePolymorph()
     end
     Layout()
     ApplyClick()
+    MTF.ApplyPolymorphMacro()
 end
 
 -- /mtf debug_polymorph: the IDs, the tracked mob, the click, and the marker.

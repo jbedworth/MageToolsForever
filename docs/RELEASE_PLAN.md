@@ -37,6 +37,7 @@ MageToolsForever/
     MageToolsForever.toc
     Commands.lua
     Core.lua
+    Layout.lua
     Conjure.lua
     Portals.lua
     Polymorph.lua
@@ -47,6 +48,7 @@ MageToolsForever/
     LICENSE
     Textures/ShieldArc.tga
     Textures/ShieldArcInner.tga
+    Textures/ShieldArcInnermost.tga
 ```
 
 The validator permits one optional empty root directory entry. Additional files
@@ -56,15 +58,15 @@ agent guidance, generated logs, and all credentials/player data.
 
 Use an explicit file allowlist. Do not ZIP the checkout and maintain a growing
 list of exclusions. Keep `LICENSE` in the package, but do not load it in the TOC.
-MTF ships two textures, `Textures/ShieldArc.tga` and `ShieldArcInner.tga`,
-the shield display's crescents, built by `scripts/build_arc.py`. The builder
+MTF ships three textures, `Textures/ShieldArc.tga`, `ShieldArcInner.tga`, and
+`ShieldArcInnermost.tga`, the shield display's crescents, built by `scripts/build_arc.py`. The builder
 requires each to be an uncompressed 32-bit square TGA with power-of-two sides.
 
 Validate the actual archive, not only the staging folder:
 
 1. Check CRC/integrity, non-empty files, and the exact file list.
 2. Reject absolute paths, traversal paths, symlinks, and extra root folders.
-3. Verify the TOC name, Interface `16001`, and Commands/Core/Conjure/Portals/Polymorph/Reminders/Shield/Chimes/
+3. Verify the TOC name, Interface `16001`, and Commands/Core/Layout/Conjure/Portals/Polymorph/Reminders/Shield/Chimes/
    Options load order. Every listed runtime file must exist inside the archive.
 4. Verify the packaged version matches the selected tag, with one leading `v`
    removed. Verify the packaged MIT copyright/permission notice is intact.

@@ -350,6 +350,23 @@ local function WriteMacro(name, body)
     end
 end
 
+-- For the other modules' macros (Polymorph): the same writer and slot check.
+-- Out of combat only.
+function MTF.CharacterMacrosAvailable()
+    return macros.available == true
+end
+
+function MTF.WriteCharacterMacro(name, body)
+    WriteMacro(name, body)
+end
+
+function MTF.DeleteCharacterMacro(name)
+    local index = GetMacroIndexByName(name)
+    if index > 0 then
+        DeleteMacro(index)
+    end
+end
+
 -- Macros change only out of combat; ApplyActions runs then.
 local function UpdateMacros(createRanks)
     if not MTF.db.conjure.macros or not macros.available then
@@ -1003,11 +1020,6 @@ end
 
 -- The bar ------------------------------------------------------------------------
 
-local function SavePosition(bar)
-    local point, _, relativePoint, x, y = bar:GetPoint()
-    MTF.db.conjure.position = {point = point, relativePoint = relativePoint, x = x, y = y}
-end
-
 local function PlaceBar(bar)
     local position = MTF.db.conjure.position
     bar:ClearAllPoints()
@@ -1018,16 +1030,13 @@ local function PlaceBar(bar)
     end
 end
 
+-- Dragging and snapping: Layout.lua.
 local function StartDrag()
-    if MTF.db.conjure.locked or InCombatLockdown() then
-        return
-    end
-    buttons.bar:StartMoving()
+    MTF.BeginDrag(buttons.bar)
 end
 
 local function StopDrag()
-    buttons.bar:StopMovingOrSizing()
-    SavePosition(buttons.bar)
+    MTF.EndDrag(buttons.bar)
 end
 
 local function CreateConjureButton(bar, name, kind)
@@ -1181,6 +1190,7 @@ function MTF.InitializeConjure()
     bar.mover.hint:SetPoint("BOTTOM", bar.mover, "TOP", 0, 2)
     bar.mover.hint:SetText("Drag to move · /mtf lock when done")
     bar.mover:Hide()
+    MTF.RegisterMovable(bar, function(position) MTF.db.conjure.position = position end)
     buttons.bar = bar
     buttons.water = CreateConjureButton(bar, "MageToolsForeverWater", "water")
     buttons.food = CreateConjureButton(bar, "MageToolsForeverFood", "food")

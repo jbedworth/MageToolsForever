@@ -24,7 +24,7 @@ local function contains(actual, fragment, context)
     end
 end
 
-local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua", "Chimes.lua", "Options.lua"}
+local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Layout.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua", "Chimes.lua", "Options.lua"}
 local SPELLS = {
     [5504] = "Conjure Water", [5505] = "Conjure Water", [5506] = "Conjure Water", [6127] = "Conjure Water",
     [587] = "Conjure Food", [597] = "Conjure Food", [990] = "Conjure Food", [6129] = "Conjure Food",
@@ -184,14 +184,24 @@ local function fixture(options)
     env.UnitIsVisible = function(unit) return state.units[unit] ~= nil and state.units[unit].far ~= true end
     -- Raid markers, by unit's GUID.
     state.marks = {}
+    -- As on Forever, the marker index is secret in combat.
     env.GetRaidTargetIndex = function(unit)
+        if state.combat then
+            local value = secret()
+            state.secrets[value] = true
+            return value
+        end
         local data = state.units[unit]
         return data and state.marks[data.guid or data.name]
     end
+    -- As in client, setting the marker a unit already has clears it.
     env.SetRaidTarget = function(unit, index)
         local data = state.units[unit]
-        state.marks[data.guid or data.name] = index
+        local key = data.guid or data.name
+        if state.marks[key] == index then index = nil end
+        state.marks[key] = index
         state.markCount = (state.markCount or 0) + 1
+        state.markedUnit = unit
     end
     -- State drivers: "[@unit,harm,nodead] show; hide", evaluated by the game.
     state.drivers = {}
@@ -618,7 +628,11 @@ local function fixture(options)
         function object:SetDesaturated(value) self.desaturated = value == true end
         function object:EnableMouse(value) self.mouse = value == true end
         function object:SetAlpha(value) self.alpha = value end
-        function object:SetScale(value) self.scale = value end
+        -- As in client, secure frames refuse layout changes in combat.
+        function object:SetScale(value)
+            if state.combat and self.protected then error("SetScale in combat") end
+            self.scale = value
+        end
         function object:GetEffectiveScale()
             local parentScale = 1
             if self.parent and self.parent.GetEffectiveScale then parentScale = self.parent:GetEffectiveScale() end
@@ -684,8 +698,15 @@ local function fixture(options)
             self.shown = false
         end
         function object:IsShown() return self.shown end
-        function object:SetPoint(...) self.points[#self.points + 1] = {...} end
-        function object:ClearAllPoints() self.points = {} end
+        function object:IsProtected() return self.protected == true end
+        function object:SetPoint(...)
+            if state.combat and self.protected then error("SetPoint in combat") end
+            self.points[#self.points + 1] = {...}
+        end
+        function object:ClearAllPoints()
+            if state.combat and self.protected then error("ClearAllPoints in combat") end
+            self.points = {}
+        end
         function object:GetPoint()
             -- As in client, a frame with no points returns nothing.
             local point = self.points[#self.points]
@@ -940,7 +961,7 @@ test("a missing client API disables MTF with one message naming it", function()
     equal(state.categories["Mage Tools Forever"], nil, "no settings page")
 end)
 test("a mixed install of old and new files is reported at login", function()
-    local state = fixture({files = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua",
+    local state = fixture({files = {"Commands.lua", "Core.lua", "Layout.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua",
         "Options.lua"}})
     equal(state.mtf.available, false)
     contains(state.last(), "missing InitializeChimes")
@@ -1618,7 +1639,7 @@ test("the absorb number can be hidden, and the break sound turned on", function(
     equal(state.mtf.ShieldDisplay.frame.text.text, "")
     equal(state.auraSoundCount, nil)
     state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(true)
-    equal(state.auraSoundCount, 40, "every rank of the seven known shields")
+    equal(state.auraSoundCount, 33, "every rank of the six shields a Mage can get")
     equal(state.auraSounds[1].trigger, 2, "on removal")
     equal(state.auraSounds[1].info.spellID, ICE_BARRIER)
     state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(false)
@@ -1669,15 +1690,18 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(said[1], "shown by MageToolsForever")
     state.clear()
     state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v1, ShieldForever v1")
+    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v3 (running), ShieldForever v1 (running)")
     local text = table.concat(state.messages, "|")
     contains(text, "the absorb total shows above your character")
     equal(text:find("failed", 1, true), nil, "every debug step ran")
 end)
-test("a newer shield display in another AddOn takes over", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 2}}})
+test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
+    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 4}}})
+    equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
+    local other = state.copies.ShieldForever.ShieldDisplay
+    other.Initialize({settings = function() return other.Sanitize({}) end, report = function() end})
     equal(state.mtf.ShieldDisplay.IsOwner(), false)
-    equal(state.mtf.ShieldDisplay.frame, nil)
+    equal(state.mtf.ShieldDisplay.frame, nil, "MTF stood down")
     local found = false
     for _, message in ipairs(state.messages) do
         if message:find("The shield display is shown by ShieldForever", 1, true) then found = true end
@@ -1691,18 +1715,19 @@ test("an icon per shield, shown by Blizzard's aura display, each in its own spot
     local ring = state.mtf.ShieldDisplay.frame
     local container = ring.icons
     equal(container.unit, "player")
-    equal(#container.slots, 7, "one slot per known shield")
+    equal(#container.slots, 6, "one slot per shield a Mage can get, Blessing of Protection included")
     equal(container.slots[1].key, "icebarrier")
     equal(container.slots[1].filter, "HELPFUL")
     equal(container.slots[1].ids[13033], true, "a set of every Ice Barrier rank, as the container requires")
     equal(container.slots[1].ids[4], nil, "not a list")
     -- The engine's shown state is secret, so each icon is placed once, in its spot.
     local barrier, ward, frost = ring.iconButtons.icebarrier, ring.iconButtons.fireward, ring.iconButtons.frostward
-    equal(barrier.points[1][4], -51, "first of five spots (102 px wide), centered under the number")
+    equal(barrier.points[1][4], -61.5, "first of six spots (123 px wide), centered under the number")
     equal(ward.points[1][4] - barrier.points[1][4], 42, "Mana Shield's spot between them")
     equal(frost.points[1][4] - ward.points[1][4], 21)
-    equal(ring.iconButtons.sacrifice.points[1][4], ring.iconButtons.powerwordshield.points[1][4],
-        "other shields share the last spot")
+    equal(ring.iconButtons.powerwordshield.points[1][4] - frost.points[1][4], 21,
+        "Power Word: Shield in the last spot")
+    equal(ring.iconButtons.sacrifice, nil, "no Warlock shields on a Mage")
 end)
 test("Mana Shield drains with time in the inner crescent; absorb shields stay in the outer one", function()
     local state = mage()
@@ -2138,6 +2163,40 @@ test("a landed Polymorph marks the mob with the moon and shows the bar on its un
     state.emit("UNIT_HEALTH", "nameplate3")
     equal(bar.shown, false, "gone when the mob dies")
 end)
+test("a Polymorph cast on the mob under the mouse is tracked and marked", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    state.units.mouseover = {name = "Defias Pillager", guid = "mob-7", level = 20}
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-m", POLYMORPH)
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-m", POLYMORPH)
+    local bar = state.env.MageToolsForeverPolymorphBar
+    equal(bar.shown, true, "tracked")
+    equal(bar.name.text, "Defias Pillager")
+    equal(state.marks["mob-7"], 5, "the moon, through mouseover")
+    equal(bar.container.unit, "none", "the bar never binds to mouseover")
+    state.units.nameplate5 = state.units.mouseover
+    state.units.mouseover = nil
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate5")
+    equal(bar.container.unit, "nameplate5", "it finds the mob on its nameplate")
+end)
+test("a Polymorph that lands in combat still gets the moon, on your target", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(state)
+    state.units.nameplate2 = state.units.target
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-c", POLYMORPH)
+    state.combat = true
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-c", POLYMORPH)
+    equal(state.marks["mob-1"], 5, "marked although the marker cannot be read in combat")
+    equal(state.markedUnit, "target", "your target, as TankHelper marks")
+    -- A recast in combat on the same mob must not toggle the moon off.
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-d", POLYMORPH)
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-d", POLYMORPH)
+    equal(state.marks["mob-1"], 5, "still the moon after a recast")
+    equal(state.markCount, 1, "marked once")
+    state.clear()
+    state.combat = false
+    state.slash("debug_polymorph")
+    contains(table.concat(state.messages, "|"), "marked=target (marker unreadable)")
+end)
 test("the mark switch and the bar's switch are respected", function()
     local state = mage({known = {[POLYMORPH] = true}})
     state.settings.MTF_POLYMORPH_MARK:SetValue(false)
@@ -2166,19 +2225,20 @@ test("clicking the bar re-sheeps the mob by name and goes back to your target", 
     sheepTarget(state)
     castPolymorph(state)
     equal(holder.attributes.type1, "macro")
-    equal(holder.attributes.macrotext1, "/cleartarget\n/targetexact Defias Pillager\n"
-        .. "/cast [@target,harm,nodead] Polymorph\n/targetlasttarget")
+    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Pillager\n/cast [@target,harm,nodead] Polymorph\n/targetlasttarget")
     -- In combat the click cannot change; it follows after combat.
     state.combat = true
     sheepTarget(state, "Defias Bandit", "mob-2")
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Bandit", "cast-28272", 28272)
     state.cast(28272)
-    equal(state.env.MageToolsForeverPolymorphBar.name.text, "Defias Bandit", "the bar shows in combat")
+    equal(state.env.MageToolsForeverPolymorphBar.name.text, "Defias Bandit  |cff999999(click: Defias Pillager)|r",
+        "the bar shows in combat, and says whom its click still sheeps")
     contains(holder.attributes.macrotext1, "Defias Pillager")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
-    equal(holder.attributes.macrotext1, "/cleartarget\n/targetexact Defias Bandit\n"
-        .. "/cast [@target,harm,nodead] Polymorph: Pig\n/targetlasttarget", "the same Polymorph you cast")
+    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph: Pig\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Bandit\n/cast [@target,harm,nodead] Polymorph: Pig\n/targetlasttarget", "the same Polymorph you cast")
 end)
 test("a Polymorph begun before combat sets the click before it lands in combat", function()
     local state = mage({known = {[POLYMORPH] = true}})
@@ -2187,8 +2247,8 @@ test("a Polymorph begun before combat sets the click before it lands in combat",
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-118", POLYMORPH)
     state.combat = true
     state.cast(POLYMORPH)
-    equal(holder.attributes.macrotext1, "/cleartarget\n/targetexact Defias Pillager\n"
-        .. "/cast [@target,harm,nodead] Polymorph\n/targetlasttarget", "ready for the whole fight")
+    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Pillager\n/cast [@target,harm,nodead] Polymorph\n/targetlasttarget", "ready for the whole fight")
     equal(state.env.MageToolsForeverPolymorphBar.shown, true)
 end)
 test("the click is there when the client knows Polymorph by its own spell ID", function()
@@ -2197,6 +2257,61 @@ test("the click is there when the client knows Polymorph by its own spell ID", f
     state.clear()
     state.slash("debug_polymorph")
     contains(state.messages[1], "known=true")
+end)
+test("a recast from the bar that lands in combat leaves the click working", function()
+    -- In client: the first click recast fine, and every click after failed,
+    -- because the landing recast rescaled the secure holder in combat.
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    sheepTarget(state)
+    castPolymorph(state)
+    local macro = holder.attributes.macrotext1
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-again", POLYMORPH)
+    state.combat = true
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-again", POLYMORPH)
+    state.emit("PLAYER_TARGET_CHANGED")
+    state.settings.MTF_POLYMORPH_SCALE:SetValue(80)
+    equal(holder.attributes.macrotext1, macro, "the click still sheeps the mob")
+    equal(holder.scale, 1, "nothing secure changed in combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(holder.scale, 0.8, "the size applies after combat")
+    equal(state.env.MageToolsForeverPolymorphBar.scale, 0.8, "the bar with it")
+end)
+test("a Polymorph that fails out of combat gives the click back to the sheep that is up", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    sheepTarget(state)
+    castPolymorph(state)
+    sheepTarget(state, "Defias Bandit", "mob-2")
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Bandit", "cast-fail", POLYMORPH)
+    contains(holder.attributes.macrotext1, "Defias Bandit", "set as the cast starts")
+    state.emit("UNIT_SPELLCAST_INTERRUPTED", "player", "cast-fail", POLYMORPH)
+    contains(holder.attributes.macrotext1, "Defias Pillager", "back to the sheep that is up")
+end)
+test("\"! Polymorph\" focuses the mob and sheeps your focus, once you know Polymorph", function()
+    local state = mage()
+    equal(macroBody(state, "! Polymorph"), nil, "not before you learn Polymorph")
+    state.known[POLYMORPH] = true
+    state.emit("SPELLS_CHANGED")
+    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
+        .. "[nocombat,harm,nodead]\n/cast [@focus,harm,nodead] Polymorph")
+    state.settings.MTF_POLYMORPH_MACRO:SetValue(false)
+    equal(macroBody(state, "! Polymorph"), nil, "turning it off deletes it")
+end)
+test("the Polymorph bar follows your focus first, so it does not go blank when the plate drops", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(state)
+    state.units.nameplate4 = state.units.target
+    state.units.focus = state.units.target
+    castPolymorph(state)
+    local bar = state.env.MageToolsForeverPolymorphBar
+    equal(bar.container.unit, "focus")
+    state.units.target = {name = "Defias Bandit", guid = "mob-2", level = 20}
+    state.units.nameplate4 = nil
+    state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate4")
+    state.emit("PLAYER_TARGET_CHANGED")
+    equal(bar.container.unit, "focus", "still bound while you fight another mob")
 end)
 test("unlocked, the Polymorph bar shows a sample to drag", function()
     local state = mage()
@@ -2341,6 +2456,91 @@ local function drop(state, icon, x, y)
     icon.scripts.OnDragStop(icon)
 end
 
+-- Drags a frame by a handle (a child that takes the drag) and drops it at x, y.
+local function dropBy(state, frame, handle, x, y)
+    handle.scripts.OnDragStart(handle)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", nil, "BOTTOMLEFT", x / frame:GetEffectiveScale(), y / frame:GetEffectiveScale())
+    handle.scripts.OnDragStop(handle)
+end
+
+local function centerOf(state, frame)
+    local x, y = state.absCenter(frame)
+    return math.floor(x + 0.5), math.floor(y + 0.5)
+end
+
+test("every MTF frame snaps, not only the buff reminders; Shift-drag moves a snapped group", function()
+    local state = mage({known = {[3561] = true, [118] = true}})
+    state.slash("unlock")
+    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
+    local polymorph = state.env.MageToolsForeverPolymorph
+    dropBy(state, conjure, conjure, 300, 300)
+    local cx, cy = centerOf(state, conjure)
+    -- The portal bar, dropped near the conjure bar's right side, snaps 20 past it, tops aligned.
+    local px = cx + conjure.width / 2 + 20 + portals.width / 2
+    local py = cy + conjure.height / 2 - portals.height / 2
+    dropBy(state, portals, portals, px + 7, py - 5)
+    equal(select(1, centerOf(state, portals)), math.floor(px + 0.5))
+    equal(select(2, centerOf(state, portals)), math.floor(py + 0.5))
+    -- The Polymorph bar under the conjure bar, lefts aligned.
+    local mx = cx - conjure.width / 2 + polymorph.width / 2
+    local my = cy - conjure.height / 2 - 20 - polymorph.height / 2
+    dropBy(state, polymorph, polymorph, mx + 4, my + 6)
+    equal(select(1, centerOf(state, polymorph)), math.floor(mx + 0.5))
+    equal(select(2, centerOf(state, polymorph)), math.floor(my + 0.5))
+    equal(state.mtf.db.polymorph.position.relativePoint, "BOTTOMLEFT", "saved")
+    -- Shift-drag the conjure bar: the portal and Polymorph bars come along.
+    local portalX = select(1, centerOf(state, portals)) - cx
+    state.shift = true
+    dropBy(state, conjure, conjure, 600, 600)
+    local nx, ny = centerOf(state, conjure)
+    equal(select(1, centerOf(state, portals)) - nx, portalX, "the group kept its spacing")
+    equal(select(2, centerOf(state, polymorph)), ny - (cy - math.floor(my + 0.5)))
+end)
+
+test("a Shift-dragged group that snaps to another frame keeps its spacing", function()
+    local state = mage({known = {[3561] = true, [118] = true}})
+    state.slash("unlock")
+    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
+    local icon = reminderIcon(state, "intellect")
+    dropBy(state, conjure, conjure, 300, 300)
+    local cx, cy = centerOf(state, conjure)
+    dropBy(state, portals, portals, cx + conjure.width / 2 + 20 + portals.width / 2, cy)
+    local gapX = select(1, centerOf(state, portals)) - cx
+    -- Drop the group a little off the spot under the buff reminder, so it snaps.
+    local ix, iy = state.absCenter(icon)
+    local iconHalf = icon.height * icon:GetEffectiveScale() / 2
+    local barHalfH = conjure.height * conjure:GetEffectiveScale() / 2
+    local spotX, spotY = ix, iy - iconHalf - 20 - barHalfH
+    state.shift = true
+    dropBy(state, conjure, conjure, spotX + 6, spotY - 5)
+    local nx, ny = centerOf(state, conjure)
+    equal(nx, math.floor(spotX + 0.5), "the group snapped")
+    equal(ny, math.floor(spotY + 0.5))
+    equal(select(1, centerOf(state, portals)) - nx, gapX, "the portal bar kept its place beside it")
+end)
+test("a drop after combat began waits, then snaps and saves the group when combat ends", function()
+    local state = mage({known = {[3561] = true}})
+    state.slash("unlock")
+    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
+    dropBy(state, conjure, conjure, 300, 300)
+    local cx, cy = centerOf(state, conjure)
+    dropBy(state, portals, portals, cx + conjure.width / 2 + 20 + portals.width / 2, cy)
+    local gapX = select(1, centerOf(state, portals)) - cx
+    local saved = state.mtf.db.portals.position
+    state.shift = true
+    conjure.scripts.OnDragStart(conjure)
+    conjure:ClearAllPoints()
+    conjure:SetPoint("CENTER", nil, "BOTTOMLEFT", 500 / conjure:GetEffectiveScale(), 500 / conjure:GetEffectiveScale())
+    state.combat = true
+    conjure.scripts.OnDragStop(conjure)
+    equal(state.mtf.db.portals.position, saved, "nothing saved in combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(state.mtf.db.portals.position.relativePoint, "BOTTOMLEFT", "saved once combat ends")
+    equal(select(1, centerOf(state, portals)) - select(1, centerOf(state, conjure)), gapX, "the group kept together")
+    equal(conjure.moving, false, "stopped moving")
+end)
 test("reminder icons start in a row 20 apart, and a drop near another snaps beside it", function()
     local state = mage()
     state.slash("unlock")
