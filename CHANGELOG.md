@@ -4,6 +4,13 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 0.2.0-beta
+
+- Every frame is magnetic: drop the conjure, portal, or Polymorph bar or a buff reminder near another and it snaps beside it, lined up. Shift-drag moves a snapped group. A drop that combat interrupts finishes when combat ends.
+- Polymorph: clicking the bar to sheep the mob again now works in combat. It recasts on your focus first, the moon marker goes on even when the Polymorph lands in combat, and a recast never toggles the moon off. A cast on the mob under your mouse counts.
+- New "! Polymorph" macro: focuses the mob under your mouse (or your target, out of combat) and sheeps your focus.
+- Shield display: the timed crescents (Mana Shield, Paladin bubbles) now run out exactly when the shield ends, not a segment early. A Paladin's Blessing of Protection on you shows as a gold innermost crescent that drains with its time left, also in combat. With Warlock Tools Forever or Shields Up Forever also installed, you still see one display.
+
 ## 0.1.0-beta
 
 - Conjure bar: Water, Food, and Mana Gem buttons. With no one targeted, left-click eats, drinks, or uses your best, and right-click conjures your best rank.
