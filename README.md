@@ -94,7 +94,9 @@ target, and if the Polymorph breaks early, the bar empties so you see it.
   click change only out of combat, so after sheeping a different mob in
   combat, the click catches up when combat ends. With several mobs of the same
   name, it picks the nearest.
-- The marker switch and **Bar size** are on the Polymorph settings page.
+- The marker switch and **Bar size** are on the Polymorph settings page. If you
+  mark with your own `/tm` macro, turn MTF's marker off: the game toggles a
+  marker that is set twice, and in combat MTF cannot see yours.
 
 ## Buff reminders
 
