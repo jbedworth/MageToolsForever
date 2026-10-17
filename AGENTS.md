@@ -115,6 +115,13 @@ frameworks without agreement.
   nothing and say once which AddOn shows it. Version 1 copies elect among
   every registered copy. WTF ships the same file: keep both copies identical
   and bump `VERSION` in both with every behavior change.
+- Version 3: bubbles (Divine Shield, Divine Protection: Paladin; Blessing
+  of Protection: anyone) are timed, drawing a gold innermost crescent
+  (Textures/ShieldArcInnermost.tga) that drains with their time left
+  (Classic IDs; check on Forever). In combat the display stays shown, since
+  buffs others cast cannot be read: the outer crescent is invisible with no
+  absorb, and the engine shows each icon and timed crescent only while its
+  buff is up.
 - The icon row holds the player's own class's shields (`class` on each
   entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
   Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
@@ -292,8 +299,15 @@ frameworks without agreement.
   <the Polymorph you cast>`, `/targetlasttarget`: a missing mob leaves no
   target, so nothing else is sheeped. Attributes change only out of combat;
   a Polymorph begun in combat on another mob updates the click when combat
-  ends. `/targetexact` picks the nearest mob of that name, so same-named mobs
-  can be confused. Verify `/targetlasttarget` after `/cleartarget` in client.
+  ends, and until then the bar names the mob its click still sheeps. A cast
+  that fails out of combat gives the click back to the sheep that is up.
+  The holder (and the bar with it) is scaled only there too: in client, a
+  recast from the bar that landed in combat rescaled the secure holder, and
+  every click after failed. Tests make secure frames refuse SetScale,
+  SetPoint, ClearAllPoints, Show, Hide, and SetAttribute in combat, as the
+  client does. `/targetexact` picks the nearest mob of that name, so
+  same-named mobs can be confused. Verify `/targetlasttarget` after
+  `/cleartarget` in client.
 
 ### Buff reminders (built)
 
@@ -346,7 +360,7 @@ frameworks without agreement.
 
 - Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, loaded in that order, plus
-  Textures/ShieldArc.tga and Textures/ShieldArcInner.tga. Shield.lua is the
+  Textures/ShieldArc.tga, Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga. Shield.lua is the
   shared component above; keep it free of MTF references. Commands parses `/mtf`; Core owns saved settings and
   their defaults, the login banner, class and install checks, slash conflict
   reporting, the hardware-input hooks trade placement waits for, and startup;
@@ -368,8 +382,8 @@ frameworks without agreement.
   Bedworth, and the release builder requires that exact notice.
 - The TOC uses `## Category: Mage`; keep it identical to the CurseForge main
   category, because the in-game AddOn list groups by exact text.
-- The runtime assets are Textures/ShieldArc.tga and ShieldArcInner.tga;
-  regenerate both with scripts/build_arc.py. Add no other runtime assets
+- The runtime assets are Textures/ShieldArc.tga, ShieldArcInner.tga, and
+  ShieldArcInnermost.tga; regenerate them with scripts/build_arc.py. Add no other runtime assets
   without agreement.
 - Git origin: git@github.com:jbedworth/MageToolsForever.git. Inspect Git state
   before acting and preserve user work. Text is LF under .gitattributes.
@@ -444,8 +458,8 @@ frameworks without agreement.
   changes; the builder puts it at the top of release-notes.md and fails
   without it.
 - Package only MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
-  Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga, and
-  Textures/ShieldArcInner.tga under the top-level `MageToolsForever/` folder, named
+  Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga,
+  Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga under the top-level `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
   `release.json` (flavor `forever`) attached for WowUp.
 - Publishing requires repository variables `ENABLE_GITHUB_RELEASES='true'` and,

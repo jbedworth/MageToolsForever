@@ -135,6 +135,8 @@ combat, and drops away the moment the shield is used up.
   crescent shows their combined total, refilled as each one lands, and a row
   of icons under the number shows which are up, each in its own spot; each
   icon drops the moment its shield breaks or ends, also in combat.
+- A Paladin's **Blessing of Protection** on you has no absorb either: it shows
+  as a gold arc innermost of all, draining with its time left.
 - Mana Shield spends your mana rather than adding to your absorb, so the game
   leaves it out of the total. It gets its own thinner crescent, nested
   inside, that drains with its time left and disappears when it breaks or

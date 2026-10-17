@@ -48,6 +48,7 @@ MageToolsForever/
     LICENSE
     Textures/ShieldArc.tga
     Textures/ShieldArcInner.tga
+    Textures/ShieldArcInnermost.tga
 ```
 
 The validator permits one optional empty root directory entry. Additional files
@@ -57,8 +58,8 @@ agent guidance, generated logs, and all credentials/player data.
 
 Use an explicit file allowlist. Do not ZIP the checkout and maintain a growing
 list of exclusions. Keep `LICENSE` in the package, but do not load it in the TOC.
-MTF ships two textures, `Textures/ShieldArc.tga` and `ShieldArcInner.tga`,
-the shield display's crescents, built by `scripts/build_arc.py`. The builder
+MTF ships three textures, `Textures/ShieldArc.tga`, `ShieldArcInner.tga`, and
+`ShieldArcInnermost.tga`, the shield display's crescents, built by `scripts/build_arc.py`. The builder
 requires each to be an uncompressed 32-bit square TGA with power-of-two sides.
 
 Validate the actual archive, not only the staging folder:
