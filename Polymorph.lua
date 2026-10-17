@@ -402,16 +402,28 @@ local function OnCastSent(target, castGUID, spellID)
     end
 end
 
-local function Mark(unit)
+-- The unit to mark: your target or focus when it is this mob (as TankHelper
+-- marks your target), else the unit that shows it. GetRaidTargetIndex can
+-- return a secret (pinned RaidMarkersDocumentation: SecretReturns), as it
+-- does in combat, so an unreadable marker never stops the mark: SetRaidTarget
+-- sets a marker outright (only Blizzard's SetRaidTargetIcon toggles one off),
+-- so setting it again is harmless; a readable equal one is left alone.
+local function Mark(guid, unit)
     if not MTF.db.polymorph.mark or type(SetRaidTarget) ~= "function" then
         return
     end
+    for _, candidate in ipairs({"target", "focus"}) do
+        if ReadGUID(candidate) == guid then
+            unit = candidate
+            break
+        end
+    end
     local index = GetRaidTargetIndex(unit)
-    if MTF.IsSecret(index) or index == MOON then
+    if not MTF.IsSecret(index) and index == MOON then
         return
     end
     SetRaidTarget(unit, MOON)
-    sheep.lastMark = unit
+    sheep.lastMark = unit .. (MTF.IsSecret(index) and " (marker unreadable)" or "")
 end
 
 local function OnCastSucceeded(castGUID)
@@ -432,7 +444,7 @@ local function OnCastSucceeded(castGUID)
     if not unit or not UnitCanAttack("player", unit) then
         return
     end
-    Mark(unit)
+    Mark(guid, unit)
     Track(guid, cast.target, C_Spell.GetSpellName(cast.spellID))
 end
 

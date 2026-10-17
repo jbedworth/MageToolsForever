@@ -184,7 +184,13 @@ local function fixture(options)
     env.UnitIsVisible = function(unit) return state.units[unit] ~= nil and state.units[unit].far ~= true end
     -- Raid markers, by unit's GUID.
     state.marks = {}
+    -- As on Forever, the marker index is secret in combat.
     env.GetRaidTargetIndex = function(unit)
+        if state.combat then
+            local value = secret()
+            state.secrets[value] = true
+            return value
+        end
         local data = state.units[unit]
         return data and state.marks[data.guid or data.name]
     end
@@ -192,6 +198,7 @@ local function fixture(options)
         local data = state.units[unit]
         state.marks[data.guid or data.name] = index
         state.markCount = (state.markCount or 0) + 1
+        state.markedUnit = unit
     end
     -- State drivers: "[@unit,harm,nodead] show; hide", evaluated by the game.
     state.drivers = {}
@@ -2151,6 +2158,20 @@ test("a landed Polymorph marks the mob with the moon and shows the bar on its un
     state.units.nameplate3.dead = true
     state.emit("UNIT_HEALTH", "nameplate3")
     equal(bar.shown, false, "gone when the mob dies")
+end)
+test("a Polymorph that lands in combat still gets the moon, on your target", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(state)
+    state.units.nameplate2 = state.units.target
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-c", POLYMORPH)
+    state.combat = true
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-c", POLYMORPH)
+    equal(state.marks["mob-1"], 5, "marked although the marker cannot be read in combat")
+    equal(state.markedUnit, "target", "your target, as TankHelper marks")
+    state.clear()
+    state.combat = false
+    state.slash("debug_polymorph")
+    contains(table.concat(state.messages, "|"), "marked=target (marker unreadable)")
 end)
 test("the mark switch and the bar's switch are respected", function()
     local state = mage({known = {[POLYMORPH] = true}})
