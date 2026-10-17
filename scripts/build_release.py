@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 ADDON = "MageToolsForever"
-RUNTIME_FILES = ("Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua",
+RUNTIME_FILES = ("Commands.lua", "Core.lua", "Layout.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua",
                  "Shield.lua", "Chimes.lua", "Options.lua")
 TEXT_FILES = (ADDON + ".toc",) + RUNTIME_FILES + ("LICENSE",)
 # Runtime textures shipped in the package: the shield display's crescents,

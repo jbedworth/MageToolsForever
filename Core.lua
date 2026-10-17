@@ -58,7 +58,7 @@ local REQUIRED_NAMESPACE = {
     "ParseCommand", "HandleCommand",
     "CheckConjureCapabilities", "InitializeConjure", "RefreshConjure", "ResetConjurePosition",
     "ApplyConjureMacros", "ReportConjureStatus", "ReportConjureDebug", "ReportClickDebug",
-    "AddInputHandler", "RunOnNextInput",
+    "AddInputHandler", "RunOnNextInput", "RegisterMovable", "BeginDrag", "EndDrag", "ScaleKeepingCenter",
     "InitializePortals", "RefreshPortals", "ResetPortalsPosition", "ReportPortalsDebug",
     "InitializePolymorph", "RefreshPolymorph", "ResetPolymorphPosition", "ReportPolymorphDebug",
     "InitializeReminders", "RefreshReminders", "ResetRemindersPosition", "ReportRemindersDebug",
@@ -626,8 +626,8 @@ function MTF.SetFramesLocked(locked)
     if locked then
         MTF.Report("All MTF frames locked.")
     else
-        MTF.Report("All MTF frames unlocked: drag them where you want (scroll over a buff reminder to resize "
-            .. "it), then type /mtf lock.")
+        MTF.Report("All MTF frames unlocked: drag them where you want (Shift-drag moves a snapped group; "
+            .. "scroll over a buff reminder to resize it), then type /mtf lock.")
     end
 end
 

@@ -37,6 +37,7 @@ MageToolsForever/
     MageToolsForever.toc
     Commands.lua
     Core.lua
+    Layout.lua
     Conjure.lua
     Portals.lua
     Polymorph.lua
@@ -64,7 +65,7 @@ Validate the actual archive, not only the staging folder:
 
 1. Check CRC/integrity, non-empty files, and the exact file list.
 2. Reject absolute paths, traversal paths, symlinks, and extra root folders.
-3. Verify the TOC name, Interface `16001`, and Commands/Core/Conjure/Portals/Polymorph/Reminders/Shield/Chimes/
+3. Verify the TOC name, Interface `16001`, and Commands/Core/Layout/Conjure/Portals/Polymorph/Reminders/Shield/Chimes/
    Options load order. Every listed runtime file must exist inside the archive.
 4. Verify the packaged version matches the selected tag, with one leading `v`
    removed. Verify the packaged MIT copyright/permission notice is intact.

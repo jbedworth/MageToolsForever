@@ -109,9 +109,8 @@ never counted or buffed. Armor recasts the armor you used last (or your best),
 and Dampen or Amplify Magic the same.
 
 Unlock frames to drag each icon where you want it and scroll over it to
-resize it. Icons are magnetic: drop one near another and it snaps beside it,
-20 pixels apart and lined up. Hold **Shift** while dragging to move a whole
-snapped group together.
+resize it; like every MTF frame, they snap together (see
+[Moving frames](#moving-frames)).
 
 ## Announce
 
@@ -142,7 +141,8 @@ combat, and drops away the moment the shield is used up.
   ends. Absorb shields drain only as they absorb, and drop when they break or
   expire.
 - The shield display works for any shield, so other AddOns can ship it too.
-  If more than one does, you still see one ring, from the newest version.
+  If more than one does (Warlock Tools Forever ships it too), you still see one
+  ring, from the newest version among the AddOns running on your character.
 - **Display size** on the Shield settings page shrinks or grows it (50-150%).
 - While frames are unlocked (see [Moving frames](#moving-frames)) it shows a
   full sample of every part to drag; locked (the default), it never blocks
@@ -172,7 +172,9 @@ All MTF frames move together. Tick **Unlock frames to move them** on the
 main MTF settings page, or type `/mtf unlock`: every MTF frame (the
 conjure, portal, and Polymorph bars, the buff reminders, and the shield
 display) gets a gold outline, and you can drag them; scroll over a buff
-reminder to resize it. Untick it, or
+reminder to resize it. Frames are magnetic: drop one near another and it
+snaps beside it, 20 pixels apart and lined up. Hold **Shift** while dragging
+to move a whole snapped group together. Untick it, or
 type `/mtf lock`, to lock them again. `/mtf reset` puts them back in their
 default places and sizes. Everything starts locked.
 

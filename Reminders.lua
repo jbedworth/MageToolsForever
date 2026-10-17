@@ -36,10 +36,8 @@ MTF.REMINDER_SCALE_STEP = 10
 MTF.DEFAULT_REMINDER_SCALE = 100
 
 local ICON_SIZE = 40
--- The snapped gap and how near a drop must be to snap, in UIParent units.
+-- The default row's gap, the snapped gap.
 local ICON_GAP = 20
-local SNAP_RANGE = 24
-local SNAP_TOLERANCE = 1.5
 local BORDER = 3
 local GOLD = {1, 0.82, 0}
 local PULSE_SECONDS = 0.6
@@ -309,131 +307,16 @@ function MTF.ResetRemindersPosition()
     MTF.RefreshReminders()
 end
 
--- Snapping ---------------------------------------------------------------------
--- Geometry in UIParent units, so icons of different sizes line up.
-
-local function Geometry(icon)
-    local ratio = icon:GetEffectiveScale() / UIParent:GetEffectiveScale()
-    local x, y = icon:GetCenter()
-    return x * ratio, y * ratio, icon:GetWidth() * ratio / 2
-end
-
--- Anchors an icon's center at a UIParent point and saves it.
-local function MoveTo(icon, x, y)
-    local ratio = UIParent:GetEffectiveScale() / icon:GetEffectiveScale()
-    local position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = x * ratio, y = y * ratio}
-    icon:ClearAllPoints()
-    icon:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
-    MTF.db.reminders.icons[icon.key].position = position
-end
-
-local function ShownIcons()
-    local shown = {}
-    for _, reminder in ipairs(MTF.REMINDERS) do
-        local icon = reminders.icons[reminder.key]
-        if icon:IsShown() then
-            shown[#shown + 1] = icon
-        end
-    end
-    return shown
-end
-
--- Two icons are snapped when side by side (or stacked) the gap apart and aligned.
-local function Snapped(a, b)
-    local ax, ay, ah = Geometry(a)
-    local bx, by, bh = Geometry(b)
-    local apart = ah + bh + ICON_GAP
-    local dx, dy = math.abs(ax - bx), math.abs(ay - by)
-    return (math.abs(dx - apart) <= SNAP_TOLERANCE and dy <= SNAP_TOLERANCE)
-        or (math.abs(dy - apart) <= SNAP_TOLERANCE and dx <= SNAP_TOLERANCE)
-end
-
--- Every icon joined to this one through snapped neighbors.
-local function SnappedGroup(icon)
-    local group, seen, queue = {}, {[icon] = true}, {icon}
-    local shown = ShownIcons()
-    while #queue > 0 do
-        local current = table.remove(queue, 1)
-        group[#group + 1] = current
-        for _, other in ipairs(shown) do
-            if not seen[other] and Snapped(current, other) then
-                seen[other] = true
-                queue[#queue + 1] = other
-            end
-        end
-    end
-    return group
-end
-
--- The nearest spot beside another icon within reach, or nil.
-local function SnapPoint(icon, skip)
-    local x, y, half = Geometry(icon)
-    local bestX, bestY, bestDistance
-    for _, other in ipairs(ShownIcons()) do
-        if not skip[other] then
-            local ox, oy, otherHalf = Geometry(other)
-            local apart = half + otherHalf + ICON_GAP
-            for _, spot in ipairs({{ox + apart, oy}, {ox - apart, oy}, {ox, oy + apart}, {ox, oy - apart}}) do
-                local distance = math.sqrt((spot[1] - x) ^ 2 + (spot[2] - y) ^ 2)
-                if distance <= SNAP_RANGE and (not bestDistance or distance < bestDistance) then
-                    bestX, bestY, bestDistance = spot[1], spot[2], distance
-                end
-            end
-        end
-    end
-    return bestX, bestY
-end
-
-local function StartDrag(icon)
-    if MTF.db.locked or InCombatLockdown() then
-        return
-    end
-    -- Shift: the snapped group follows, anchored to the dragged icon.
-    reminders.dragging = {icon}
-    if IsShiftKeyDown() then
-        reminders.dragging = SnappedGroup(icon)
-        local scale = icon:GetEffectiveScale()
-        local leadX, leadY = icon:GetCenter()
-        for index = 2, #reminders.dragging do
-            local follower = reminders.dragging[index]
-            local followerScale = follower:GetEffectiveScale()
-            local x, y = follower:GetCenter()
-            follower:ClearAllPoints()
-            follower:SetPoint("CENTER", icon, "CENTER", (x * followerScale - leadX * scale) / followerScale,
-                (y * followerScale - leadY * scale) / followerScale)
-        end
-    end
-    icon:StartMoving()
-end
-
-local function StopDrag(icon)
-    icon:StopMovingOrSizing()
-    local moved = reminders.dragging or {icon}
-    reminders.dragging = nil
-    local inGroup = {}
-    for _, member in ipairs(moved) do
-        inGroup[member] = true
-    end
-    local x, y = Geometry(icon)
-    local snapX, snapY = SnapPoint(icon, inGroup)
-    local shiftX, shiftY = (snapX or x) - x, (snapY or y) - y
-    for _, member in ipairs(moved) do
-        local memberX, memberY = Geometry(member)
-        MoveTo(member, memberX + shiftX, memberY + shiftY)
-    end
-end
-
--- Resizing keeps the icon's center where it is.
+-- Dragging and snapping: Layout.lua. The mouse wheel resizes in 10% steps,
+-- keeping the icon's center.
 local function Resize(icon, delta)
     if MTF.db.locked or InCombatLockdown() then
         return
     end
     local saved = MTF.db.reminders.icons[icon.key]
     local step = delta > 0 and MTF.REMINDER_SCALE_STEP or -MTF.REMINDER_SCALE_STEP
-    local x, y = Geometry(icon)
     saved.scale = MTF.SanitizeReminderScale(saved.scale + step)
-    icon:SetScale(saved.scale / 100)
-    MoveTo(icon, x, y)
+    MTF.ScaleKeepingCenter(icon, saved.scale / 100)
 end
 
 local function ShowTooltip(icon)
@@ -465,8 +348,8 @@ local function CreateIcon(reminder)
     icon:RegisterForClicks("AnyUp", "AnyDown")
     icon:SetAttribute("useOnKeyDown", false)
     icon:RegisterForDrag("LeftButton")
-    icon:SetScript("OnDragStart", StartDrag)
-    icon:SetScript("OnDragStop", StopDrag)
+    icon:SetScript("OnDragStart", MTF.BeginDrag)
+    icon:SetScript("OnDragStop", MTF.EndDrag)
     icon:SetScript("OnMouseWheel", Resize)
     icon:SetScript("OnEnter", ShowTooltip)
     icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -493,6 +376,7 @@ local function CreateIcon(reminder)
     icon.pulse = pulse
     icon.mover = MTF.CreateMover(icon)
     icon.mover.hint:SetText("")
+    MTF.RegisterMovable(icon, function(position) MTF.db.reminders.icons[reminder.key].position = position end)
     icon:Hide()
     return icon
 end

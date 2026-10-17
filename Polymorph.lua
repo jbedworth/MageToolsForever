@@ -121,7 +121,8 @@ local function KnowsPolymorph()
     return false
 end
 
--- The unit showing this mob now: its nameplate, else target, focus, or mouseover.
+-- The unit showing this mob now: its nameplate, else target or focus. Not
+-- mouseover: it changes with the pointer and has no event MTF rebinds on.
 local function FindUnit(guid)
     if not guid then
         return nil
@@ -132,7 +133,7 @@ local function FindUnit(guid)
             return unit
         end
     end
-    for _, unit in ipairs({"target", "focus", "mouseover"}) do
+    for _, unit in ipairs({"target", "focus"}) do
         if ReadGUID(unit) == guid then
             return unit
         end
@@ -243,16 +244,13 @@ local function ShowTooltip(button)
     GameTooltip:Show()
 end
 
+-- Dragging and snapping: Layout.lua. The holder moves; the bar rides on it.
 local function StartDrag()
-    if not MTF.db.locked and not InCombatLockdown() then
-        holder:StartMoving()
-    end
+    MTF.BeginDrag(holder)
 end
 
 local function StopDrag()
-    holder:StopMovingOrSizing()
-    local point, _, relativePoint, x, y = holder:GetPoint()
-    MTF.db.polymorph.position = {point = point, relativePoint = relativePoint, x = x, y = y}
+    MTF.EndDrag(holder)
 end
 
 local function Place()
@@ -302,6 +300,7 @@ local function CreateBar()
     holder:RegisterForDrag("LeftButton")
     holder:SetScript("OnDragStart", StartDrag)
     holder:SetScript("OnDragStop", StopDrag)
+    MTF.RegisterMovable(holder, function(position) MTF.db.polymorph.position = position end)
     holder:SetScript("OnEnter", ShowTooltip)
     holder:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- The bar sits on the holder and takes no mouse, so clicks reach the holder.
