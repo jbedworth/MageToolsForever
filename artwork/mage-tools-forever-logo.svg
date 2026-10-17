@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Mage Tools Forever</title>
+  <desc id="description">An original arcane sigil: a glowing blue four-pointed star, edged in gold, with a bright arcane orb at its heart, inside a rune ring on a rich dark-brown field framed by a fine gold border.</desc>
+  <defs>
+    <radialGradient id="background" cx="50%" cy="42%" r="70%">
+      <stop offset="0" stop-color="#49301c"/>
+      <stop offset="0.6" stop-color="#2b190f"/>
+      <stop offset="1" stop-color="#170e09"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4d38b"/>
+      <stop offset="0.32" stop-color="#d5a956"/>
+      <stop offset="0.64" stop-color="#96703a"/>
+      <stop offset="1" stop-color="#e9bf6a"/>
+    </linearGradient>
+    <linearGradient id="arcane" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9fe6ff"/>
+      <stop offset="0.5" stop-color="#3d8fe8"/>
+      <stop offset="1" stop-color="#1c3f9c"/>
+    </linearGradient>
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#4fa8ff" stop-opacity="0.35"/>
+      <stop offset="0.7" stop-color="#1f5bb8" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#0b1f4a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orb" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.35" stop-color="#b8ecff"/>
+      <stop offset="1" stop-color="#2560c4"/>
+    </radialGradient>
+    <filter id="shadow" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#080502" flood-opacity="0.7"/>
+    </filter>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+    <!-- The star: four long points, and four short ones turned 45 degrees. -->
+    <path id="star" d="M512 222 Q530 462 770 480 Q530 498 512 738 Q494 498 254 480 Q494 462 512 222 Z"/>
+    <path id="small" d="M512 282 Q524 468 710 480 Q524 492 512 678 Q500 492 314 480 Q500 468 512 282 Z" transform="rotate(45 512 480)"/>
+    <!-- A lighter facet inside the star, for depth. -->
+    <path id="facet" d="M512 300 Q522 470 692 480 Q522 490 512 660 Q502 490 332 480 Q502 470 512 300 Z"/>
+    <linearGradient id="deep" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5a7ee8"/>
+      <stop offset="1" stop-color="#1a2f78"/>
+    </linearGradient>
+    <linearGradient id="light" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e6f8ff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#7cc4ff" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+  <path d="M0 0H1024V1024H0Z" fill="url(#background)"/>
+  <rect x="46" y="46" width="932" height="932" rx="94" fill="none" stroke="url(#gold)" stroke-width="5"/>
+  <rect x="62" y="62" width="900" height="900" rx="80" fill="none" stroke="#b48b45" stroke-opacity="0.28" stroke-width="2"/>
+  <path d="M512 91 L525 108 L512 125 L499 108 Z M512 899 L525 916 L512 933 L499 916 Z" fill="url(#gold)"/>
+  <!-- An arcane aura behind the sigil. -->
+  <circle cx="512" cy="480" r="360" fill="url(#aura)"/>
+  <g filter="url(#shadow)">
+    <circle cx="512" cy="480" r="300" fill="#0d1426" fill-opacity="0.55"/>
+    <!-- Glow pass: the ring and star blurred, then drawn sharp on top. -->
+    <g filter="url(#glow)" opacity="0.6">
+      <circle cx="512" cy="480" r="300" fill="none" stroke="#5fb6ff" stroke-width="30"/>
+      <use href="#star" fill="#5fb6ff"/>
+      <use href="#small" fill="#5fb6ff"/>
+    </g>
+    <!-- Gold edges, then the arcane band. -->
+    <circle cx="512" cy="480" r="300" fill="none" stroke="url(#gold)" stroke-width="30"/>
+    <circle cx="512" cy="480" r="300" fill="none" stroke="url(#arcane)" stroke-width="22"/>
+    <!-- Rune marks on the band, every 30 degrees. -->
+    <g stroke="#f0ca78" stroke-width="5" stroke-linecap="round" opacity="0.9">
+      <path d="M512 172 V188" transform="rotate(15 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(45 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(75 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(105 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(135 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(165 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(195 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(225 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(255 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(285 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(315 512 480)"/>
+      <path d="M512 172 V188" transform="rotate(345 512 480)"/>
+    </g>
+    <!-- The short points behind, the long star in front. -->
+    <use href="#small" fill="url(#deep)" stroke="url(#gold)" stroke-width="8" stroke-linejoin="round"/>
+    <use href="#star" fill="url(#arcane)" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round"/>
+    <use href="#facet" fill="url(#light)" opacity="0.55"/>
+    <!-- Fine outer and inner rings, as on the other Forever logos. -->
+    <circle cx="512" cy="480" r="338" fill="none" stroke="#f0ca78" stroke-opacity="0.45" stroke-width="2"/>
+    <circle cx="512" cy="480" r="350" fill="none" stroke="#b48b45" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="3 12"/>
+    <!-- The arcane orb at the heart. -->
+    <circle cx="512" cy="480" r="70" fill="#9fe0ff" opacity="0.8" filter="url(#glow)"/>
+    <circle cx="512" cy="480" r="46" fill="url(#orb)" stroke="url(#gold)" stroke-width="6"/>
+    <!-- Three small sparkles drifting off the sigil. -->
+    <g fill="#d8f4ff">
+      <path d="M712 268 Q715 285 732 288 Q715 291 712 308 Q709 291 692 288 Q709 285 712 268 Z"/>
+      <path d="M318 662 Q320 674 332 676 Q320 678 318 690 Q316 678 304 676 Q316 674 318 662 Z"/>
+      <path d="M736 640 Q738 649 747 651 Q738 653 736 662 Q734 653 725 651 Q734 649 736 640 Z"/>
+    </g>
+  </g>
+  <path d="M359 850H457 M567 850H665" fill="none" stroke="#b98e47" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round"/>
+  <path d="M512 837 L524 850 L512 863 L500 850 Z" fill="url(#gold)"/>
+</svg>

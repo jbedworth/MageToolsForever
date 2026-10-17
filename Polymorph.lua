@@ -18,8 +18,9 @@ local _, MTF = ...
 --
 -- Clicking the bar re-sheeps the mob: a secure macro targets it by name,
 -- casts Polymorph, and goes back to your target. Secure attributes change only
--- out of combat, so a Polymorph begun in combat on a different mob updates
--- the click when combat ends. The secure button holds the bar's place; the
+-- out of combat, so the click is set as the cast starts (a pull's Polymorph
+-- starts before combat); one begun in combat on a different mob updates the
+-- click when combat ends. The secure button holds the bar's place; the
 -- bar is an ordinary frame on top, so it can show and hide in combat.
 
 -- Classic IDs: Polymorph ranks, then Pig, Turtle, and Cow. Every spellbook
@@ -112,7 +113,7 @@ local function BuildSpellSet()
 end
 
 local function KnowsPolymorph()
-    for _, id in ipairs(POLYMORPH_IDS) do
+    for id in pairs(sheep.ids) do
         if C_SpellBook.IsSpellKnown(id) == true then
             return true
         end
@@ -194,7 +195,7 @@ local function ApplyClick()
     end
     sheep.clickDirty = false
     local settings = MTF.db.polymorph
-    local name, spell = sheep.mobName, sheep.spellName
+    local name, spell = sheep.clickName, sheep.clickSpell
     if name and spell then
         -- A missing mob leaves no target, so nothing else gets sheeped.
         holder:SetAttribute("type1", "macro")
@@ -210,14 +211,15 @@ local function ApplyClick()
 end
 
 local function Forget()
-    sheep.guid, sheep.mobName = nil, nil
+    sheep.guid, sheep.mobName, sheep.clickName = nil, nil, nil
     Bind(nil)
     Layout()
     ApplyClick()
 end
 
 local function Track(guid, mobName, spellName)
-    sheep.guid, sheep.mobName, sheep.spellName = guid, mobName, spellName
+    sheep.guid, sheep.mobName = guid, mobName
+    sheep.clickName, sheep.clickSpell = mobName, spellName
     local token = {}
     sheep.token = token
     Bind(FindUnit(guid))
@@ -377,8 +379,15 @@ local function OnCastSent(target, castGUID, spellID)
     local unit = FindCastUnit(target)
     sheep.casts[castGUID] = {target = target, spellID = spellID, guid = unit and ReadGUID(unit)}
     sheep.lastCast = {spellID = spellID, target = target}
-    if MTF.db.polymorph.enabled then
-        AnnounceCast(target)
+    if not MTF.db.polymorph.enabled then
+        return
+    end
+    AnnounceCast(target)
+    -- A pull's Polymorph starts out of combat and lands in it: set the click
+    -- now, while the game still allows it.
+    if not InCombatLockdown() then
+        sheep.clickName, sheep.clickSpell = target, C_Spell.GetSpellName(spellID)
+        ApplyClick()
     end
 end
 
@@ -519,6 +528,8 @@ function MTF.ReportPolymorphDebug()
     if last then
         MTF.Report(string.format("debug_polymorph lastCast spell=%d target=%s", last.spellID, last.target))
     end
-    MTF.Report(string.format("debug_polymorph mob=%s unit=%s click=%s marked=%s", tostring(sheep.mobName),
-        tostring(bar.boundUnit), tostring(holder.mobName), tostring(sheep.lastMark)))
+    MTF.Report(string.format("debug_polymorph mob=%s unit=%s marked=%s", tostring(sheep.mobName),
+        tostring(bar.boundUnit), tostring(sheep.lastMark)))
+    MTF.Report(string.format("debug_polymorph click shown=%s type=%s macro=%s", tostring(holder:IsShown()),
+        tostring(holder:GetAttribute("type1")), tostring(holder:GetAttribute("macrotext1")):gsub("\n", " | ")))
 end
