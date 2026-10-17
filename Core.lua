@@ -58,6 +58,7 @@ local REQUIRED_NAMESPACE = {
     "ParseCommand", "HandleCommand",
     "CheckConjureCapabilities", "InitializeConjure", "RefreshConjure", "ResetConjurePosition",
     "ApplyConjureMacros", "ReportConjureStatus", "ReportConjureDebug", "ReportClickDebug",
+    "CharacterMacrosAvailable", "WriteCharacterMacro", "DeleteCharacterMacro", "ApplyPolymorphMacro",
     "AddInputHandler", "RunOnNextInput", "RegisterMovable", "BeginDrag", "EndDrag", "ScaleKeepingCenter",
     "InitializePortals", "RefreshPortals", "ResetPortalsPosition", "ReportPortalsDebug",
     "InitializePolymorph", "RefreshPolymorph", "ResetPolymorphPosition", "ReportPolymorphDebug",
@@ -377,6 +378,7 @@ function MTF.SanitizeDB(db)
         position = SanitizePosition(polymorph.position),
         scale = MTF.SanitizeScale(polymorph.scale),
         mark = polymorph.mark ~= false,
+        macro = polymorph.macro ~= false,
     }
     local reminders = type(db.reminders) == "table" and db.reminders or {}
     local reminderSpells = type(reminders.spells) == "table" and reminders.spells or {}

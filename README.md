@@ -85,8 +85,12 @@ target, and if the Polymorph breaks early, the bar empties so you see it.
   Defias Pillager; you spank it, you tank it."
 - When the cast lands, MTF marks the mob with the moon. (In a raid, only the
   leader and assistants can mark.)
-- **Click the bar** to sheep the same mob again: MTF targets it by name,
-  casts the same Polymorph, and goes back to your target. The game lets the
+- **"! Polymorph"** in your character macros (once you know Polymorph) focuses
+  the hostile mob under your mouse (or your target, out of combat) and sheeps
+  your focus. The bar follows your focus, so it keeps the timer while you fight
+  something else.
+- **Click the bar** to sheep your focus again; with no focus, MTF targets the
+  mob by name, casts the same Polymorph, and goes back to your target. The game lets the
   click change only out of combat, so after sheeping a different mob in
   combat, the click catches up when combat ends. With several mobs of the same
   name, it picks the nearest.

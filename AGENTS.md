@@ -292,7 +292,14 @@ frameworks without agreement.
 - When the cast succeeds, the moon raid marker (index 5) via `SetRaidTarget`,
   skipped when the mob already has the moon; switch on the Polymorph page, on by
   default. In a raid only leaders and assistants can mark.
-- Click to re-sheep (author-approved, "if we can"): the bar sits on a secure
+- "! Polymorph" (author-approved, after the author's own, `polymorph.macro`):
+  once you know Polymorph, `#showtooltip`, `/focus [@mouseover,harm,nodead]
+  [nocombat,harm,nodead]`, `/cast [@focus,harm,nodead] Polymorph`. It does not
+  `/tm`: MTF marks on landing, and a second mark would toggle it off.
+  The bar finds the sheep through your focus, then target, then its nameplate.
+- Click to re-sheep (author-approved, "if we can"; on your focus first since
+  the author's focus workflow: `/cast [@focus,harm,nodead] <spell>`,
+  `/stopmacro [@focus,exists]`, then by name): the bar sits on a secure
   button (`MageToolsForeverPolymorph`, the drag anchor); the visible bar is an
   ordinary frame anchored to it, so it shows and hides in combat. The macro is
   `/cleartarget`, `/targetexact <mob>`, `/cast [@target,harm,nodead]
