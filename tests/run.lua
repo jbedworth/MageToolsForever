@@ -194,9 +194,12 @@ local function fixture(options)
         local data = state.units[unit]
         return data and state.marks[data.guid or data.name]
     end
+    -- As in client, setting the marker a unit already has clears it.
     env.SetRaidTarget = function(unit, index)
         local data = state.units[unit]
-        state.marks[data.guid or data.name] = index
+        local key = data.guid or data.name
+        if state.marks[key] == index then index = nil end
+        state.marks[key] = index
         state.markCount = (state.markCount or 0) + 1
         state.markedUnit = unit
     end
@@ -2168,6 +2171,11 @@ test("a Polymorph that lands in combat still gets the moon, on your target", fun
     state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-c", POLYMORPH)
     equal(state.marks["mob-1"], 5, "marked although the marker cannot be read in combat")
     equal(state.markedUnit, "target", "your target, as TankHelper marks")
+    -- A recast in combat on the same mob must not toggle the moon off.
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-d", POLYMORPH)
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-d", POLYMORPH)
+    equal(state.marks["mob-1"], 5, "still the moon after a recast")
+    equal(state.markCount, 1, "marked once")
     state.clear()
     state.combat = false
     state.slash("debug_polymorph")
