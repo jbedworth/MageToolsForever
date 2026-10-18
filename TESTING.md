@@ -67,6 +67,10 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
   readable in combat; aura APIs error in combat for AddOn code; `/click` does
   not press AddOn buttons; trade placement from `TRADE_SHOW` works; macros need
   `Constants.MacroConsts.MAX_CHARACTER_MACROS`.
+- The minimum-absorb gate (shield display v5) works: a frame anchored to a
+  StatusBar's fill texture follows a secret value, and its clipping hides the
+  crescent while the fill is empty. A Paladin's Seal of Righteousness shield
+  no longer flickers the ring (confirmed on a Paladin).
 
 ### Open client questions
 

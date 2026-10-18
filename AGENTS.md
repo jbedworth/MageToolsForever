@@ -128,6 +128,13 @@ frameworks without agreement.
   StatusBar fills its whole height, so across the full square a timed bar
   emptied a segment or more before its buff ended (found in client; the
   fix confirmed on a Mage).
+- Version 5 (with MTF and WTF; found in client): absorbs
+  under the larger of 25 points and 5% of max health (25 when max health is
+  secret) never show; a Paladin's Seal of Righteousness proc, 10-20 points,
+  flickered the ring. The absorb cannot be compared, so a hidden gate
+  StatusBar, one point wide and ending at the minimum, takes it as its value,
+  and a clipping frame anchored to the gate's fill holds the crescent and the
+  number (confirmed on a Paladin). Fixed constants, no setting.
 - The icon row holds the player's own class's shields (`class` on each
   entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
   Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a

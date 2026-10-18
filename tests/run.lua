@@ -625,6 +625,11 @@ local function fixture(options)
         function object:SetMinMaxValues(minValue, maxValue) self.minValue, self.maxValue = minValue, maxValue end
         function object:SetStatusBarTexture(texture) self.statusBarTexture = texture end
         function object:SetValue(value) self.value = value end
+        function object:GetStatusBarTexture()
+            self.fill = self.fill or widget("Texture", nil, self)
+            return self.fill
+        end
+        function object:SetClipsChildren(value) self.clips = value end
         function object:SetDesaturated(value) self.desaturated = value == true end
         function object:EnableMouse(value) self.mouse = value == true end
         function object:SetAlpha(value) self.alpha = value end
@@ -1657,6 +1662,20 @@ test("an absorb MTF cannot name, from another player or a trinket, shows for 30 
     state.runTimers()
     equal(ring.shown, false)
 end)
+test("a tiny absorb stays hidden: a gate bar ending at the minimum clips the ring", function()
+    local state = mage()
+    local ring = state.mtf.ShieldDisplay.frame
+    state.emit("UNIT_ABSORB_AMOUNT_CHANGED", "player")
+    equal(ring.gate.value, state.absorb, "the secret absorb, passed on unread")
+    equal(ring.gate.minValue, 74, "one point wide, so the fill is empty or full")
+    equal(ring.gate.maxValue, 75, "5% of 1500 health beats 25 points")
+    equal(ring.gated.clips, true)
+    equal(ring.gated.points[2][2], ring.gate:GetStatusBarTexture(), "the clip ends where the gate's fill ends")
+    equal(ring.bar.parent, ring.gated)
+    equal(ring.gated.parent, ring.visible, "the opacity still follows the absorb")
+    state.slash("unlock")
+    equal(ring.gate.value, 1, "unlocked, the gate is open for the sample")
+end)
 test("a known shield going is not mistaken for another absorb", function()
     local state = mage()
     local ring = state.mtf.ShieldDisplay.frame
@@ -1690,13 +1709,14 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(said[1], "shown by MageToolsForever")
     state.clear()
     state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v4 (running), ShieldForever v1 (running)")
+    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v5 (running), ShieldForever v1 (running)")
+    contains(table.concat(state.messages, "|"), "minimumAbsorb=75")
     local text = table.concat(state.messages, "|")
     contains(text, "the absorb total shows above your character")
     equal(text:find("failed", 1, true), nil, "every debug step ran")
 end)
 test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 5}}})
+    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 6}}})
     equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
     local other = state.copies.ShieldForever.ShieldDisplay
     other.Initialize({settings = function() return other.Sanitize({}) end, report = function() end})
