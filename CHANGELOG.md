@@ -4,6 +4,13 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 0.2.1-beta
+
+- Shield display: tiny shields no longer flicker the crescent. Absorbs under 25 points or 5% of your health, whichever is larger, are not drawn (a Paladin's Seal of Righteousness gives one of 10-20 points).
+- The sound when a shield ends now plays (the old sound did not play on Forever). Choose it from nine sounds under its switch; choosing one plays it.
+- Cooldown chimes: Dyre's Picks, nine new sounds, lead each chime's sound menu.
+- With Dyre's Shields Up (formerly Shields Up Forever) also installed, you still see one display.
+
 ## 0.2.0-beta
 
 - Every frame is magnetic: drop the conjure, portal, or Polymorph bar or a buff reminder near another and it snaps beside it, lined up. Shift-drag moves a snapped group. A drop that combat interrupts finishes when combat ends.
