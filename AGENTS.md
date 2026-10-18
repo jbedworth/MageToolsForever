@@ -122,6 +122,12 @@ frameworks without agreement.
   buffs others cast cannot be read: the outer crescent is invisible with no
   absorb, and the engine shows each icon and timed crescent only while its
   buff is up.
+- Version 4: each crescent texture spans its own height (scripts/build_arc.py
+  stretches it; Shield.lua's `*_SPAN` constants match, checked by a Python
+  test), and every crescent texture and bar is drawn at that height. A
+  StatusBar fills its whole height, so across the full square a timed bar
+  emptied a segment or more before its buff ended (found in client; the
+  fix confirmed on a Mage).
 - The icon row holds the player's own class's shields (`class` on each
   entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
   Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
@@ -165,8 +171,8 @@ frameworks without agreement.
   tracker) on `player`, filter `HELPFUL`, a slot per known shield with
   `includeSpellIDs` = a set `{[rankID] = true}` of its ranks (a list matches
   nothing, found in client) (Classic IDs match on Forever: Mana Shield
-  1463, Fire Ward 543), icon and cooldown swipe; the engine shows and hides
-  each icon, also in combat. `IsShown` on those icons is secret to AddOn code
+  1463, Fire Ward 543, Power Word: Shield), icon and cooldown swipe; the
+  engine shows and hides each icon, also in combat. `IsShown` on those icons is secret to AddOn code
   (found in client), so each shield has a fixed spot (mage shields 1-4,
   others share 5); never lay them out by visibility. The row sits outside the
   opacity frame, so a shield the total leaves out still shows its icon:
