@@ -1,4 +1,4 @@
-local _, MTF = ...
+local addonName, MTF = ...
 
 -- Cooldown chimes: a sound just before Blink, Frost Nova, and your other
 -- chosen spells are ready again (author-approved, after MageAlert), also in
@@ -26,6 +26,18 @@ end
 
 local function Timers()
     return type(C_Timer) == "table" and type(C_Timer.After) == "function"
+end
+
+-- The effect sounds ship with the AddOn; the client plays no game sound by
+-- path, but plays an AddOn's own file.
+local SOUND_FOLDER = "Interface\\AddOns\\" .. addonName .. "\\Sounds\\"
+
+local function SoundFile(key)
+    for _, sound in ipairs(MTF.CHIME_SOUNDS) do
+        if sound.key == key and sound.file then
+            return SOUND_FOLDER .. sound.file
+        end
+    end
 end
 
 local function SoundKit(key)
@@ -74,6 +86,9 @@ local function Speak(text)
 end
 
 local function SoundAvailable(sound)
+    if sound.file then
+        return type(PlaySoundFile) == "function"
+    end
     if sound.voice then
         return SpeechVoice() ~= nil
     end
@@ -127,6 +142,13 @@ local function Play(chime)
     local key = MTF.db.chimes.sounds[chime.key]
     if key == "voice" then
         Speak(chime.label .. " ready")
+        return
+    end
+    local file = SoundFile(key)
+    if file then
+        if type(PlaySoundFile) == "function" then
+            PlaySoundFile(file, "Master")
+        end
         return
     end
     local kit = SoundKit(key) or SoundKit(MTF.DEFAULT_CHIME_SOUND)

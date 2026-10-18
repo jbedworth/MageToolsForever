@@ -71,6 +71,9 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
   StatusBar's fill texture follows a secret value, and its clipping hides the
   crescent while the fill is empty. A Paladin's Seal of Righteousness shield
   no longer flickers the ring (confirmed on a Paladin).
+- The break sound: the client plays no game sound by path (RaidWarning.ogg
+  stayed silent); an AddOn's own file plays, also through `AddAuraSound`
+  with trigger Removed when Blessing of Protection runs out.
 
 ### Open client questions
 
@@ -80,7 +83,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
    combat.
 3. Whether `PlaySound` plays from a timer in combat, which cooldowns are
    readable out of combat, and whether the Mainline SOUNDKIT sounds exist.
-4. Whether the break sound's trigger Removed fires for each shield.
+4. Whether the break sound plays when a shield breaks from damage in combat.
 
 ## In-client checklist
 

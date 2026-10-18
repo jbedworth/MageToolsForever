@@ -190,6 +190,17 @@ local LEARNED_MAX = 1200
 -- Chime sounds: the client's own interface sounds, by SOUNDKIT name, from the
 -- pinned SoundKitConstants. A name the client lacks is left out of the list.
 MTF.CHIME_SOUNDS = {
+    -- Dyre's Picks, first (author-approved): the AddOn's own sounds, shipped in
+    -- Sounds/ with the shield display's break sounds and played by file.
+    {key = "effectfadingslow", label = "Dyre's Picks: Fading slow disappear", file = "FadingSlowDisappear.mp3"},
+    {key = "effectblowswoosh", label = "Dyre's Picks: Disappear blow swoosh", file = "DisappearBlowSwoosh.mp3"},
+    {key = "effectcartoonvanish", label = "Dyre's Picks: Cartoon vanish", file = "CartoonVanish.mp3"},
+    {key = "effectdisappear", label = "Dyre's Picks: Disappear", file = "Disappear.mp3"},
+    {key = "effectmagical", label = "Dyre's Picks: Magical disappear", file = "MagicalDisappear.mp3"},
+    {key = "effectdisappearshort", label = "Dyre's Picks: Disappear (short)", file = "DisappearShort.wav"},
+    {key = "effectdisappearingswoosh", label = "Dyre's Picks: Disappearing swoosh", file = "DisappearingSwoosh.wav"},
+    {key = "effectteleportvanish", label = "Dyre's Picks: Teleport warp vanish", file = "TeleportWarpVanish.wav"},
+    {key = "effectslowswoosh", label = "Dyre's Picks: Slow swoosh", file = "SlowSwoosh.wav"},
     -- The client's interface sounds, by SOUNDKIT name.
     {key = "mapping", label = "Interface: Map ping", kit = "MAP_PING"},
     {key = "whisper", label = "Interface: Whisper", kit = "TELL_MESSAGE"},

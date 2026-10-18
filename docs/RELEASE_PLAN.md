@@ -49,6 +49,15 @@ MageToolsForever/
     Textures/ShieldArc.tga
     Textures/ShieldArcInner.tga
     Textures/ShieldArcInnermost.tga
+    Sounds/FadingSlowDisappear.mp3
+    Sounds/DisappearBlowSwoosh.mp3
+    Sounds/CartoonVanish.mp3
+    Sounds/Disappear.mp3
+    Sounds/MagicalDisappear.mp3
+    Sounds/DisappearShort.wav
+    Sounds/DisappearingSwoosh.wav
+    Sounds/TeleportWarpVanish.wav
+    Sounds/SlowSwoosh.wav
 ```
 
 The validator permits one optional empty root directory entry. Additional files

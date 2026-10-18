@@ -1647,6 +1647,12 @@ test("the absorb number can be hidden, and the break sound turned on", function(
     equal(state.auraSoundCount, 33, "every rank of the six shields a Mage can get")
     equal(state.auraSounds[1].trigger, 2, "on removal")
     equal(state.auraSounds[1].info.spellID, ICE_BARRIER)
+    equal(state.auraSounds[1].info.soundFileName,
+        "Interface\\AddOns\\MageToolsForever\\Sounds\\FadingSlowDisappear.mp3")
+    equal(state.played.file, state.auraSounds[1].info.soundFileName, "turning it on plays it once")
+    state.settings.MTF_SHIELD_BREAK_SOUND_CHOICE:SetValue("cartoonvanish")
+    equal(state.played.file, "Interface\\AddOns\\MageToolsForever\\Sounds\\CartoonVanish.mp3", "choosing plays it")
+    equal(state.mtf.db.shield.breakSoundKey, "cartoonvanish")
     state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(false)
     local left = 0
     for _ in pairs(state.auraSounds) do left = left + 1 end
@@ -1709,14 +1715,14 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(said[1], "shown by MageToolsForever")
     state.clear()
     state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v5 (running), ShieldForever v1 (running)")
+    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v6 (running), ShieldForever v1 (running)")
     contains(table.concat(state.messages, "|"), "minimumAbsorb=75")
     local text = table.concat(state.messages, "|")
     contains(text, "the absorb total shows above your character")
     equal(text:find("failed", 1, true), nil, "every debug step ran")
 end)
 test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 6}}})
+    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 7}}})
     equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
     local other = state.copies.ShieldForever.ShieldDisplay
     other.Initialize({settings = function() return other.Sanitize({}) end, report = function() end})
@@ -1798,6 +1804,20 @@ test("out of combat, MTF reads the real cooldown and chimes just before it ends"
     equal(state.sounds[1].kit, 73280, "Talent ready")
     advance(state, 5)
     equal(#state.sounds, 1, "once")
+end)
+test("a chime can use one of MTF's own effect sounds, played by file", function()
+    local state = mage()
+    state.settings.MTF_CHIME_SOUND_BLINK:SetValue("effectmagical")
+    equal(state.mtf.db.chimes.sounds.blink, "effectmagical")
+    local file = "Interface\\AddOns\\MageToolsForever\\Sounds\\MagicalDisappear.mp3"
+    equal(state.played.file, file, "previewed")
+    state.played = nil
+    state.combat = true
+    state.cast(BLINK)
+    advance(state, 15)
+    equal(state.played.file, file, "the chime plays the file, also in combat")
+    equal(state.played.channel, "Master")
+    equal(#state.sounds, 0, "no sound kit as well")
 end)
 test("one cast chimes once, even when the client reports it twice", function()
     local state = mage()
@@ -1914,9 +1934,11 @@ test("each chime's sound is picked from a menu of submenus, as the Cooldown Mana
     local root = openMenu(dropdown)
     local names = {}
     for _, entry in ipairs(root.entries) do names[#names + 1] = entry.text end
-    equal(table.concat(names, ","), "Interface,Animals,Devices,Impacts,Instruments,Short,Warcraft 2,Warcraft 3",
-        "a submenu per group; no Text to Speech without a voice")
-    local short = root.entries[6]
+    equal(table.concat(names, ","),
+        "Dyre's Picks,Interface,Animals,Devices,Impacts,Instruments,Short,Warcraft 2,Warcraft 3",
+        "a submenu per group, Dyre's Picks first; no Text to Speech without a voice")
+    equal(#root.entries[1].entries, 9, "Dyre's Picks: the AddOn's own sounds")
+    local short = root.entries[7]
     equal(#short.entries, 26)
     equal(short.entries[1].text, "Bell Strike", "sounds by name inside their group")
     equal(short.entries[1].isSelected(short.entries[1].data), false)
@@ -1925,13 +1947,13 @@ test("each chime's sound is picked from a menu of submenus, as the Cooldown Mana
     equal(state.sounds[#state.sounds].kit, 353392, "choosing one plays it")
     equal(short.entries[1].isSelected(short.entries[1].data), true)
     equal(dropdown.getSelectionTextFunc(), "Short: Bell Strike", "the dropdown shows the full label")
-    local interface = root.entries[1]
+    local interface = root.entries[2]
     local labels = {}
     for _, entry in ipairs(interface.entries) do labels[#labels + 1] = entry.text end
     equal(table.concat(labels, ","), "Map ping,Whisper,Group invite,Ready check,Raid warning,Talent ready",
         "only the interface sounds this client has")
     local frost = soundDropdown(state, "frostnova")
-    equal(#frost.choices(), 6 + 93, "the plain list stays, every sound by its full label")
+    equal(#frost.choices(), 6 + 93 + 9, "the plain list stays, every sound by its full label")
 end)
 test("a pooled dropdown control still builds other settings' menus Blizzard's way", function()
     local state = mage()

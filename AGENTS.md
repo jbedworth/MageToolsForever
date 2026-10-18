@@ -135,6 +135,15 @@ frameworks without agreement.
   StatusBar, one point wide and ending at the minimum, takes it as its value,
   and a clipping frame anchored to the gate's fill holds the crescent and the
   number (confirmed on a Paladin). Fixed constants, no setting.
+- Version 6 (with MTF and WTF; found in client): the break sound is one of
+  the AddOn's own files in Sounds/, byte-identical in all three, chosen in a
+  dropdown under the sound switch (author-approved: a default you can change,
+  Fading slow disappear). The client plays no game sound by path
+  (RaidWarning.ogg stayed silent), while an AddOn's file plays, also through
+  `C_UnitAuras.AddAuraSound` when a buff runs out. Turning the sound on, or
+  choosing one, plays it once. The sounds are licensed to Vertiso Corporation
+  from Envato (Elements and AudioJungle; the author keeps the license files,
+  not in Git); they are not under the MIT License.
 - The icon row holds the player's own class's shields (`class` on each
   entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
   Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
@@ -244,7 +253,9 @@ frameworks without agreement.
   names War2 and War3; author-approved: the
   same scheme, labels "Category: Name", generated from the pinned
   CooldownViewerSoundAlertData.lua; the old `popclick` key maps to
-  `impactspopclick`), or
+  `impactspopclick`), the nine Dyre's Picks sounds (first in the menu) shipped in Sounds/ with the
+  shield display (author-approved; played with `PlaySoundFile`, since the
+  client plays no game sound by path), or
   "Text to Speech" (says "<Spell> ready") through `C_VoiceChat.SpeakText`
   (`AllowedWhenTainted`), with the player's TTS voice, rate, and volume from
   `C_TTSSettings`, offered only when a voice exists. Every spell defaults to
@@ -491,7 +502,7 @@ frameworks without agreement.
   without it.
 - Package only MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga,
-  Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga under the top-level `MageToolsForever/` folder, named
+  Textures/ShieldArcInner.tga, Textures/ShieldArcInnermost.tga, and the break sounds in Sounds/ under the top-level `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
   `release.json` (flavor `forever`) attached for WowUp.
 - Publishing requires repository variables `ENABLE_GITHUB_RELEASES='true'` and,
