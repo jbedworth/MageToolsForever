@@ -1,4 +1,4 @@
-local addonName, MTF = ...
+local _, MTF = ...
 
 -- Cooldown chimes: a sound just before Blink, Frost Nova, and your other
 -- chosen spells are ready again (author-approved, after MageAlert), also in
@@ -8,7 +8,8 @@ local addonName, MTF = ...
 -- readable in combat: it uses the length it last read for that spell out of
 -- combat, else Classic's, and right after an out-of-combat cast it reads the
 -- real time left. Cold Snap resets your Frost spells, so it cancels their
--- chimes.
+-- chimes. The sounds come from Dyre's Sounds, and while Dyre's Cooldown Chimes
+-- is loaded MTF plays none: DCC plays them.
 
 -- Seconds after a cast before MTF reads its cooldown, once the client has set it.
 local READ_DELAY = 0.1
@@ -28,133 +29,24 @@ local function Timers()
     return type(C_Timer) == "table" and type(C_Timer.After) == "function"
 end
 
--- The effect sounds ship with the AddOn; the client plays no game sound by
--- path, but plays an AddOn's own file.
-local SOUND_FOLDER = "Interface\\AddOns\\" .. addonName .. "\\Sounds\\"
-
-local function SoundFile(key)
-    for _, sound in ipairs(MTF.CHIME_SOUNDS) do
-        if sound.key == key and sound.file then
-            return SOUND_FOLDER .. sound.file
-        end
-    end
-end
-
-local function SoundKit(key)
-    for _, sound in ipairs(MTF.CHIME_SOUNDS) do
-        if sound.key == key then
-            if sound.id then
-                return sound.id
-            end
-            if type(SOUNDKIT) == "table" and type(SOUNDKIT[sound.kit]) == "number" then
-                return SOUNDKIT[sound.kit]
-            end
-        end
-    end
-end
-
--- The game's text-to-speech, with the voice, speed, and volume the player
--- set for it. C_VoiceChat.SpeakText accepts calls from AddOn code.
-local DEFAULT_SPEECH_VOLUME = 100
-
-local function SpeechVoice()
-    if type(C_VoiceChat) ~= "table" or type(C_VoiceChat.SpeakText) ~= "function" then
-        return nil
-    end
-    if type(C_TTSSettings) == "table" and type(C_TTSSettings.GetVoiceOptionID) == "function"
-        and type(Enum) == "table" and type(Enum.TtsVoiceType) == "table" then
-        local voiceID = C_TTSSettings.GetVoiceOptionID(Enum.TtsVoiceType.Standard)
-        if type(voiceID) == "number" then
-            return voiceID
-        end
-    end
-    local voices = type(C_VoiceChat.GetTtsVoices) == "function" and C_VoiceChat.GetTtsVoices()
-    local first = type(voices) == "table" and voices[1]
-    return type(first) == "table" and first.voiceID or nil
-end
-
-local function Speak(text)
-    local voiceID = SpeechVoice()
-    if not voiceID then
-        return
-    end
-    local settings = type(C_TTSSettings) == "table" and C_TTSSettings
-    local rate = settings and type(settings.GetSpeechRate) == "function" and settings.GetSpeechRate() or 0
-    local volume = settings and type(settings.GetSpeechVolume) == "function" and settings.GetSpeechVolume()
-        or DEFAULT_SPEECH_VOLUME
-    C_VoiceChat.SpeakText(voiceID, text, rate, volume, true)
-end
-
-local function SoundAvailable(sound)
-    if sound.file then
-        return type(PlaySoundFile) == "function"
-    end
-    if sound.voice then
-        return SpeechVoice() ~= nil
-    end
-    return SoundKit(sound.key) ~= nil
-end
-
--- The sound choices this client has.
-function MTF.AvailableChimeSounds()
-    local available = {}
-    for _, sound in ipairs(MTF.CHIME_SOUNDS) do
-        if SoundAvailable(sound) then
-            available[#available + 1] = sound
-        end
-    end
-    return available
-end
-
--- A sound's group and its name within it, from its label "Group: Name".
-function MTF.ChimeSoundParts(sound)
-    local group, name = sound.label:match("^(.-): (.+)$")
-    return group, name or sound.label
-end
-
--- The available sounds as ordered groups: {{name = "Interface", sounds = {...}}, ...}.
-function MTF.ChimeSoundGroups()
-    local groups, byName = {}, {}
-    for _, sound in ipairs(MTF.AvailableChimeSounds()) do
-        -- A sound without a group (Text to Speech) is a group of its own.
-        local group = MTF.ChimeSoundParts(sound) or sound.label
-        if not byName[group] then
-            byName[group] = {name = group, sounds = {}}
-            groups[#groups + 1] = byName[group]
-        end
-        local sounds = byName[group].sounds
-        sounds[#sounds + 1] = sound
-    end
-    return groups
-end
-
--- A saved sound key's full label, "Short: Bell Strike".
-function MTF.ChimeSoundLabel(key)
-    for _, sound in ipairs(MTF.CHIME_SOUNDS) do
-        if sound.key == key then
-            return sound.label
-        end
-    end
-end
-
--- A chime's own sound: a client sound, or the spell said aloud.
+-- A chime's own sound through Dyre's Sounds; Text to Speech says
+-- "<Spell> ready". A sound the client cannot play (no voice installed) falls
+-- back to the default. Without the library nothing plays, and MTF says once
+-- what to install. While Dyre's Cooldown Chimes is loaded, it plays them.
 local function Play(chime)
-    local key = MTF.db.chimes.sounds[chime.key]
-    if key == "voice" then
-        Speak(chime.label .. " ready")
-        return
+    if MTF.ChimesStandAside() then
+        return false
     end
-    local file = SoundFile(key)
-    if file then
-        if type(PlaySoundFile) == "function" then
-            PlaySoundFile(file, "Master")
-        end
-        return
+    local library = MTF.SoundLibrary()
+    if not library then
+        MTF.ReportMissingSounds()
+        return false
     end
-    local kit = SoundKit(key) or SoundKit(MTF.DEFAULT_CHIME_SOUND)
-    if kit and type(PlaySound) == "function" then
-        PlaySound(kit, "Master")
+    local speech = chime.label .. " ready"
+    if library.Play(MTF.db.chimes.sounds[chime.key], speech) then
+        return true
     end
+    return library.Play(MTF.DEFAULT_CHIME_SOUND, speech)
 end
 
 -- Plays a chime's sound once, so the settings page can preview it.
@@ -261,6 +153,9 @@ function MTF.InitializeChimes()
         end
     end
     events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+    if MTF.db.chimes.enabled and not MTF.ChimesStandAside() then
+        MTF.ReportMissingSounds()
+    end
 end
 
 -- /mtf debug_chimes: each chime spell as the client knows it, whether its
@@ -286,7 +181,8 @@ function MTF.ReportChimesDebug()
             chimes.readyAt[chime.key] and string.format("%.1fs", chimes.readyAt[chime.key] - now) or "-"))
     end
     local last = chimes.lastCast
-    Report(string.format("voice=%s lead=%s lastCast=%s", tostring(SpeechVoice()),
+    local _, sounds = MTF.SoundLibrary()
+    Report(string.format("sounds=%s playedByDCC=%s lead=%s lastCast=%s", sounds, tostring(MTF.ChimesStandAside()),
         tostring(MTF.db and MTF.db.chimes.lead),
         last and string.format("%s %.1fs ago", last.key, now - last.time) or "none"))
     for _, entry in ipairs(chimes.log) do

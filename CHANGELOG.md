@@ -4,6 +4,14 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 0.3.0-beta
+
+- With **Dyre's Buff Reminders** installed, MTF hides its own buff reminders, so you never see two icons for one buff. Your reminder settings in MTF stay as they are.
+- Sounds now come from Dyre's Sounds, a small library AddOn that all of Dyre's AddOns share, so your computer keeps one copy of the sound files instead of several. The CurseForge app installs it with Mage Tools Forever; otherwise get it from CurseForge or github.com/jbedworth/DyresSounds.
+- Without Dyre's Sounds, Mage Tools Forever plays no sounds (no cooldown chimes and no sound when a shield ends) and says so once in chat. Everything else works as before.
+- The sound you chose for the end of a shield stays your choice, and so does each chime's sound.
+- With Dyre's Cooldown Chimes installed, Mage Tools Forever plays no chimes: Dyre's Cooldown Chimes plays them, and on its first run it copies your MTF chime settings. MTF keeps its own chime settings as they are, and its Cooldown Chimes page says that Dyre's Cooldown Chimes plays them.
+
 ## 0.2.2-beta
 
 - Shield display: the outer crescent is centered with the inner ones again; since the last update it was drawn lower and taller than them.

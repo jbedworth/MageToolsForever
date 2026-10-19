@@ -38,7 +38,9 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
   fires when a cooldown ends. `C_Secrets.GetSpellCooldownSecrecy` reports a
   spell's cooldown secrecy (printed by `/mtf debug_chimes`).
 - `C_Item.GetItemCount` and the `C_Container` item APIs carry no secret flags.
-- Chime sounds come from `Blizzard_SharedXML/Mainline/SoundKitConstants.lua`.
+- Every sound comes from the library AddOn Dyre's Sounds (its own suite and
+  TESTING.md cover the catalog and the menu); MTF's mocks fake it with a few
+  sounds of each kind, and leave it out to test the missing-library path.
 - AuraContainer `includeSpellIDs` is a set, `{[spellID] = true}`
   (Blizzard_CustomAuraContainer.lua: "Map of permitted spell IDs"); a list
   matched nothing in client, so no shield icon showed. With the set, Mana Shield's inner
@@ -81,7 +83,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
    ranks.
 2. Whether `SetAlpha` with the secret absorb hides the crescent at 0 in
    combat.
-3. Whether `PlaySound` plays from a timer in combat, which cooldowns are
+3. Whether a chime played through Dyre's Sounds plays from a timer in combat, which cooldowns are
    readable out of combat, and whether the Mainline SOUNDKIT sounds exist.
 4. Whether the break sound plays when a shield breaks from damage in combat.
 
@@ -172,10 +174,25 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       spell ID; WTF found curses did not.)
 - [ ] With a second AddOn shipping the shield display, one ring shows and the
       other AddOn says which one draws it.
-- [ ] The Sound dropdown opens a menu of submenus like the Cooldown Manager's
-      sound picker (Interface, its seven groups, then Text to Speech), shows
-      the full name of the choice, plays a sound when chosen, and other
-      AddOns' dropdowns on the settings pages still work.
+- [ ] With Dyre's Sounds installed (and the old `Sounds/` folder gone from
+      MageToolsForever), no message about sounds at login; the chime and
+      shield Sound dropdowns open Dyre's Sounds' menu of submenus (Dyre's
+      Picks first, then Interface, the Cooldown Manager's groups, then Text to
+      Speech), show the full name of the choice, play a sound when chosen, and
+      other AddOns' dropdowns on the settings pages still work.
+- [ ] Choices made before 0.3.0 survive the update: each chime keeps its sound
+      (an old Dyre's Picks choice shows as the same Dyre's Picks sound), and
+      the shield break sound keeps its choice and plays when a shield ends.
+- [ ] With Dyre's Sounds disabled: MTF loads, says once at login "Install
+      Dyre's Sounds to hear the chimes", the chimes page shows the switches
+      without sound menus, no chime plays, and turning on the shield sound
+      says once that Dyre's Sounds is needed. Enabling Dyre's Sounds again
+      brings back every choice unchanged.
+- [ ] With Dyre's Cooldown Chimes enabled: MTF plays no chime (you hear each
+      chime once, from DCC), no MTF install message for chimes, the main
+      page's Cooldown chimes tooltip and the Cooldown Chimes page say DCC
+      plays them, and `/mtf debug_chimes` shows `playedByDCC=true`. MTF's
+      chime settings are unchanged after a `/reload`.
 - [ ] Blink and Frost Nova chime half a second before they are ready, in and
       out of combat, with Talent ready by default; each spell's own
       sound, switch, and the lead change it; Text to Speech

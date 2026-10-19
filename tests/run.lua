@@ -292,6 +292,83 @@ local function fixture(options)
         RAID_WARNING = 8959, UI_ORDERHALL_TALENT_READY_TOAST = 73280}
     state.sounds = {}
     env.PlaySound = function(kit, channel) state.sounds[#state.sounds + 1] = {kit = kit, channel = channel} end
+    -- Dyre's Sounds, faked with a few sounds of each kind (the library has its
+    -- own suite): every sound it plays lands in state.sounds by key. Text to
+    -- Speech plays only with state.voice. options.noSounds leaves it out, and
+    -- options.oldSounds offers an older contract.
+    state.loadedAddOns = options.loadedAddOns
+    if not options.noSounds then
+        local order = {
+            {key = "fadingslow", label = "Dyre's Picks: Fading slow disappear", file = "FadingSlowDisappear.mp3"},
+            {key = "cartoonvanish", label = "Dyre's Picks: Cartoon vanish", file = "CartoonVanish.mp3"},
+            {key = "magical", label = "Dyre's Picks: Magical disappear", file = "MagicalDisappear.mp3"},
+            {key = "talent", label = "Interface: Talent ready", kit = "UI_ORDERHALL_TALENT_READY_TOAST"},
+            {key = "alarm", label = "Interface: Alarm clock", kit = "ALARM_CLOCK_WARNING_2"},
+            {key = "shortbellstrike", label = "Short: Bell Strike", id = 353392},
+            {key = "impactspopclick", label = "Impacts: Pop Click", id = 316434},
+            {key = "impspell", label = "Imp: Spell chirp", fileID = 639156},
+            {key = "voice", label = "Text to Speech", voice = true},
+        }
+        local catalog = {}
+        for _, sound in ipairs(order) do catalog[sound.key] = sound end
+        local aliases = {popclick = "impactspopclick", effectmagical = "magical", effectfadingslow = "fadingslow"}
+        local library = {}
+        function library.RequireContract(minimum)
+            if not options.oldSounds and minimum <= 1 then return library end
+        end
+        function library.Resolve(key)
+            key = aliases[key] or key
+            return catalog[key] and key or nil
+        end
+        function library.Label(key)
+            local sound = catalog[library.Resolve(key) or ""]
+            return sound and sound.label
+        end
+        function library.AuraSound(key)
+            local sound = catalog[library.Resolve(key) or ""]
+            if sound and sound.file then
+                return {soundFileName = "Interface\\AddOns\\DyresSounds\\Sounds\\" .. sound.file}
+            elseif sound and sound.fileID then
+                return {soundFileID = sound.fileID}
+            end
+        end
+        function library.List(filter)
+            local list = {}
+            for _, sound in ipairs(order) do
+                if filter ~= "aura" or library.AuraSound(sound.key) then list[#list + 1] = sound end
+            end
+            return list
+        end
+        function library.Groups(filter)
+            local groups, byName = {}, {}
+            for _, sound in ipairs(library.List(filter)) do
+                local group = sound.label:match("^(.-): ") or sound.label
+                if not byName[group] then
+                    byName[group] = {name = group, sounds = {}}
+                    groups[#groups + 1] = byName[group]
+                end
+                table.insert(byName[group].sounds, sound)
+            end
+            return groups
+        end
+        function library.Play(key, speech, channel)
+            local sound = catalog[library.Resolve(key) or ""]
+            if not sound or (sound.voice and (not state.voice or type(speech) ~= "string")) then return false end
+            state.sounds[#state.sounds + 1] = {key = sound.key, speech = speech, channel = channel}
+            return true
+        end
+        function library.Choices(filter)
+            return function()
+                local list = {}
+                for _, sound in ipairs(library.List(filter)) do
+                    list[#list + 1] = {value = sound.key, label = sound.label}
+                end
+                return list
+            end
+        end
+        function library.SetupMenu(initializer, filter) initializer.soundMenu = filter or "all" end
+        env.DyresSounds = library
+    end
     -- Cooldowns: secret in combat, as the client's GetSpellCooldown is.
     state.cooldowns = {}
     env.C_Spell.GetSpellCooldown = function(id)
@@ -994,7 +1071,8 @@ test("saved settings get defaults and are repaired on load", function()
     equal(db.chimes.spells.blink, true)
     equal(db.chimes.spells.coldsnap, false)
     local repaired = fixture({db = {conjure = {shareSize = 99, position = {point = 1}}, shield = "broken",
-        chimes = {sound = "talent", sounds = {blink = "kazoo", counterspell = "alarm", frostnova = "popclick"}, lead = 0.7,
+        chimes = {sound = "talent", sounds = {blink = "kazoo", counterspell = "alarm", frostnova = "popclick",
+            iceblock = "effectmagical"}, lead = 0.7,
             spells = {blink = false}, learned = {blink = 14.9, frostnova = 5000}}}})
     db = repaired.mtf.db
     equal(db.conjure.shareSize, 20)
@@ -1003,6 +1081,7 @@ test("saved settings get defaults and are repaired on load", function()
     equal(db.chimes.sounds.blink, "talent", "an unknown sound gives way to the default")
     equal(db.chimes.sounds.counterspell, "alarm", "a sound you chose stays")
     equal(db.chimes.sounds.frostnova, "impactspopclick", "the old Pop click key carries over")
+    equal(db.chimes.sounds.iceblock, "magical", "an old effect key is mapped by Dyre's Sounds")
     equal(db.chimes.sounds.evocation, "talent", "the one sound chosen before carries over")
     equal(db.chimes.lead, 0.5)
     equal(db.chimes.spells.blink, false)
@@ -1648,15 +1727,41 @@ test("the absorb number can be hidden, and the break sound turned on", function(
     equal(state.auraSounds[1].trigger, 2, "on removal")
     equal(state.auraSounds[1].info.spellID, ICE_BARRIER)
     equal(state.auraSounds[1].info.soundFileName,
-        "Interface\\AddOns\\MageToolsForever\\Sounds\\FadingSlowDisappear.mp3")
-    equal(state.played.file, state.auraSounds[1].info.soundFileName, "turning it on plays it once")
+        "Interface\\AddOns\\DyresSounds\\Sounds\\FadingSlowDisappear.mp3", "Dyre's Sounds' file: MTF ships none")
+    equal(state.sounds[#state.sounds].key, "fadingslow", "turning it on plays it once")
     state.settings.MTF_SHIELD_BREAK_SOUND_CHOICE:SetValue("cartoonvanish")
-    equal(state.played.file, "Interface\\AddOns\\MageToolsForever\\Sounds\\CartoonVanish.mp3", "choosing plays it")
+    equal(state.sounds[#state.sounds].key, "cartoonvanish", "choosing plays it")
     equal(state.mtf.db.shield.breakSoundKey, "cartoonvanish")
+    local live
+    for _, sound in pairs(state.auraSounds) do live = sound end
+    equal(live.info.soundFileName, "Interface\\AddOns\\DyresSounds\\Sounds\\CartoonVanish.mp3",
+        "registered again with the new sound")
     state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(false)
     local left = 0
     for _ in pairs(state.auraSounds) do left = left + 1 end
     equal(left, 0)
+end)
+test("the break sound keeps the player's choice, and without Dyre's Sounds MTF says once what to install", function()
+    equal(mage({db = {shield = {breakSoundKey = "cartoonvanish"}}}).mtf.db.shield.breakSoundKey, "cartoonvanish",
+        "a choice saved by 0.2 is a Dyre's Sounds key")
+    local state = mage({noSounds = true, db = {shield = {breakSoundKey = "magical"}}})
+    equal(state.mtf.db.shield.breakSoundKey, "magical", "a missing library never resets a choice")
+    local page = state.categories.Shield
+    local dropdown
+    for _, initializer in ipairs(page.initializers) do
+        if initializer.setting.variable == "MTF_SHIELD_BREAK_SOUND_CHOICE" then dropdown = initializer end
+    end
+    equal(#dropdown.choices(), 0, "nothing to choose from")
+    equal(dropdown.soundMenu, nil)
+    state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(true)
+    equal(state.auraSoundCount, nil, "no sound to register")
+    state.settings.MTF_SHIELD_NUMBER:SetValue(false)
+    local count, said = 0, nil
+    for _, message in ipairs(state.messages) do
+        if message:find("Install Dyre's Sounds", 1, true) then count, said = count + 1, message end
+    end
+    equal(count, 1, "one line for all of MTF's sounds, the shield sound included")
+    contains(said, "the chimes and the shield sound")
 end)
 test("an absorb MTF cannot name, from another player or a trinket, shows for 30 seconds", function()
     local state = mage()
@@ -1715,14 +1820,14 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(said[1], "shown by MageToolsForever")
     state.clear()
     state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v7 (running), ShieldForever v1 (running)")
+    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v8 (running), ShieldForever v1 (running)")
     contains(table.concat(state.messages, "|"), "minimumAbsorb=75")
     local text = table.concat(state.messages, "|")
     contains(text, "the absorb total shows above your character")
     equal(text:find("failed", 1, true), nil, "every debug step ran")
 end)
 test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 8}}})
+    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 9}}})
     equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
     local other = state.copies.ShieldForever.ShieldDisplay
     other.Initialize({settings = function() return other.Sanitize({}) end, report = function() end})
@@ -1803,23 +1908,22 @@ test("out of combat, MTF reads the real cooldown and chimes just before it ends"
     equal(#state.sounds, 0)
     advance(state, 0.3)
     equal(#state.sounds, 1, "half a second early")
-    equal(state.sounds[1].kit, 73280, "Talent ready")
+    equal(state.sounds[1].key, "talent", "Talent ready, played by Dyre's Sounds")
     advance(state, 5)
     equal(#state.sounds, 1, "once")
 end)
-test("a chime can use one of MTF's own effect sounds, played by file", function()
+test("a chime plays its own sound through Dyre's Sounds, also in combat", function()
     local state = mage()
     state.settings.MTF_CHIME_SOUND_BLINK:SetValue("effectmagical")
-    equal(state.mtf.db.chimes.sounds.blink, "effectmagical")
-    local file = "Interface\\AddOns\\MageToolsForever\\Sounds\\MagicalDisappear.mp3"
-    equal(state.played.file, file, "previewed")
-    state.played = nil
+    equal(state.mtf.db.chimes.sounds.blink, "magical", "saved in Dyre's Sounds' spelling")
+    equal(state.sounds[1].key, "magical", "previewed")
+    equal(state.sounds[1].speech, "Blink ready", "the speech text goes along")
     state.combat = true
     state.cast(BLINK)
     advance(state, 15)
-    equal(state.played.file, file, "the chime plays the file, also in combat")
-    equal(state.played.channel, "Master")
-    equal(#state.sounds, 0, "no sound kit as well")
+    equal(#state.sounds, 2)
+    equal(state.sounds[2].key, "magical", "the chime plays it, also in combat")
+    equal(state.played, nil, "MTF plays no file of its own")
 end)
 test("one cast chimes once, even when the client reports it twice", function()
     local state = mage()
@@ -1881,34 +1985,6 @@ test("Cold Snap cancels Frost chimes; switches and the lead are honored", functi
     advance(state, 20)
     equal(#state.sounds, 1, "other spells never chime")
 end)
--- A menu description as the client's menu API builds it: buttons open submenus.
-local function menuDescription()
-    local description = {entries = {}}
-    function description:CreateButton(text)
-        local submenu = menuDescription()
-        submenu.text = text
-        self.entries[#self.entries + 1] = submenu
-        return submenu
-    end
-    function description:CreateRadio(text, isSelected, setSelected, data)
-        local radio = {text = text, data = data, isSelected = isSelected, setSelected = setSelected}
-        self.entries[#self.entries + 1] = radio
-        return radio
-    end
-    return description
-end
-
--- The settings control frame the client pools, with its own dropdown builder.
-local function dropdownControl()
-    local control = {Dropdown = {}}
-    function control:SetupDropdownMenu(button, setting, options, initTooltip, initializer)
-        self.blizzardMenu = true
-    end
-    function control:Init(initializer)
-        self:SetupDropdownMenu(self.Dropdown, initializer.setting, nil, nil, initializer)
-    end
-    return control
-end
 
 local function soundDropdown(state, key)
     local soundSetting = state.settings["MTF_CHIME_SOUND_" .. key:upper()]
@@ -1917,86 +1993,122 @@ local function soundDropdown(state, key)
     end
 end
 
--- Opens a dropdown as the client would: the pooled control is initialized for it.
-local function openMenu(dropdown, control)
-    control = control or dropdownControl()
-    dropdown:InitFrame(control)
-    control:Init(dropdown)
-    local root = menuDescription()
-    control.Dropdown.inserter(control.Dropdown.setting, root)
-    return root, control
-end
-
-test("each chime's sound is picked from a menu of submenus, as the Cooldown Manager's", function()
+test("each chime's sound is chosen in Dyre's Sounds' menu under its switch", function()
     local state = mage()
-    local dropdown, soundSetting = soundDropdown(state, "blink")
-    dropdown.GetSetting = function() return soundSetting end
+    local dropdown = soundDropdown(state, "blink")
     equal(dropdown.parentInitializer.setting, state.settings.MTF_CHIME_BLINK, "under Blink's switch")
-    equal(dropdown.data.forceSteppersHidden, true, "no steppers through a menu of submenus")
-    local root = openMenu(dropdown)
-    local names = {}
-    for _, entry in ipairs(root.entries) do names[#names + 1] = entry.text end
-    equal(table.concat(names, ","),
-        "Dyre's Picks,Interface,Animals,Devices,Impacts,Instruments,Short,Warcraft 2,Warcraft 3",
-        "a submenu per group, Dyre's Picks first; no Text to Speech without a voice")
-    equal(#root.entries[1].entries, 9, "Dyre's Picks: the AddOn's own sounds")
-    local short = root.entries[7]
-    equal(#short.entries, 26)
-    equal(short.entries[1].text, "Bell Strike", "sounds by name inside their group")
-    equal(short.entries[1].isSelected(short.entries[1].data), false)
-    short.entries[1].setSelected(short.entries[1].data)
-    equal(state.mtf.db.chimes.sounds.blink, "shortbellstrike")
-    equal(state.sounds[#state.sounds].kit, 353392, "choosing one plays it")
-    equal(short.entries[1].isSelected(short.entries[1].data), true)
-    equal(dropdown.getSelectionTextFunc(), "Short: Bell Strike", "the dropdown shows the full label")
-    local interface = root.entries[2]
+    equal(dropdown.soundMenu, "all", "Dyre's Sounds' nested menu, every kind of sound")
     local labels = {}
-    for _, entry in ipairs(interface.entries) do labels[#labels + 1] = entry.text end
-    equal(table.concat(labels, ","), "Map ping,Whisper,Group invite,Ready check,Raid warning,Talent ready",
-        "only the interface sounds this client has")
-    local frost = soundDropdown(state, "frostnova")
-    equal(#frost.choices(), 6 + 93 + 9, "the plain list stays, every sound by its full label")
+    for _, choice in ipairs(dropdown.choices()) do labels[#labels + 1] = choice.label end
+    equal(table.concat(labels, ","), "Dyre's Picks: Fading slow disappear,Dyre's Picks: Cartoon vanish,"
+        .. "Dyre's Picks: Magical disappear,Interface: Talent ready,Interface: Alarm clock,Short: Bell Strike,"
+        .. "Impacts: Pop Click,Imp: Spell chirp,Text to Speech", "the plain list is the library's")
+    contains(dropdown.tooltip, "Text to Speech says \"Blink ready\"")
+    state.settings.MTF_CHIME_SOUND_BLINK:SetValue("shortbellstrike")
+    equal(state.mtf.db.chimes.sounds.blink, "shortbellstrike")
+    equal(state.sounds[#state.sounds].key, "shortbellstrike", "choosing one plays it")
+    local count = #state.sounds
+    state.settings.MTF_CHIME_SOUND_BLINK:SetValue("kazoo")
+    equal(state.mtf.db.chimes.sounds.blink, "shortbellstrike", "a sound the library lacks is ignored")
+    equal(#state.sounds, count)
+    equal(state.mtf.db.chimes.sounds.frostnova, "talent", "Frost Nova keeps its own")
 end)
-test("a pooled dropdown control still builds other settings' menus Blizzard's way", function()
+test("Text to Speech says the spell, and without a voice the default plays", function()
     local state = mage()
-    local dropdown, soundSetting = soundDropdown(state, "blink")
-    dropdown.GetSetting = function() return soundSetting end
-    local _, control = openMenu(dropdown)
-    equal(control.blizzardMenu, nil, "MTF's own menu")
-    -- The client reuses the control for another AddOn's dropdown.
-    control.Dropdown.inserter = nil
-    control:Init({setting = {}})
-    equal(control.blizzardMenu, true, "another dropdown gets Blizzard's menu")
-end)
-test("Text to Speech is its own entry, and a voice says the spell", function()
-    local state = mage()
-    state.spoken = {}
-    state.env.C_VoiceChat = {
-        GetTtsVoices = function() return {{voiceID = 7, name = "Voice"}} end,
-        SpeakText = function(voiceID, text, rate, volume, overlap)
-            state.spoken[#state.spoken + 1] = {voice = voiceID, text = text, volume = volume}
-        end,
-    }
-    local dropdown, soundSetting = soundDropdown(state, "blink")
-    dropdown.GetSetting = function() return soundSetting end
-    local root = openMenu(dropdown)
-    local last = root.entries[#root.entries]
-    equal(last.text, "Text to Speech", "last, at the top level")
-    equal(last.entries, nil, "an entry, not a submenu")
-    last.setSelected(last.data)
-    equal(state.spoken[1].text, "Blink ready")
-    equal(state.spoken[1].voice, 7)
+    state.voice = true
+    state.settings.MTF_CHIME_SOUND_BLINK:SetValue("voice")
+    equal(state.sounds[1].key, "voice")
+    equal(state.sounds[1].speech, "Blink ready")
     state.cast(BLINK)
     advance(state, 15)
-    equal(state.spoken[2].text, "Blink ready", "said when it is ready")
-    soundSetting:SetValue("impactspopclick")
-    equal(state.sounds[#state.sounds].kit, 316434, "the Cooldown Manager's Pop click")
-    equal(state.mtf.db.chimes.sounds.frostnova, "talent", "Frost Nova keeps its own")
+    equal(state.sounds[2].key, "voice")
+    equal(state.sounds[2].speech, "Blink ready", "said when it is ready")
+    state.voice = false
+    state.cast(BLINK)
+    advance(state, 15)
+    equal(state.sounds[3].key, "talent", "no voice: the default sound instead")
+    state.settings.MTF_CHIME_SOUND_FROSTNOVA:SetValue("popclick")
+    equal(state.mtf.db.chimes.sounds.frostnova, "impactspopclick", "an old key, mapped")
     state.clear()
     state.slash("debug_chimes")
     contains(state.messages[1], "debug_chimes blink name=Blink known=")
-    contains(state.messages[1], "sound=impactspopclick")
-    contains(table.concat(state.messages, "|"), "voice=7 lead=0.5")
+    contains(state.messages[1], "sound=voice")
+    contains(table.concat(state.messages, "|"), "sounds=ok playedByDCC=false lead=0.5")
+end)
+test("without Dyre's Sounds chimes are timed, nothing plays, and MTF says so once", function()
+    local state = mage({noSounds = true, db = {chimes = {sounds = {blink = "effectmagical", frostnova = "nonsense"}}}})
+    local function count()
+        local found = 0
+        for _, message in ipairs(state.messages) do
+            if message:find("Install Dyre's Sounds to hear MTF's sounds", 1, true) then found = found + 1 end
+        end
+        return found
+    end
+    equal(count(), 1, "said at login")
+    local said
+    for _, message in ipairs(state.messages) do
+        if message:find("Install Dyre's Sounds", 1, true) then said = message end
+    end
+    contains(said, "MTF: ")
+    contains(said, "Get it from CurseForge.", "says where to get it")
+    equal(said:find("github", 1, true), nil, "CurseForge only, for now")
+    equal(state.mtf.db.chimes.sounds.blink, "effectmagical", "a saved choice is kept for when it is installed")
+    equal(state.mtf.db.chimes.sounds.frostnova, "nonsense", "nothing is reset without the library")
+    state.combat = true
+    state.cast(BLINK)
+    advance(state, 20)
+    equal(#state.sounds, 0)
+    equal(state.played, nil)
+    state.mtf.PreviewChime("blink")
+    equal(count(), 1, "once per session")
+    equal(state.settings.MTF_CHIME_SOUND_BLINK, nil, "no sound menus to fill")
+    contains(state.categories["Cooldown Chimes"].initializers[2].tooltip, "Install Dyre's Sounds")
+    state.clear()
+    state.slash("debug_chimes")
+    contains(table.concat(state.messages, "|"), "sounds=missing")
+end)
+test("with an older Dyre's Sounds MTF says to update it", function()
+    local state = mage({oldSounds = true})
+    local found
+    for _, message in ipairs(state.messages) do
+        if message:find("Update Dyre's Sounds", 1, true) then found = message end
+    end
+    contains(found, "too old")
+    state.cast(BLINK)
+    advance(state, 20)
+    equal(#state.sounds, 0)
+end)
+test("with Dyre's Cooldown Chimes loaded MTF plays no chimes and keeps its settings", function()
+    local saved = {enabled = true, lead = 1, spells = {blink = true, coldsnap = true},
+        sounds = {blink = "shortbellstrike"}, learned = {blink = 14}}
+    local state = mage({loadedAddOns = {DyresCooldownChimes = true}, db = {chimes = saved}})
+    state.cast(BLINK)
+    advance(state, 20)
+    state.mtf.PreviewChime("blink")
+    equal(#state.sounds, 0, "Dyre's Cooldown Chimes plays them")
+    local chimes = state.mtf.db.chimes
+    equal(chimes.lead, 1)
+    equal(chimes.spells.coldsnap, true)
+    equal(chimes.sounds.blink, "shortbellstrike")
+    equal(chimes.learned.blink, 14, "left for Dyre's Cooldown Chimes to copy")
+    local page = state.categories["Cooldown Chimes"]
+    for _, initializer in ipairs(page.initializers) do
+        equal(initializer.modifyPredicates[1](), false, initializer.setting.variable .. " is greyed out")
+    end
+    contains(page.initializers[1].tooltip, "Dyre's Cooldown Chimes is installed and plays the chimes")
+    contains(page.initializers[2].tooltip, "Dyre's Cooldown Chimes")
+    for _, initializer in ipairs(state.categories["Mage Tools Forever"].initializers) do
+        if initializer.setting.variable == "MTF_CHIMES_ENABLED" then
+            contains(initializer.tooltip, "Dyre's Cooldown Chimes")
+        end
+    end
+    state.clear()
+    state.slash("debug_chimes")
+    contains(table.concat(state.messages, "|"), "playedByDCC=true")
+    local quiet = mage({noSounds = true, loadedAddOns = {DyresCooldownChimes = true}})
+    for _, message in ipairs(quiet.messages) do
+        equal(message:find("to hear the chimes", 1, true), nil, "no install message for chimes DCC plays")
+    end
 end)
 
 -- Portals ---------------------------------------------------------------------------
@@ -2647,6 +2759,31 @@ test("resizing an icon keeps its center", function()
     local nx, ny = iconCenter(state, "intellect")
     equal(nx, x)
     equal(ny, y)
+end)
+test("with Dyre's Buff Reminders loaded, MTF's reminders stay hidden and keep their settings", function()
+    local state = mage({known = {[INTELLECT] = true, [FROST_ARMOR] = true},
+        loadedAddOns = {DyresBuffReminders = true}})
+    equal(reminderIcon(state, "intellect").shown, false, "no second icon beside Dyre's Buff Reminders'")
+    equal(reminderIcon(state, "armor").shown, false)
+    state.slash("unlock")
+    equal(reminderIcon(state, "intellect").shown, false, "not even to drag")
+    equal(state.mtf.db.reminders.spells.intellect, true, "the saved switch is untouched")
+    local greyed = 0
+    for _, name in ipairs({"Buff Reminders", "Mage Tools Forever"}) do
+        for _, initializer in ipairs(state.categories[name].initializers) do
+            local variable = initializer.setting and initializer.setting.variable or ""
+            if variable:find("^MTF_REMINDER") then
+                equal(initializer.modifyPredicates[1](), false, variable .. " is greyed out")
+                contains(initializer.tooltip, "Dyre's Buff Reminders")
+                greyed = greyed + 1
+            end
+        end
+    end
+    equal(greyed, #state.mtf.REMINDERS + 2, "every reminder switch, the group switch, and the main switch")
+    local plain = mage()
+    for _, initializer in ipairs(plain.categories["Buff Reminders"].initializers) do
+        equal(#initializer.modifyPredicates, 0, "not greyed without Dyre's Buff Reminders")
+    end
 end)
 test("unlocked, each reminder shows to drag and resizes with the mouse wheel", function()
     local state = mage()

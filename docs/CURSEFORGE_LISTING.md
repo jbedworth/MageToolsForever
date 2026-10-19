@@ -12,6 +12,7 @@ tested.
 | Class | Addons |
 | Main category | Mage. Keep it identical to the TOC `## Category`, which groups the AddOn in the in-game AddOn list. |
 | Additional categories | Bags & Inventory, Buffs & Debuffs (CurseForge allows up to 4; unrelated ones can send the project back for changes). |
+| Relations | Dyre's Sounds, required dependency (set by each CI upload) |
 | Author shown | Dyre, set through the CurseForge account's username |
 | License | MIT License |
 | Logo | artwork/mage-tools-forever-logo.png (1024 x 1024) |
@@ -84,6 +85,10 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 ### Cooldown chimes
 - A sound just before Blink, Frost Nova, Counterspell, Ice Block, Ice Barrier, Evocation, and other spells you pick are ready again, also in combat.
 - Each spell has its own sound: the game's interface sounds, all 93 of the Cooldown Manager's alert sounds, or a voice that says the spell's name. Pick how early it plays.
+- With Dyre's Cooldown Chimes installed, it plays the chimes instead, so you never hear two.
+
+### Needs Dyre's Sounds
+The chimes and the shield sound come from **Dyre's Sounds**; the CurseForge app installs it for you. Without it, MTF says so once in chat and plays no sounds; everything else works.
 
 ### Moving frames
 - `/mtf unlock` (or a switch on the main settings page) outlines every MTF frame so you can drag it, with a grid that marks the center of your screen. `/mtf lock` locks them again; `/mtf reset` puts them back.
@@ -97,7 +102,7 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 ### Compatibility
 Beta: tested on the Forever beta client 1.60.1. MTF keeps working on later beta builds; if a client update removes an API it needs, it turns that feature off with one chat message.
 
-WowUp users (2.24.0 or later): install from the repository URL; GitHub releases carry the Forever metadata WowUp needs.
+WowUp users (2.24.0 or later): install from the repository URL, and Dyre's Sounds the same way; GitHub releases carry the Forever metadata WowUp needs.
 
 Source, issues, and license (MIT): https://github.com/jbedworth/MageToolsForever
 ```

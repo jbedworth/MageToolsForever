@@ -187,134 +187,69 @@ MTF.CHIME_SPELLS = {
 local LEARNED_MIN = 1.5
 local LEARNED_MAX = 1200
 
--- Chime sounds: the client's own interface sounds, by SOUNDKIT name, from the
--- pinned SoundKitConstants. A name the client lacks is left out of the list.
-MTF.CHIME_SOUNDS = {
-    -- Dyre's Picks, first (author-approved): the AddOn's own sounds, shipped in
-    -- Sounds/ with the shield display's break sounds and played by file.
-    {key = "effectfadingslow", label = "Dyre's Picks: Fading slow disappear", file = "FadingSlowDisappear.mp3"},
-    {key = "effectblowswoosh", label = "Dyre's Picks: Disappear blow swoosh", file = "DisappearBlowSwoosh.mp3"},
-    {key = "effectcartoonvanish", label = "Dyre's Picks: Cartoon vanish", file = "CartoonVanish.mp3"},
-    {key = "effectdisappear", label = "Dyre's Picks: Disappear", file = "Disappear.mp3"},
-    {key = "effectmagical", label = "Dyre's Picks: Magical disappear", file = "MagicalDisappear.mp3"},
-    {key = "effectdisappearshort", label = "Dyre's Picks: Disappear (short)", file = "DisappearShort.wav"},
-    {key = "effectdisappearingswoosh", label = "Dyre's Picks: Disappearing swoosh", file = "DisappearingSwoosh.wav"},
-    {key = "effectteleportvanish", label = "Dyre's Picks: Teleport warp vanish", file = "TeleportWarpVanish.wav"},
-    {key = "effectslowswoosh", label = "Dyre's Picks: Slow swoosh", file = "SlowSwoosh.wav"},
-    -- The client's interface sounds, by SOUNDKIT name.
-    {key = "mapping", label = "Interface: Map ping", kit = "MAP_PING"},
-    {key = "whisper", label = "Interface: Whisper", kit = "TELL_MESSAGE"},
-    {key = "invite", label = "Interface: Group invite", kit = "IG_PLAYER_INVITE"},
-    {key = "readycheck", label = "Interface: Ready check", kit = "READY_CHECK"},
-    {key = "raidwarning", label = "Interface: Raid warning", kit = "RAID_WARNING"},
-    {key = "toast", label = "Interface: Friend toast", kit = "UI_BNET_TOAST"},
-    {key = "talent", label = "Interface: Talent ready", kit = "UI_ORDERHALL_TALENT_READY_TOAST"},
-    {key = "click", label = "Interface: Soft click", kit = "UI_IG_STORE_PAGE_NAV_BUTTON"},
-    {key = "auction", label = "Interface: Auction bell", kit = "AUCTION_WINDOW_OPEN"},
-    {key = "alarm", label = "Interface: Alarm clock", kit = "ALARM_CLOCK_WARNING_2"},
-    -- The Cooldown Manager's alert sounds, by sound kit ID and in its categories,
-    -- generated from the pinned Blizzard_CooldownViewer/CooldownViewerSoundAlertData.lua
-    -- (author-approved: the same scheme, both sets in every dropdown). Names as
-    -- Blizzard's comments give them, "Guiter" corrected; categories as its menu
-    -- names them (War2 and War3 show as "Warcraft 2" and "Warcraft 3").
-    {key = "animalscat", label = "Animals: Cat", id = 316401},
-    {key = "animalschicken", label = "Animals: Chicken", id = 316406},
-    {key = "animalscow", label = "Animals: Cow", id = 316407},
-    {key = "animalsgnoll", label = "Animals: Gnoll", id = 316409},
-    {key = "animalsgoat", label = "Animals: Goat", id = 316715},
-    {key = "animalslion", label = "Animals: Lion", id = 316411},
-    {key = "animalspanther", label = "Animals: Panther", id = 316412},
-    {key = "animalsrattlesnake", label = "Animals: Rattlesnake", id = 316413},
-    {key = "animalssheep", label = "Animals: Sheep", id = 316414},
-    {key = "animalswolf", label = "Animals: Wolf", id = 316415},
-    {key = "devicesboathorn", label = "Devices: Boat Horn", id = 316442},
-    {key = "devicesairhorn", label = "Devices: Air Horn", id = 316436},
-    {key = "devicesbikehorn", label = "Devices: Bike Horn", id = 316713},
-    {key = "devicescashregister", label = "Devices: Cash Register", id = 316446},
-    {key = "devicesjackpotbell", label = "Devices: Jackpot Bell", id = 316717},
-    {key = "devicesjackpotcoins", label = "Devices: Jackpot Coins", id = 316718},
-    {key = "devicesjackpotfail", label = "Devices: Jackpot Fail", id = 316719},
-    {key = "devicesrotaryphonedial", label = "Devices: Rotary Phone Dial", id = 316433},
-    {key = "devicesrotaryphonering", label = "Devices: Rotary Phone Ring", id = 316492},
-    {key = "devicesstovepipe", label = "Devices: Stove Pipe", id = 316425},
-    {key = "devicestrashcanlid", label = "Devices: Trashcan Lid", id = 316430},
-    {key = "impactsanvilstrike", label = "Impacts: Anvil Strike", id = 316528},
-    {key = "impactsbubblesmash", label = "Impacts: Bubble Smash", id = 316419},
-    {key = "impactslowthud", label = "Impacts: Low Thud", id = 316531},
-    {key = "impactsmetalclanks", label = "Impacts: Metal Clanks", id = 316532},
-    {key = "impactsmetalrattle", label = "Impacts: Metal Rattle", id = 316486},
-    {key = "impactsmetalscrape", label = "Impacts: Metal Scrape", id = 316484},
-    {key = "impactsmetalwarble", label = "Impacts: Metal Warble", id = 316536},
-    {key = "impactspopclick", label = "Impacts: Pop Click", id = 316434},
-    {key = "impactsstrangeclang", label = "Impacts: Strange Clang", id = 316453},
-    {key = "impactsswordscrape", label = "Impacts: Sword Scrape", id = 316535},
-    {key = "instrumentsbellring", label = "Instruments: Bell Ring", id = 316493},
-    {key = "instrumentsbelltrill", label = "Instruments: Bell Trill", id = 316712},
-    {key = "instrumentsbrass", label = "Instruments: Brass", id = 316722},
-    {key = "instrumentschimeascending", label = "Instruments: Chime Ascending", id = 316447},
-    {key = "instrumentsguitarchug", label = "Instruments: Guitar Chug", id = 316477},
-    {key = "instrumentsguitarpinch", label = "Instruments: Guitar Pinch", id = 316482},
-    {key = "instrumentspitchpipedistressed", label = "Instruments: Pitch Pipe Distressed", id = 316509},
-    {key = "instrumentspitchpipenote", label = "Instruments: Pitch Pipe Note", id = 316501},
-    {key = "instrumentssynthbig", label = "Instruments: Synth Big", id = 316540},
-    {key = "instrumentssynthbuzz", label = "Instruments: Synth Buzz", id = 316476},
-    {key = "instrumentssynthhigh", label = "Instruments: Synth High", id = 316460},
-    {key = "instrumentswarhorn", label = "Instruments: Warhorn", id = 316723},
-    {key = "shortbellstrike", label = "Short: Bell Strike", id = 353392},
-    {key = "shortbelltree", label = "Short: Bell Tree", id = 353387},
-    {key = "shortbigpot", label = "Short: Big Pot", id = 353388},
-    {key = "shortblades", label = "Short: Blades", id = 353389},
-    {key = "shortcoffeemug", label = "Short: Coffee Mug", id = 353424},
-    {key = "shortcowbell", label = "Short: Cow Bell", id = 353393},
-    {key = "shortfingersnap", label = "Short: Finger Snap", id = 353395},
-    {key = "shortguitar", label = "Short: Guitar", id = 353404},
-    {key = "shortkalimba", label = "Short: Kalimba", id = 353405},
-    {key = "shortmetalbladedrop", label = "Short: Metal Blade Drop", id = 353406},
-    {key = "shortmetalbladeonrod", label = "Short: Metal Blade On Rod", id = 353407},
-    {key = "shortmetalimpact", label = "Short: Metal Impact", id = 353408},
-    {key = "shortminiwoodxylophone", label = "Short: Mini Wood Xylophone", id = 353410},
-    {key = "shortpapercup", label = "Short: Paper Cup", id = 353425},
-    {key = "shortsheetmetal", label = "Short: Sheet Metal", id = 353417},
-    {key = "shortstovepipe", label = "Short: Stove Pipe", id = 353419},
-    {key = "shortstovepipeblade", label = "Short: Stove Pipe Blade", id = 353420},
-    {key = "shortswordshing", label = "Short: Sword Shing", id = 353421},
-    {key = "shortsynthbleep", label = "Short: Synth Bleep", id = 353402},
-    {key = "shortsynthblurp", label = "Short: Synth Blurp", id = 353400},
-    {key = "shortsyntherror", label = "Short: Synth Error", id = 353397},
-    {key = "shortsynthhigh", label = "Short: Synth High", id = 353399},
-    {key = "shorttriangle", label = "Short: Triangle", id = 353423},
-    {key = "shortwaterdrop", label = "Short: Water Drop", id = 353426},
-    {key = "shortwinebottle", label = "Short: Wine Bottle", id = 353427},
-    {key = "shortwoodxylophone", label = "Short: Wood Xylophone", id = 353428},
-    {key = "war2abstractwhoosh", label = "Warcraft 2: Abstract Whoosh", id = 316731},
-    {key = "war2choir", label = "Warcraft 2: Choir", id = 316733},
-    {key = "war2construction", label = "Warcraft 2: Construction", id = 316735},
-    {key = "war2magicchimes", label = "Warcraft 2: Magic Chimes", id = 316736},
-    {key = "war2pigsqueal", label = "Warcraft 2: Pig Squeal", id = 316745},
-    {key = "war2saws", label = "Warcraft 2: Saws", id = 316738},
-    {key = "war2seal", label = "Warcraft 2: Seal", id = 316746},
-    {key = "war2slow", label = "Warcraft 2: Slow", id = 316748},
-    {key = "war2smith", label = "Warcraft 2: Smith", id = 316749},
-    {key = "war2synthstinger", label = "Warcraft 2: Synth Stinger", id = 316739},
-    {key = "war2trumpetrally", label = "Warcraft 2: Trumpet Rally", id = 316740},
-    {key = "war2zippymagic", label = "Warcraft 2: Zippy Magic", id = 316737},
-    {key = "war3bell", label = "Warcraft 3: Bell", id = 316773},
-    {key = "war3crunchybell", label = "Warcraft 3: Crunchy Bell", id = 316774},
-    {key = "war3drumsplash", label = "Warcraft 3: Drum Splash", id = 316768},
-    {key = "war3error", label = "Warcraft 3: Error", id = 316775},
-    {key = "war3fanfare", label = "Warcraft 3: Fanfare", id = 316769},
-    {key = "war3gateopen", label = "Warcraft 3: Gate Open", id = 316776},
-    {key = "war3gold", label = "Warcraft 3: Gold", id = 316770},
-    {key = "war3magicshimmer", label = "Warcraft 3: Magic Shimmer", id = 316778},
-    {key = "war3ringout", label = "Warcraft 3: Ringout", id = 316771},
-    {key = "war3rooster", label = "Warcraft 3: Rooster", id = 316765},
-    {key = "war3shimmerbell", label = "Warcraft 3: Shimmer Bell", id = 316779},
-    {key = "war3wolfhowl", label = "Warcraft 3: Wolf Howl", id = 316766},
-    -- The game's text-to-speech says the spell, as MageAlert's voice clips did,
-    -- last as in the Cooldown Manager's menu.
-    {key = "voice", label = "Text to Speech", voice = true},
-}
+-- Chime sounds come from the library AddOn Dyre's Sounds (author-approved:
+-- only it ships sound files, so players keep one copy), listed as OptionalDeps
+-- so MTF loads and times chimes without it. A chime's sound is a Dyre's Sounds
+-- key; MTF's older keys ("effect...", "popclick") are its aliases.
 MTF.DEFAULT_CHIME_SOUND = "talent"
+local SOUNDS_CONTRACT = 1
+local SOUNDS_FUNCTIONS = {"List", "Groups", "Label", "Resolve", "Play", "Choices", "SetupMenu"}
+local SOUNDS_WHERE = " Get it from CurseForge."
+local SOUNDS_MESSAGES = {
+    missing = "Install Dyre's Sounds to hear MTF's sounds (the chimes and the shield sound)." .. SOUNDS_WHERE,
+    old = "Update Dyre's Sounds to hear MTF's sounds: this version is too old for MTF." .. SOUNDS_WHERE,
+}
+
+-- Dyre's Sounds with the contract and functions MTF uses, else nil and why
+-- ("missing" or "old").
+function MTF.SoundLibrary()
+    local library = rawget(_G, "DyresSounds")
+    if type(library) ~= "table" or type(library.RequireContract) ~= "function" then
+        return nil, "missing"
+    end
+    library = library.RequireContract(SOUNDS_CONTRACT)
+    if type(library) ~= "table" then
+        return nil, "old"
+    end
+    for _, name in ipairs(SOUNDS_FUNCTIONS) do
+        if type(library[name]) ~= "function" then
+            return nil, "old"
+        end
+    end
+    return library, "ok"
+end
+
+-- Says once per session what to install when the chime sounds are missing.
+function MTF.ReportMissingSounds()
+    local library, state = MTF.SoundLibrary()
+    if library or MTF.soundsReported then
+        return
+    end
+    MTF.soundsReported = true
+    MTF.Report(SOUNDS_MESSAGES[state])
+end
+
+-- Dyre's Cooldown Chimes plays the chimes for every class (author-approved:
+-- MTF stands aside for it and keeps its own chime settings, which DCC copies
+-- on its first run).
+function MTF.ChimesStandAside()
+    if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
+        return false
+    end
+    local loaded = C_AddOns.IsAddOnLoaded("DyresCooldownChimes")
+    return loaded == true
+end
+
+-- Dyre's Buff Reminders shows buff reminders for every class (author-approved
+-- two-step move): while it is loaded, MTF's own reminder icons stay hidden and
+-- MTF's saved reminder settings stay as they are.
+function MTF.RemindersStandAside()
+    if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
+        return false
+    end
+    local loaded = C_AddOns.IsAddOnLoaded("DyresBuffReminders")
+    return loaded == true
+end
 
 local function IsWholeNumber(value)
     return type(value) == "number" and value == math.floor(value)
@@ -353,16 +288,18 @@ local function SanitizePosition(position)
         x = position.x, y = position.y}
 end
 
--- Keys saved before the Cooldown Manager catalog, mapped to its keys.
-local SOUND_ALIASES = {popclick = "impactspopclick"}
-
-local function ValidSound(key)
-    key = SOUND_ALIASES[key] or key
-    for _, sound in ipairs(MTF.CHIME_SOUNDS) do
-        if sound.key == key then
-            return key
-        end
+-- A saved sound key in Dyre's Sounds' spelling, or nil when it knows no such
+-- sound. Without the library a saved key is kept as it is, so a missing
+-- library never resets a choice.
+local function SavedSound(key)
+    if type(key) ~= "string" then
+        return nil
     end
+    local library = MTF.SoundLibrary()
+    if not library then
+        return key
+    end
+    return library.Resolve(key)
 end
 
 function MTF.SanitizeDB(db)
@@ -444,7 +381,7 @@ function MTF.SanitizeDB(db)
     local learned = type(chimes.learned) == "table" and chimes.learned or {}
     local sounds = type(chimes.sounds) == "table" and chimes.sounds or {}
     -- The one sound every chime used before each had its own.
-    local formerSound = ValidSound(chimes.sound)
+    local formerSound = SavedSound(chimes.sound)
     db.chimes = {
         enabled = chimes.enabled ~= false,
         lead = MTF.SanitizeChimeLead(chimes.lead),
@@ -458,7 +395,7 @@ function MTF.SanitizeDB(db)
         else
             db.chimes.spells[chime.key] = chime.on
         end
-        db.chimes.sounds[chime.key] = ValidSound(sounds[chime.key]) or formerSound or MTF.DEFAULT_CHIME_SOUND
+        db.chimes.sounds[chime.key] = SavedSound(sounds[chime.key]) or formerSound or MTF.DEFAULT_CHIME_SOUND
         local seconds = learned[chime.key]
         if type(seconds) == "number" and seconds >= LEARNED_MIN and seconds <= LEARNED_MAX then
             db.chimes.learned[chime.key] = seconds
@@ -528,7 +465,7 @@ end
 -- hands it MTF's settings and chat, and it decides whether this copy draws.
 function MTF.InitializeShield()
     MTF.ShieldDisplay.Initialize({settings = function() return MTF.db.shield end, report = MTF.Report,
-        unlockHint = "Drag to move · /mtf lock when done"})
+        unlockHint = "Drag to move · /mtf lock when done", missingSounds = MTF.ReportMissingSounds})
 end
 
 function MTF.RefreshShield()

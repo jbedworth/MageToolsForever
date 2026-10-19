@@ -5,6 +5,13 @@ has its own switch on the main settings page and its own settings page in
 **Options → AddOns → Mage Tools Forever**, or type `/mtf`. Settings are saved
 per character.
 
+**Sounds need Dyre's Sounds.** The cooldown chimes and the sound when a
+shield ends come from Dyre's Sounds, a small library AddOn that all of Dyre's
+AddOns share, so your computer keeps one copy of the sound files. The
+CurseForge app installs it with Mage Tools Forever; otherwise get it from
+CurseForge or [GitHub](https://github.com/jbedworth/DyresSounds). Without it,
+MTF works but plays no sounds, and says so once in chat.
+
 ## Conjure
 
 A small bar with **Water**, **Food**, **Food & Water**, and **Mana Gem**
@@ -155,7 +162,8 @@ combat, and drops away the moment the shield is used up.
 - While frames are unlocked (see [Moving frames](#moving-frames)) it shows a
   full sample of every part to drag; locked (the default), it never blocks
   clicks on the world.
-- Optional: a sound when a shield ends or breaks, also in combat.
+- Optional: a sound when a shield ends or breaks, also in combat, chosen
+  from Dyre's Sounds.
 
 ## Cooldown chimes
 
@@ -163,12 +171,22 @@ A sound just before a spell is ready again, also in combat: **Blink**,
 **Frost Nova**, **Counterspell**, **Ice Block**, **Ice Barrier**, and
 **Evocation** by default; Cold Snap, the wards, Cone of Cold, Fire Blast,
 Presence of Mind, Arcane Power, and Combustion are off by default. Each spell
-has its own switch and its own sound, picked from a menu like the Cooldown
-Manager's sound picker: an Interface submenu of the game's sounds, the
-Cooldown Manager's 93 alert sounds in its own submenus (Animals, Devices,
-Impacts, Instruments, Short, Warcraft 2, Warcraft 3), and Text to Speech,
-which says the spell's name ("Blink ready"). Every spell starts on Talent ready. Pick how early it plays (default half a
-second) on the Cooldown Chimes settings page.
+has its own switch and its own sound, picked from Dyre's Sounds' menu, like
+the Cooldown Manager's sound picker: Dyre's Picks, the game's interface
+sounds, the Cooldown Manager's 93 alert sounds, and Text to Speech, which says
+the spell's name ("Blink ready"). Every spell starts on Talent ready. Pick how
+early it plays (default half a second) on the Cooldown Chimes settings page.
+Without Dyre's Sounds, the chimes play nothing.
+
+**Dyre's Buff Reminders** shows buff reminders for every class. With it
+installed, MTF hides its own reminder icons, so you never see two for one
+buff, and keeps its own reminder settings as they are. Use `/dbr` for them.
+
+**Dyre's Cooldown Chimes** plays these chimes for every class. With it
+installed, MTF plays no chimes of its own (so you never hear two), and its
+Cooldown Chimes page says so; use Dyre's Cooldown Chimes' settings (`/dcc`)
+instead. On its first run it copies your MTF chime settings, and MTF keeps
+its own as they are.
 
 The game hides cooldowns from AddOns in combat, so MTF times each one from your
 cast, using the real cooldown it read the last time you cast the spell out of
@@ -216,8 +234,9 @@ builds; if a client update removes an API it needs, it turns that feature off
 with one chat message. Spell and item IDs are Classic's; `/mtf debug_conjure`
 shows what your client knows.
 
-WowUp users (2.24.0 or later): install from the repository URL; GitHub releases
-carry the Forever metadata WowUp needs.
+WowUp users (2.24.0 or later): install from the repository URL, and Dyre's
+Sounds (github.com/jbedworth/DyresSounds) the same way; GitHub releases carry
+the Forever metadata WowUp needs.
 
 ## License
 

@@ -135,20 +135,30 @@ frameworks without agreement.
   StatusBar, one point wide and ending at the minimum, takes it as its value,
   and a clipping frame anchored to the gate's fill holds the crescent and the
   number (confirmed on a Paladin). Fixed constants, no setting.
-- Version 6 (with MTF and WTF; found in client): the break sound is one of
-  the AddOn's own files in Sounds/, byte-identical in all three, chosen in a
-  dropdown under the sound switch (author-approved: a default you can change,
-  Fading slow disappear). The client plays no game sound by path
+- Version 6 (with MTF and WTF; found in client): the break sound is chosen
+  in a dropdown under the sound switch (author-approved: a default you can
+  change, Fading slow disappear). The client plays no game sound by path
   (RaidWarning.ogg stayed silent), while an AddOn's file plays, also through
   `C_UnitAuras.AddAuraSound` when a buff runs out. Turning the sound on, or
-  choosing one, plays it once. The sounds are licensed to Vertiso Corporation
-  from Envato (Elements and AudioJungle; the author keeps the license files,
-  not in Git); they are not under the MIT License.
+  choosing one, plays it once.
 - Version 7 (with MTF and WTF; found in client): every crescent is anchored
   to the display itself. In v5 and v6 the outer crescent was fitted to its
   parent, the minimum-absorb clipping frame, which reaches 40 px below the
   display for the number, so it was drawn lower and taller than the inner
   crescents (seen on a Mage with Fire Ward and Mana Shield).
+- Version 8 (with MTF, WTF, and Dyre's Shields Up, DSU): no AddOn but Dyre's
+  Sounds ships sound files (author-approved, mandatory: one copy for all of
+  Dyre's AddOns). The break sound comes from the library Dyre's Sounds
+  (`DyresSounds.RequireContract(1)`; its aura sounds: Dyre's Picks and game
+  file IDs). Interface: `SoundChoices()` and `SetupSoundMenu(initializer)`
+  replace `BREAK_SOUNDS`; the shield page builds its dropdown with
+  `Settings.CreateDropdown(page, sound, display.SoundChoices, ...)` and
+  `display.SetupSoundMenu(dropdown)`, under the sound switch. Saved keys
+  (v6 and v7 saved the library's keys) are kept. Without the library the
+  display works, a saved choice is kept, and turning the sound on says once in
+  chat to install Dyre's Sounds. Shield.lua is byte-identical to DSU's copy.
+  MTF passes `missingSounds = MTF.ReportMissingSounds` to `Initialize`, so the
+  shield sound and the chimes share one line (author-approved: one per AddOn).
 - The icon row holds the player's own class's shields (`class` on each
   entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
   Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
@@ -241,33 +251,46 @@ frameworks without agreement.
   0.1 s after a cast it reads the real cooldown when readable and reschedules.
   Cold Snap cancels the Frost chimes. Mana Shield has no Classic cooldown and
   chimes only if the client reports one.
-- Each chime has its own sound (author-approved), picked under its switch
-  from one dropdown with nested menus like the Cooldown Manager's sound
-  picker (author-approved, after its screenshot): a submenu per group (the
-  part of each label before ": "), a top-level entry for a sound with no
-  group (Text to Speech, last), the full label as the selection text, and no
-  steppers. Blizzard's settings dropdown builds its menu in its control's
-  `SetupDropdownMenu`; MTF wraps that method on the pooled control and builds
-  `CreateButton` submenus of `CreateRadio` entries (as
-  `CooldownViewerUtil.BuildSoundMenus` does) only for an initializer marked
-  `mtfSoundMenu`, handing every other dropdown back to Blizzard's. Choosing a
-  sound plays it. The sounds: SOUNDKIT names from the pinned SoundKitConstants, played with
-  `PlaySound(kit, "Master")` (names the client lacks are left out), all 93 of
-  the Cooldown Manager's alert sounds by kit ID in its categories (Animals,
-  Devices, Impacts, Instruments, Short, Warcraft 2, Warcraft 3, as its menu
-  names War2 and War3; author-approved: the
-  same scheme, labels "Category: Name", generated from the pinned
-  CooldownViewerSoundAlertData.lua; the old `popclick` key maps to
-  `impactspopclick`), the nine Dyre's Picks sounds (first in the menu) shipped in Sounds/ with the
-  shield display (author-approved; played with `PlaySoundFile`, since the
-  client plays no game sound by path), or
-  "Text to Speech" (says "<Spell> ready") through `C_VoiceChat.SpeakText`
-  (`AllowedWhenTainted`), with the player's TTS voice, rate, and volume from
-  `C_TTSSettings`, offered only when a voice exists. Every spell defaults to
-  Interface: Talent ready (author-approved: a good sound for a spell becoming
-  available; players discover they can change it); a sound chosen for all
-  chimes before each had its own (`chimes.sound`, read once) carries over.
-  MageAlert's own sound files are not ours to ship.
+- Each chime has its own sound (author-approved), picked under its switch.
+  The sounds, the nested menu (like the Cooldown Manager's sound picker), and
+  the playing all come from the library AddOn Dyre's Sounds
+  (`src/DyresSounds`, author-approved, mandatory: only it ships sound files,
+  so MTF ships none). Core's `MTF.SoundLibrary()` is
+  `DyresSounds.RequireContract(1)` with `List`, `Groups`, `Label`, `Resolve`,
+  `Play`, `Choices`, and `SetupMenu` checked as functions. A chime plays with
+  `Play(key, "<Spell> ready")` (the speech for Text to Speech); a sound that
+  cannot play (no voice) falls back to the default. The dropdown is
+  `Settings.CreateDropdown(page, sound, library.Choices(), ...)` plus
+  `library.SetupMenu(dropdown)`; choosing a sound plays it. Saved keys are
+  sanitized with `Resolve` (MTF's old "effect..." and `popclick` keys are its
+  aliases); without the library a saved key is kept as it is, so a missing
+  library never resets a choice. Every spell defaults to Interface: Talent
+  ready (author-approved: a good sound for a spell becoming available;
+  players discover they can change it); a sound chosen for all chimes before
+  each had its own (`chimes.sound`, read once) carries over. MageAlert's own
+  sound files are not ours to ship.
+- The TOC lists the library as `## OptionalDeps: DyresSounds` (never
+  `## Dependencies`, which would stop MTF loading without it), and CurseForge
+  as a required dependency (`RELATIONS` in scripts/publish_curseforge.py,
+  slug `dyres-sounds`), so the CurseForge app installs it. Without the
+  library, or with an older contract, chimes still time but play nothing, the
+  page shows the switches without sound menus, and MTF says once per session
+  in chat what to install or update.
+- Dyre's Buff Reminders (DBR, `src/DyresBuffReminders`) shows buff reminders for
+  every class (author-approved two-step move). While
+  `C_AddOns.IsAddOnLoaded("DyresBuffReminders")` is true, MTF's own reminder
+  icons stay hidden, also unlocked (MTF.RemindersStandAside), and the reminder
+  settings are greyed out (author-approved) with tooltips saying DBR shows them; MTF's saved reminder settings stay as they are. Later MTF drops
+  its reminders.
+- While DCC is loaded, every chime setting is greyed out too (author-approved, as
+  for DBR), with tooltips saying DCC plays the chimes.
+- Dyre's Cooldown Chimes (DCC, `src/DyresCooldownChimes`) plays chimes for
+  every class (author-approved two-step move). Step two, now: when
+  `C_AddOns.IsAddOnLoaded("DyresCooldownChimes")` is true, MTF plays no
+  chimes (no install message either), and the chime tooltips on the main page
+  and the Cooldown Chimes page say DCC plays them. MTF keeps its saved chime
+  settings untouched, since DCC copies them on its first run on a character.
+  Later MTF drops its chimes, with a CHANGELOG note and a chat message.
 
 ### Portals (built)
 
@@ -410,7 +433,8 @@ frameworks without agreement.
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, loaded in that order, plus
   Textures/ShieldArc.tga, Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga. Shield.lua is the
   shared component above; keep it free of MTF references. Commands parses `/mtf`; Core owns saved settings and
-  their defaults, the login banner, class and install checks, slash conflict
+  their defaults, the Dyre's Sounds check and the Dyre's Cooldown Chimes check,
+  the login banner, class and install checks, slash conflict
   reporting, the hardware-input hooks trade placement waits for, and startup;
   Conjure, Shield, and Chimes own their modules and `/mtf debug_*` commands;
   Options owns the settings pages.
@@ -431,7 +455,8 @@ frameworks without agreement.
 - The TOC uses `## Category: Mage`; keep it identical to the CurseForge main
   category, because the in-game AddOn list groups by exact text.
 - The runtime assets are Textures/ShieldArc.tga, ShieldArcInner.tga, and
-  ShieldArcInnermost.tga; regenerate them with scripts/build_arc.py. Add no other runtime assets
+  ShieldArcInnermost.tga; regenerate them with scripts/build_arc.py. MTF ships no
+  sounds (Dyre's Sounds does). Add no other runtime assets
   without agreement.
 - Git origin: git@github.com:jbedworth/MageToolsForever.git. Inspect Git state
   before acting and preserve user work. Text is LF under .gitattributes.
@@ -507,7 +532,7 @@ frameworks without agreement.
   without it.
 - Package only MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga,
-  Textures/ShieldArcInner.tga, Textures/ShieldArcInnermost.tga, and the break sounds in Sounds/ under the top-level `MageToolsForever/` folder, named
+  Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga (no sounds: they come from Dyre's Sounds) under the top-level `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
   `release.json` (flavor `forever`) attached for WowUp.
 - Publishing requires repository variables `ENABLE_GITHUB_RELEASES='true'` and,

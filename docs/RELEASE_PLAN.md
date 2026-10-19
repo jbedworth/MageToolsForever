@@ -49,15 +49,6 @@ MageToolsForever/
     Textures/ShieldArc.tga
     Textures/ShieldArcInner.tga
     Textures/ShieldArcInnermost.tga
-    Sounds/FadingSlowDisappear.mp3
-    Sounds/DisappearBlowSwoosh.mp3
-    Sounds/CartoonVanish.mp3
-    Sounds/Disappear.mp3
-    Sounds/MagicalDisappear.mp3
-    Sounds/DisappearShort.wav
-    Sounds/DisappearingSwoosh.wav
-    Sounds/TeleportWarpVanish.wav
-    Sounds/SlowSwoosh.wav
 ```
 
 The validator permits one optional empty root directory entry. Additional files
@@ -70,6 +61,10 @@ list of exclusions. Keep `LICENSE` in the package, but do not load it in the TOC
 MTF ships three textures, `Textures/ShieldArc.tga`, `ShieldArcInner.tga`, and
 `ShieldArcInnermost.tga`, the shield display's crescents, built by `scripts/build_arc.py`. The builder
 requires each to be an uncompressed 32-bit square TGA with power-of-two sides.
+MTF ships no sounds: they come from the library AddOn Dyre's Sounds, listed in
+the TOC as `## OptionalDeps: DyresSounds` and on CurseForge as a required
+dependency (`RELATIONS` in `scripts/publish_curseforge.py`, slug
+`dyres-sounds`, sent with every upload's metadata).
 
 Validate the actual archive, not only the staging folder:
 

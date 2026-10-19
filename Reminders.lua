@@ -249,6 +249,7 @@ function MTF.RefreshReminders()
     local settings = MTF.db.reminders
     local unlocked = not MTF.db.locked
     local canCheck = settings.enabled and UnitIsDeadOrGhost("player") ~= true
+    local aside = MTF.RemindersStandAside()
     for _, reminder in ipairs(MTF.REMINDERS) do
         local icon = reminders.icons[reminder.key]
         local saved = settings.icons[reminder.key]
@@ -256,7 +257,7 @@ function MTF.RefreshReminders()
         icon.texture:SetTexture(BestTexture(reminder))
         icon.mover:SetShown(unlocked)
         icon:EnableMouseWheel(unlocked)
-        local wanted = settings.enabled and settings.spells[reminder.key]
+        local wanted = settings.enabled and settings.spells[reminder.key] and not aside
         icon.missing = nil
         if unlocked then
             -- Dragging must not cast.

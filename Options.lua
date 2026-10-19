@@ -20,7 +20,6 @@ local REQUIRED_SETTINGS = {
 }
 
 local category
-local NestSoundMenu
 
 local function HasSettingsAPI()
     if type(Settings) ~= "table" or type(Settings.VarType) ~= "table" then
@@ -137,8 +136,21 @@ local function AddPolymorphPage(parent)
         "How big the Polymorph bar is, in percent. A change in combat applies when combat ends.")
 end
 
+local REMINDERS_ELSEWHERE = " Dyre's Buff Reminders shows your buff reminders now, so these icons stay hidden. Type /dbr to change them."
+
+-- Greys out a setting another Dyre's AddOn now handles (Dyre's Buff Reminders,
+-- Dyre's Cooldown Chimes): it shows its saved value but cannot be changed here.
+local function Grey(initializer, aside)
+    if aside and type(initializer) == "table" and type(initializer.AddModifyPredicate) == "function" then
+        initializer:AddModifyPredicate(function() return false end)
+    end
+    return initializer
+end
+
 local function AddRemindersPage(parent)
     local page = Settings.RegisterVerticalLayoutSubcategory(parent, REMINDERS_TITLE)
+    local aside = MTF.RemindersStandAside()
+    local note = aside and REMINDERS_ELSEWHERE or ""
     for _, reminder in ipairs(MTF.REMINDERS) do
         local setting = Proxy(page, "MTF_REMINDER_" .. reminder.key:upper(), Settings.VarType.Boolean,
             reminder.label, reminder.on,
@@ -147,12 +159,12 @@ local function AddRemindersPage(parent)
                 MTF.db.reminders.spells[reminder.key] = value == true
                 RefreshReminders()
             end)
-        Settings.CreateCheckbox(page, setting, "Show an icon with a pulsing border while you lack "
-            .. reminder.label .. ", out of combat.")
+        Grey(Settings.CreateCheckbox(page, setting, "Show an icon with a pulsing border while you lack "
+            .. reminder.label .. ", out of combat." .. note), aside)
     end
-    Flag(page, "MTF_REMINDER_GROUP", "Arcane Intellect: also your group", "reminders", "group", true,
+    Grey(Flag(page, "MTF_REMINDER_GROUP", "Arcane Intellect: also your group", "reminders", "group", true,
         "Also remind you when a party or raid member who uses mana lacks Arcane Intellect or Arcane Brilliance. "
-            .. "The icon shows how many, and its tooltip who.", RefreshReminders)
+            .. "The icon shows how many, and its tooltip who." .. note, RefreshReminders), aside)
 end
 
 local function AddShieldPage(parent)
@@ -173,16 +185,13 @@ local function AddShieldPage(parent)
             RefreshShield()
             display.PreviewBreakSound()
         end)
-    local function SoundChoices()
-        local container = Settings.CreateControlTextContainer()
-        for _, choice in ipairs(display.BREAK_SOUNDS) do
-            container:Add(choice.key, choice.label)
-        end
-        return container:GetData()
+    -- The sounds come from Dyre's Sounds; without it the list is empty.
+    local dropdown = Settings.CreateDropdown(page, sound, display.SoundChoices,
+        "The sound when a shield ends. Choosing one plays it once. The sounds come from Dyre's Sounds.")
+    display.SetupSoundMenu(dropdown)
+    if type(dropdown.SetParentInitializer) == "function" then
+        dropdown:SetParentInitializer(soundSwitch, function() return MTF.db.shield.breakSound end)
     end
-    local dropdown = Settings.CreateDropdown(page, sound, SoundChoices,
-        "The sound when a shield ends. Choosing one plays it once.")
-    dropdown:SetParentInitializer(soundSwitch, function() return MTF.db.shield.breakSound end)
     local scale = Proxy(page, "MTF_SHIELD_SCALE", Settings.VarType.Number, "Display size (%)", display.DEFAULT_SCALE,
         function() return MTF.db.shield.scale end,
         function(value)
@@ -193,106 +202,66 @@ local function AddShieldPage(parent)
         "How big the shield display is, in percent.")
 end
 
--- The sound menu: a submenu per group and a top-level entry for a sound with
--- no group, as the Cooldown Manager's sound picker (CooldownViewerUtil
--- .BuildSoundMenus) builds it with the same menu API. Blizzard's settings
--- dropdown builds its menu in its control's SetupDropdownMenu; the control
--- frames are pooled and shared with other settings, so the replacement
--- builds the nested menu only for an MTF sound dropdown and hands every
--- other one back to Blizzard's.
-local function SoundMenuInserter(setting, rootDescription)
-    local function IsSelected(key)
-        return setting:GetValue() == key
-    end
-    local function SetSelected(key)
-        setting:SetValue(key)
-    end
-    for _, group in ipairs(MTF.ChimeSoundGroups()) do
-        if #group.sounds == 1 and not MTF.ChimeSoundParts(group.sounds[1]) then
-            rootDescription:CreateRadio(group.sounds[1].label, IsSelected, SetSelected, group.sounds[1].key)
-        else
-            local submenu = rootDescription:CreateButton(group.name)
-            for _, choice in ipairs(group.sounds) do
-                local _, name = MTF.ChimeSoundParts(choice)
-                submenu:CreateRadio(name, IsSelected, SetSelected, choice.key)
-            end
-        end
-    end
-end
+-- Said on the chimes settings while Dyre's Cooldown Chimes plays them.
+local PLAYED_BY_DCC = " Dyre's Cooldown Chimes is installed and plays the chimes instead, so MTF plays none: "
+    .. "use its settings (/dcc). MTF keeps these settings as they are."
+local NO_SOUNDS = " Install Dyre's Sounds to hear them and to choose each spell's sound."
 
-local function NestedSetupDropdownMenu(original)
-    return function(control, button, setting, options, initTooltip, initializer)
-        if not (initializer and initializer.mtfSoundMenu) then
-            return original(control, button, setting, options, initTooltip, initializer)
-        end
-        Settings.InitDropdown(button, setting, SoundMenuInserter, initTooltip)
+-- What the chime settings add to their tooltips: that DCC plays the chimes,
+-- or that the sounds need Dyre's Sounds.
+local function ChimesNote(library)
+    if MTF.ChimesStandAside() then
+        return PLAYED_BY_DCC
     end
-end
-
-function NestSoundMenu(initializer)
-    if type(initializer.InitFrame) ~= "function" or type(Settings.InitDropdown) ~= "function" then
-        return
+    if not library then
+        return NO_SOUNDS
     end
-    initializer.mtfSoundMenu = true
-    initializer.data = initializer.data or {}
-    -- A menu of submenus has no single list to step through.
-    initializer.data.forceSteppersHidden = true
-    -- The dropdown shows the full label, "Short: Bell Strike".
-    initializer.getSelectionTextFunc = function()
-        return MTF.ChimeSoundLabel(initializer:GetSetting():GetValue()) or ""
-    end
-    local initFrame = initializer.InitFrame
-    function initializer:InitFrame(frame)
-        if type(frame.SetupDropdownMenu) == "function" and not frame.mtfNestedSoundMenu then
-            frame.mtfNestedSoundMenu = true
-            frame.SetupDropdownMenu = NestedSetupDropdownMenu(frame.SetupDropdownMenu)
-        end
-        return initFrame(self, frame)
-    end
+    return ""
 end
 
 local function AddChimesPage(parent)
     local page = Settings.RegisterVerticalLayoutSubcategory(parent, CHIMES_TITLE)
-    -- Every sound by its full label: the dropdown's plain list, used when the
-    -- nested menu below is not set up.
-    local function Choices()
-        local container = Settings.CreateControlTextContainer()
-        for _, sound in ipairs(MTF.AvailableChimeSounds()) do
-            container:Add(sound.key, sound.label)
-        end
-        return container:GetData()
-    end
+    local library = MTF.SoundLibrary()
+    local note = ChimesNote(library)
+    local aside = MTF.ChimesStandAside()
     local lead = Proxy(page, "MTF_CHIMES_LEAD", Settings.VarType.Number, "Chime early (seconds)",
         MTF.DEFAULT_CHIME_LEAD,
         function() return MTF.db.chimes.lead end,
         function(value)
             MTF.db.chimes.lead = MTF.SanitizeChimeLead(value)
         end)
-    Settings.CreateSlider(page, lead, SliderOptions(MTF.CHIME_LEAD_MIN, MTF.CHIME_LEAD_MAX, MTF.CHIME_LEAD_STEP),
-        "How long before a cooldown ends the chime plays, so you can act the moment it is ready.")
+    Grey(Settings.CreateSlider(page, lead, SliderOptions(MTF.CHIME_LEAD_MIN, MTF.CHIME_LEAD_MAX, MTF.CHIME_LEAD_STEP),
+        "How long before a cooldown ends the chime plays, so you can act the moment it is ready." .. note), aside)
     for _, chime in ipairs(MTF.CHIME_SPELLS) do
         local setting = Proxy(page, "MTF_CHIME_" .. chime.key:upper(), Settings.VarType.Boolean, chime.label,
             chime.on,
             function() return MTF.db.chimes.spells[chime.key] end,
             function(value) MTF.db.chimes.spells[chime.key] = value == true end)
-        local switch = Settings.CreateCheckbox(page, setting, "Chime when " .. chime.label .. " is ready again.")
-        -- Each spell's own sound (author-approved), under its switch, in a menu
-        -- of submenus as the Cooldown Manager's sound picker has.
-        local sound = Proxy(page, "MTF_CHIME_SOUND_" .. chime.key:upper(), Settings.VarType.String, "Sound",
-            MTF.DEFAULT_CHIME_SOUND,
-            function() return MTF.db.chimes.sounds[chime.key] end,
-            function(value)
-                for _, choice in ipairs(MTF.CHIME_SOUNDS) do
-                    if choice.key == value then
-                        MTF.db.chimes.sounds[chime.key] = value
+        local switch = Grey(Settings.CreateCheckbox(page, setting,
+            "Chime when " .. chime.label .. " is ready again." .. note), aside)
+        -- Each spell's own sound (author-approved), under its switch, in Dyre's
+        -- Sounds' menu of submenus, as the Cooldown Manager's sound picker has.
+        -- Without the library there is no list to choose from.
+        if library then
+            local sound = Proxy(page, "MTF_CHIME_SOUND_" .. chime.key:upper(), Settings.VarType.String, "Sound",
+                MTF.DEFAULT_CHIME_SOUND,
+                function() return MTF.db.chimes.sounds[chime.key] end,
+                function(value)
+                    local key = library.Resolve(value)
+                    if key then
+                        MTF.db.chimes.sounds[chime.key] = key
                         MTF.PreviewChime(chime.key)
                     end
-                end
-            end)
-        local dropdown = Settings.CreateDropdown(page, sound, Choices,
-            "The sound for " .. chime.label .. ". Choosing one plays it once.")
-        NestSoundMenu(dropdown)
-        dropdown:SetParentInitializer(switch, function() return MTF.db.chimes.spells[chime.key] end)
+                end)
+            local dropdown = Settings.CreateDropdown(page, sound, library.Choices(),
+                "The sound for " .. chime.label .. ". Choosing one plays it once. Text to Speech says \""
+                    .. chime.label .. " ready\"." .. note)
+            library.SetupMenu(dropdown)
+            Grey(dropdown, aside)
+            if type(dropdown.SetParentInitializer) == "function" then
+                dropdown:SetParentInitializer(switch, function() return MTF.db.chimes.spells[chime.key] end)
+            end
+        end
     end
 end
 
@@ -444,14 +413,16 @@ function MTF.InitializeOptions()
     Flag(category, "MTF_POLYMORPH_ENABLED", "Polymorph bar", "polymorph", "enabled", true,
         "A bar with your Polymorph's time left and the sheeped mob's name; click it to sheep the mob again.",
         RefreshPolymorph)
-    Flag(category, "MTF_REMINDERS_ENABLED", "Buff reminders", "reminders", "enabled", true,
-        "An icon with a pulsing border for each buff you lack, out of combat: Arcane Intellect and your armor.",
-        RefreshReminders)
+    local remindersAside = MTF.RemindersStandAside()
+    Grey(Flag(category, "MTF_REMINDERS_ENABLED", "Buff reminders", "reminders", "enabled", true,
+        "An icon with a pulsing border for each buff you lack, out of combat: Arcane Intellect and your armor."
+            .. (remindersAside and REMINDERS_ELSEWHERE or ""), RefreshReminders), remindersAside)
     Flag(category, "MTF_SHIELD_ENABLED", "Shield display", "shield", "enabled", true,
         "A crescent beside your character that fills with your remaining shield, full when it lands.",
         RefreshShield)
-    Flag(category, "MTF_CHIMES_ENABLED", "Cooldown chimes", "chimes", "enabled", true,
-        "A sound just before Blink, Frost Nova, and your other chosen spells are ready again.")
+    Grey(Flag(category, "MTF_CHIMES_ENABLED", "Cooldown chimes", "chimes", "enabled", true,
+        "A sound just before Blink, Frost Nova, and your other chosen spells are ready again."
+            .. ChimesNote(MTF.SoundLibrary())), MTF.ChimesStandAside())
     local unlocked = Proxy(category, "MTF_UNLOCKED", Settings.VarType.Boolean, "Unlock frames to move them", false,
         function() return not MTF.db.locked end,
         function(value) MTF.SetFramesLocked(value ~= true) end)
