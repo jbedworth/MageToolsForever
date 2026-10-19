@@ -2089,7 +2089,7 @@ test("Text to Speech says the spell, and without a voice the default plays", fun
     state.slash("debug_chimes")
     contains(state.messages[1], "debug_chimes blink name=Blink known=")
     contains(state.messages[1], "sound=voice")
-    contains(table.concat(state.messages, "|"), "sounds=ok playedByDCC=false lead=0.5")
+    contains(table.concat(state.messages, "|"), "sounds=ok playedBy=MTF lead=0.5")
 end)
 test("without Dyre's Sounds chimes are timed, nothing plays, and MTF says so once", function()
     local state = mage({noSounds = true, db = {chimes = {sounds = {blink = "effectmagical", frostnova = "nonsense"}}}})
@@ -2134,40 +2134,60 @@ test("with an older Dyre's Sounds MTF says to update it", function()
     advance(state, 20)
     equal(#state.sounds, 0)
 end)
-test("with Dyre's Cooldown Chimes loaded MTF plays no chimes and keeps its settings", function()
+local function chimesStandAside(addon, title, slash)
     local saved = {enabled = true, lead = 1, spells = {blink = true, coldsnap = true},
         sounds = {blink = "shortbellstrike"}, learned = {blink = 14}}
-    local state = mage({loadedAddOns = {DyresCooldownChimes = true}, db = {chimes = saved}})
+    local state = mage({loadedAddOns = {[addon] = true}, db = {chimes = saved}})
     state.cast(BLINK)
     advance(state, 20)
     state.mtf.PreviewChime("blink")
-    equal(#state.sounds, 0, "Dyre's Cooldown Chimes plays them")
+    equal(#state.sounds, 0, title .. " plays them")
     local chimes = state.mtf.db.chimes
     equal(chimes.lead, 1)
     equal(chimes.spells.coldsnap, true)
     equal(chimes.sounds.blink, "shortbellstrike")
-    equal(chimes.learned.blink, 14, "left for Dyre's Cooldown Chimes to copy")
+    equal(chimes.learned.blink, 14, "left for " .. title .. " to copy")
     equal(state.categories["Cooldown Chimes"], nil, "the list name says who runs them")
-    local page = state.categories["Cooldown Chimes (Dyre's Cooldown Chimes)"]
-    equal(page.headings[1].heading, "Cooldown chimes are now managed by Dyre's Cooldown Chimes")
-    contains(page.headings[1].tooltip, "/dcc")
+    local page = state.categories["Cooldown Chimes (" .. title .. ")"]
+    equal(page.headings[1].heading, "Cooldown chimes are now managed by " .. title)
+    contains(page.headings[1].tooltip, "Use " .. slash .. " to change them.")
+    contains(page.headings[1].tooltip, "if you remove " .. title .. ".")
     for _, initializer in ipairs(page.initializers) do
         equal(initializer.modifyPredicates[1](), false, initializer.setting.variable .. " is greyed out")
     end
-    contains(page.initializers[1].tooltip, "Dyre's Cooldown Chimes is installed and plays the chimes")
-    contains(page.initializers[2].tooltip, "Dyre's Cooldown Chimes")
+    contains(page.initializers[1].tooltip, title .. " is installed and plays the chimes")
+    contains(page.initializers[1].tooltip, "(" .. slash .. ")")
+    contains(page.initializers[2].tooltip, title)
+    local found
     for _, initializer in ipairs(state.categories["Mage Tools Forever"].initializers) do
         if initializer.setting.variable == "MTF_CHIMES_ENABLED" then
-            contains(initializer.tooltip, "Dyre's Cooldown Chimes")
+            found = initializer
         end
     end
+    contains(found.tooltip, title .. " is installed and plays the chimes")
+    equal(found.modifyPredicates[1](), false, "the main page's chimes switch is greyed out")
     state.clear()
     state.slash("debug_chimes")
-    contains(table.concat(state.messages, "|"), "playedByDCC=true")
-    local quiet = mage({noSounds = true, loadedAddOns = {DyresCooldownChimes = true}})
+    contains(table.concat(state.messages, "|"), "playedBy=" .. addon)
+    local quiet = mage({noSounds = true, loadedAddOns = {[addon] = true}})
     for _, message in ipairs(quiet.messages) do
-        equal(message:find("to hear the chimes", 1, true), nil, "no install message for chimes DCC plays")
+        equal(message:find("Install Dyre's Sounds", 1, true), nil, "no install message for chimes " .. title .. " plays")
     end
+end
+test("with Dyre's Buff Reminders loaded MTF plays no chimes and keeps its settings", function()
+    chimesStandAside("DyresBuffReminders", "Dyre's Buff Reminders", "/dbr")
+end)
+test("with Dyre's Cooldown Chimes loaded MTF plays no chimes and keeps its settings", function()
+    chimesStandAside("DyresCooldownChimes", "Dyre's Cooldown Chimes", "/dcc")
+end)
+test("with both loaded Dyre's Buff Reminders is named for the chimes", function()
+    local state = mage({loadedAddOns = {DyresBuffReminders = true, DyresCooldownChimes = true}})
+    state.cast(BLINK)
+    advance(state, 20)
+    equal(#state.sounds, 0)
+    equal(state.mtf.ChimesOwner().addon, "DyresBuffReminders")
+    local page = state.categories["Cooldown Chimes (Dyre's Buff Reminders)"]
+    contains(page.headings[1].tooltip, "/dbr")
 end)
 
 -- Portals ---------------------------------------------------------------------------

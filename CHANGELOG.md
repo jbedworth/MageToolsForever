@@ -4,6 +4,10 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 0.3.2-beta
+
+- With **Dyre's Buff Reminders** installed, MTF plays no cooldown chimes: Dyre's Buff Reminders plays them, so you never hear two, and on its first run it copies your MTF chime settings. MTF's chime settings are greyed out and point you to `/dbr`, and MTF keeps them as they are.
+
 ## 0.3.1-beta
 
 - The Shield, Buff Reminders, and Cooldown Chimes settings pages say when one of Dyre's AddOns runs that feature: the name in the settings list names it, and a heading at the top says so.

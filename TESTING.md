@@ -188,11 +188,15 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       without sound menus, no chime plays, and turning on the shield sound
       says once that Dyre's Sounds is needed. Enabling Dyre's Sounds again
       brings back every choice unchanged.
-- [ ] With Dyre's Cooldown Chimes enabled: MTF plays no chime (you hear each
-      chime once, from DCC), no MTF install message for chimes, the main
-      page's Cooldown chimes tooltip and the Cooldown Chimes page say DCC
-      plays them, and `/mtf debug_chimes` shows `playedByDCC=true`. MTF's
-      chime settings are unchanged after a `/reload`.
+- [ ] With Dyre's Buff Reminders 0.2.0 or later enabled: MTF plays no chime
+      (you hear each chime once, from DBR), no MTF install message for chimes,
+      the settings list shows "Cooldown Chimes (Dyre's Buff Reminders)", its
+      heading and tooltips and the main page's Cooldown chimes tooltip name
+      DBR and `/dbr`, every chime setting is greyed out, and
+      `/mtf debug_chimes` shows `playedBy=DyresBuffReminders`. DBR does not
+      warn that MTF also plays chimes. MTF's chime settings are unchanged
+      after a `/reload`. With Dyre's Cooldown Chimes enabled instead, the
+      same holds with DCC and `/dcc`.
 - [ ] Blink and Frost Nova chime half a second before they are ready, in and
       out of combat, with Talent ready by default; each spell's own
       sound, switch, and the lead change it; Text to Speech

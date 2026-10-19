@@ -186,11 +186,10 @@ settings; use `/dsu` for them.
 installed, MTF hides its own reminder icons, so you never see two for one
 buff, and keeps its own reminder settings as they are. Use `/dbr` for them.
 
-**Dyre's Cooldown Chimes** plays these chimes for every class. With it
+**Dyre's Buff Reminders** also plays these chimes for every class. With it
 installed, MTF plays no chimes of its own (so you never hear two), and its
-Cooldown Chimes page says so; use Dyre's Cooldown Chimes' settings (`/dcc`)
-instead. On its first run it copies your MTF chime settings, and MTF keeps
-its own as they are.
+chime settings are greyed out; use `/dbr` instead. On its first run it copies
+your MTF chime settings, and MTF keeps its own as they are.
 
 The game hides cooldowns from AddOns in combat, so MTF times each one from your
 cast, using the real cooldown it read the last time you cast the spell out of

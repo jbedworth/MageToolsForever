@@ -259,16 +259,15 @@ local function AddShieldPage(parent)
         "How big the shield display is, in percent." .. note), display)
 end
 
--- Said on the chimes settings while Dyre's Cooldown Chimes plays them.
-local PLAYED_BY_DCC = " Dyre's Cooldown Chimes is installed and plays the chimes instead, so MTF plays none: "
-    .. "use its settings (/dcc). MTF keeps these settings as they are."
 local NO_SOUNDS = " Install Dyre's Sounds to hear them and to choose each spell's sound."
 
--- What the chime settings add to their tooltips: that DCC plays the chimes,
--- or that the sounds need Dyre's Sounds.
+-- What the chime settings add to their tooltips: which Dyre's AddOn plays the
+-- chimes, or that the sounds need Dyre's Sounds.
 local function ChimesNote(library)
-    if MTF.ChimesStandAside() then
-        return PLAYED_BY_DCC
+    local owner = MTF.ChimesOwner()
+    if owner then
+        return " " .. owner.title .. " is installed and plays the chimes instead, so MTF plays none: "
+            .. "use its settings (" .. owner.slash .. "). MTF keeps these settings as they are."
     end
     if not library then
         return NO_SOUNDS
@@ -277,12 +276,13 @@ local function ChimesNote(library)
 end
 
 local function AddChimesPage(parent)
-    local aside = MTF.ChimesStandAside()
+    local owner = MTF.ChimesOwner()
+    local aside = owner ~= nil
     local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent,
-        ManagedTitle(CHIMES_TITLE, "Dyre's Cooldown Chimes", aside))
-    ManagedHeading(layout, aside, "Cooldown chimes are now managed by Dyre's Cooldown Chimes",
-        "Use /dcc to change them. "
-            .. "MTF keeps its own settings as they are, and uses them again if you remove Dyre's Cooldown Chimes.")
+        ManagedTitle(CHIMES_TITLE, owner and owner.title, aside))
+    ManagedHeading(layout, aside, owner and ("Cooldown chimes are now managed by " .. owner.title),
+        owner and ("Use " .. owner.slash .. " to change them. "
+            .. "MTF keeps its own settings as they are, and uses them again if you remove " .. owner.title .. "."))
     local library = MTF.SoundLibrary()
     local note = ChimesNote(library)
     local lead = Proxy(page, "MTF_CHIMES_LEAD", Settings.VarType.Number, "Chime early (seconds)",

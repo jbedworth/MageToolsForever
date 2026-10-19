@@ -229,15 +229,31 @@ function MTF.ReportMissingSounds()
     MTF.Report(SOUNDS_MESSAGES[state])
 end
 
--- Dyre's Cooldown Chimes plays the chimes for every class (author-approved:
--- MTF stands aside for it and keeps its own chime settings, which DCC copies
--- on its first run).
-function MTF.ChimesStandAside()
+-- The stand-alone Dyre's AddOns that play the chimes for every class
+-- (author-approved: MTF stands aside for them and keeps its own chime
+-- settings, which they copy on their first run). Dyre's Buff Reminders has
+-- them from 0.2.0-beta; Dyre's Cooldown Chimes, never released, merged into it.
+MTF.CHIME_OWNERS = {
+    {addon = "DyresBuffReminders", title = "Dyre's Buff Reminders", slash = "/dbr"},
+    {addon = "DyresCooldownChimes", title = "Dyre's Cooldown Chimes", slash = "/dcc"},
+}
+
+-- The first loaded AddOn of MTF.CHIME_OWNERS, else nil.
+function MTF.ChimesOwner()
     if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
-        return false
+        return nil
     end
-    local loaded = C_AddOns.IsAddOnLoaded("DyresCooldownChimes")
-    return loaded == true
+    for _, owner in ipairs(MTF.CHIME_OWNERS) do
+        local loaded = C_AddOns.IsAddOnLoaded(owner.addon)
+        if loaded == true then
+            return owner
+        end
+    end
+    return nil
+end
+
+function MTF.ChimesStandAside()
+    return MTF.ChimesOwner() ~= nil
 end
 
 -- Dyre's Buff Reminders shows buff reminders for every class (author-approved

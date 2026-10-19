@@ -292,15 +292,17 @@ frameworks without agreement.
   icons stay hidden, also unlocked (MTF.RemindersStandAside), and the reminder
   settings are greyed out (author-approved) with tooltips saying DBR shows them; MTF's saved reminder settings stay as they are. Later MTF drops
   its reminders.
-- While DCC is loaded, every chime setting is greyed out too (author-approved, as
-  for DBR), with tooltips saying DCC plays the chimes.
-- Dyre's Cooldown Chimes (DCC, `src/DyresCooldownChimes`) plays chimes for
-  every class (author-approved two-step move). Step two, now: when
-  `C_AddOns.IsAddOnLoaded("DyresCooldownChimes")` is true, MTF plays no
-  chimes (no install message either), and the chime tooltips on the main page
-  and the Cooldown Chimes page say DCC plays them. MTF keeps its saved chime
-  settings untouched, since DCC copies them on its first run on a character.
-  Later MTF drops its chimes, with a CHANGELOG note and a chat message.
+- Cooldown chimes for every class (author-approved two-step move) are in
+  DBR's Cooldown Chimes section from DBR 0.2.0-beta; Dyre's Cooldown Chimes
+  (DCC, never released) merged into it. Step two, from MTF 0.3.2-beta (DBR's
+  `OTHER_CHIMES` treats MTF as standing aside from 0.3.2 on, so it warns
+  only about older MTF): while `MTF.ChimesOwner()` finds DyresBuffReminders,
+  or DyresCooldownChimes (kept while the author still has it installed), MTF
+  plays no chimes (no install message either), every chime setting is greyed
+  out, and the page title, heading, and tooltips name that AddOn and its slash
+  command. MTF keeps its saved chime settings untouched, since that AddOn
+  copies them on its first run on a character. Later MTF drops its chimes,
+  with a CHANGELOG note and a chat message.
 
 ### Portals (built)
 
@@ -443,7 +445,7 @@ frameworks without agreement.
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, loaded in that order, plus
   Textures/ShieldArc.tga, Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga. Shield.lua is the
   shared component above; keep it free of MTF references. Commands parses `/mtf`; Core owns saved settings and
-  their defaults, the Dyre's Sounds check and the Dyre's Cooldown Chimes check,
+  their defaults, the Dyre's Sounds check and the stand-aside checks,
   the login banner, class and install checks, slash conflict
   reporting, the hardware-input hooks trade placement waits for, and startup;
   Conjure, Shield, and Chimes own their modules and `/mtf debug_*` commands;

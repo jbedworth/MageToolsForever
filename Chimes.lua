@@ -8,8 +8,8 @@ local _, MTF = ...
 -- readable in combat: it uses the length it last read for that spell out of
 -- combat, else Classic's, and right after an out-of-combat cast it reads the
 -- real time left. Cold Snap resets your Frost spells, so it cancels their
--- chimes. The sounds come from Dyre's Sounds, and while Dyre's Cooldown Chimes
--- is loaded MTF plays none: DCC plays them.
+-- chimes. The sounds come from Dyre's Sounds, and while Dyre's Buff Reminders
+-- (or Dyre's Cooldown Chimes) is loaded MTF plays none: that AddOn plays them.
 
 -- Seconds after a cast before MTF reads its cooldown, once the client has set it.
 local READ_DELAY = 0.1
@@ -32,7 +32,7 @@ end
 -- A chime's own sound through Dyre's Sounds; Text to Speech says
 -- "<Spell> ready". A sound the client cannot play (no voice installed) falls
 -- back to the default. Without the library nothing plays, and MTF says once
--- what to install. While Dyre's Cooldown Chimes is loaded, it plays them.
+-- what to install. While MTF.ChimesOwner() is loaded, that AddOn plays them.
 local function Play(chime)
     if MTF.ChimesStandAside() then
         return false
@@ -182,7 +182,8 @@ function MTF.ReportChimesDebug()
     end
     local last = chimes.lastCast
     local _, sounds = MTF.SoundLibrary()
-    Report(string.format("sounds=%s playedByDCC=%s lead=%s lastCast=%s", sounds, tostring(MTF.ChimesStandAside()),
+    local owner = MTF.ChimesOwner()
+    Report(string.format("sounds=%s playedBy=%s lead=%s lastCast=%s", sounds, owner and owner.addon or "MTF",
         tostring(MTF.db and MTF.db.chimes.lead),
         last and string.format("%s %.1fs ago", last.key, now - last.time) or "none"))
     for _, entry in ipairs(chimes.log) do

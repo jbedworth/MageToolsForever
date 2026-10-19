@@ -85,7 +85,7 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 ### Cooldown chimes
 - A sound just before Blink, Frost Nova, Counterspell, Ice Block, Ice Barrier, Evocation, and other spells you pick are ready again, also in combat.
 - Each spell has its own sound: the game's interface sounds, all 93 of the Cooldown Manager's alert sounds, or a voice that says the spell's name. Pick how early it plays.
-- With Dyre's Cooldown Chimes installed, it plays the chimes instead, so you never hear two.
+- With Dyre's Buff Reminders installed, it plays the chimes instead, so you never hear two.
 
 ### Needs Dyre's Sounds
 The chimes and the shield sound come from **Dyre's Sounds**; the CurseForge app installs it for you. Without it, MTF says so once in chat and plays no sounds; everything else works.
