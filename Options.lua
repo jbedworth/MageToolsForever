@@ -147,9 +147,28 @@ local function Grey(initializer, aside)
     return initializer
 end
 
+-- A page whose feature a stand-alone Dyre's AddOn now runs (author-approved rule)
+-- says so twice: its name in the settings list names that AddOn, and a heading
+-- with a tooltip tops the page. Headings as Blizzard's Controls page adds them
+-- (Blizzard_SettingControls.lua: CreateSettingsListSectionHeaderInitializer).
+local function ManagedTitle(title, addonTitle, managed)
+    return managed and (title .. " (" .. addonTitle .. ")") or title
+end
+
+local function ManagedHeading(layout, managed, heading, tooltip)
+    if managed and type(CreateSettingsListSectionHeaderInitializer) == "function" and type(layout) == "table"
+            and type(layout.AddInitializer) == "function" then
+        layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(heading, tooltip))
+    end
+end
+
 local function AddRemindersPage(parent)
-    local page = Settings.RegisterVerticalLayoutSubcategory(parent, REMINDERS_TITLE)
     local aside = MTF.RemindersStandAside()
+    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent,
+        ManagedTitle(REMINDERS_TITLE, "Dyre's Buff Reminders", aside))
+    ManagedHeading(layout, aside, "Buff reminders are now managed by Dyre's Buff Reminders",
+        "Use /dbr to change them. "
+            .. "MTF keeps its own settings as they are, and uses them again if you remove Dyre's Buff Reminders.")
     local note = aside and REMINDERS_ELSEWHERE or ""
     for _, reminder in ipairs(MTF.REMINDERS) do
         local setting = Proxy(page, "MTF_REMINDER_" .. reminder.key:upper(), Settings.VarType.Boolean,
@@ -167,15 +186,51 @@ local function AddRemindersPage(parent)
             .. "The icon shows how many, and its tooltip who." .. note, RefreshReminders), aside)
 end
 
+-- The shield display draws in one AddOn only (Shield.lua's election); in the
+-- others its settings do nothing, so they are greyed out (author-approved) with
+-- a note naming the AddOn that draws it. Checked each time the page shows.
+local SHIELD_ELSEWHERE = " Dyre's Shields Up shows the shield display now, so these settings do nothing "
+    .. "here. Type /dsu to change it. MTF keeps its own shield settings as they are."
+
+local function ShieldOwnerNote(display)
+    if MTF.ShieldStandAside() then
+        return SHIELD_ELSEWHERE
+    end
+    if display.IsOwner() then
+        return ""
+    end
+    local owner = display.OwnerAddOn()
+    local title = owner and type(C_AddOns) == "table" and type(C_AddOns.GetAddOnMetadata) == "function"
+        and C_AddOns.GetAddOnMetadata(owner, "Title")
+    if type(title) ~= "string" or title == "" then
+        title = tostring(owner)
+    end
+    return " " .. title .. " draws the shield display, so use its settings for it."
+end
+
+local function GreyUnlessOwner(initializer, display)
+    if type(initializer) == "table" and type(initializer.AddModifyPredicate) == "function" then
+        initializer:AddModifyPredicate(function() return not MTF.ShieldStandAside() and display.IsOwner() end)
+    end
+    return initializer
+end
+
 local function AddShieldPage(parent)
-    local page = Settings.RegisterVerticalLayoutSubcategory(parent, SHIELD_TITLE)
-    Flag(page, "MTF_SHIELD_NUMBER", "Show the absorb amount", "shield", "number", true,
-        "Show your remaining absorb as a number beside the ring.", RefreshShield)
-    local soundSwitch = Flag(page, "MTF_SHIELD_BREAK_SOUND", "Sound when a shield ends", "shield", "breakSound",
-        false,
-        "Play a sound when your Ice Barrier, Mana Shield, Fire Ward, or Frost Ward ends or breaks, also in combat.",
-        RefreshShield)
+    local aside = MTF.ShieldStandAside()
+    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent,
+        ManagedTitle(SHIELD_TITLE, "Dyre's Shields Up", aside))
+    ManagedHeading(layout, aside, "Shields are now managed by Dyre's Shields Up",
+        "Use /dsu to change the shield display. "
+            .. "MTF keeps its own settings as they are, and uses them again if you remove Dyre's Shields Up.")
     local display = MTF.ShieldDisplay
+    local note = ShieldOwnerNote(display)
+    GreyUnlessOwner(Flag(page, "MTF_SHIELD_NUMBER", "Show the absorb amount", "shield", "number", true,
+        "Show your remaining absorb as a number beside the ring." .. note, RefreshShield), display)
+    local soundSwitch = GreyUnlessOwner(Flag(page, "MTF_SHIELD_BREAK_SOUND", "Sound when a shield ends",
+        "shield", "breakSound", false,
+        "Play a sound when your Ice Barrier, Mana Shield, Fire Ward, or Frost Ward ends or breaks, "
+            .. "also in combat." .. note,
+        RefreshShield), display)
     -- Which sound, under its switch (author-approved: a default you can change).
     local sound = Proxy(page, "MTF_SHIELD_BREAK_SOUND_CHOICE", Settings.VarType.String, "Sound",
         display.DEFAULT_BREAK_SOUND,
@@ -187,8 +242,9 @@ local function AddShieldPage(parent)
         end)
     -- The sounds come from Dyre's Sounds; without it the list is empty.
     local dropdown = Settings.CreateDropdown(page, sound, display.SoundChoices,
-        "The sound when a shield ends. Choosing one plays it once. The sounds come from Dyre's Sounds.")
+        "The sound when a shield ends. Choosing one plays it once. The sounds come from Dyre's Sounds." .. note)
     display.SetupSoundMenu(dropdown)
+    GreyUnlessOwner(dropdown, display)
     if type(dropdown.SetParentInitializer) == "function" then
         dropdown:SetParentInitializer(soundSwitch, function() return MTF.db.shield.breakSound end)
     end
@@ -198,8 +254,9 @@ local function AddShieldPage(parent)
             MTF.db.shield.scale = display.SanitizeScale(value)
             RefreshShield()
         end)
-    Settings.CreateSlider(page, scale, SliderOptions(display.SCALE_MIN, display.SCALE_MAX, display.SCALE_STEP),
-        "How big the shield display is, in percent.")
+    GreyUnlessOwner(Settings.CreateSlider(page, scale,
+        SliderOptions(display.SCALE_MIN, display.SCALE_MAX, display.SCALE_STEP),
+        "How big the shield display is, in percent." .. note), display)
 end
 
 -- Said on the chimes settings while Dyre's Cooldown Chimes plays them.
@@ -220,10 +277,14 @@ local function ChimesNote(library)
 end
 
 local function AddChimesPage(parent)
-    local page = Settings.RegisterVerticalLayoutSubcategory(parent, CHIMES_TITLE)
+    local aside = MTF.ChimesStandAside()
+    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent,
+        ManagedTitle(CHIMES_TITLE, "Dyre's Cooldown Chimes", aside))
+    ManagedHeading(layout, aside, "Cooldown chimes are now managed by Dyre's Cooldown Chimes",
+        "Use /dcc to change them. "
+            .. "MTF keeps its own settings as they are, and uses them again if you remove Dyre's Cooldown Chimes.")
     local library = MTF.SoundLibrary()
     local note = ChimesNote(library)
-    local aside = MTF.ChimesStandAside()
     local lead = Proxy(page, "MTF_CHIMES_LEAD", Settings.VarType.Number, "Chime early (seconds)",
         MTF.DEFAULT_CHIME_LEAD,
         function() return MTF.db.chimes.lead end,
@@ -417,9 +478,9 @@ function MTF.InitializeOptions()
     Grey(Flag(category, "MTF_REMINDERS_ENABLED", "Buff reminders", "reminders", "enabled", true,
         "An icon with a pulsing border for each buff you lack, out of combat: Arcane Intellect and your armor."
             .. (remindersAside and REMINDERS_ELSEWHERE or ""), RefreshReminders), remindersAside)
-    Flag(category, "MTF_SHIELD_ENABLED", "Shield display", "shield", "enabled", true,
-        "A crescent beside your character that fills with your remaining shield, full when it lands.",
-        RefreshShield)
+    GreyUnlessOwner(Flag(category, "MTF_SHIELD_ENABLED", "Shield display", "shield", "enabled", true,
+        "A crescent beside your character that fills with your remaining shield, full when it lands."
+            .. ShieldOwnerNote(MTF.ShieldDisplay), RefreshShield), MTF.ShieldDisplay)
     Grey(Flag(category, "MTF_CHIMES_ENABLED", "Cooldown chimes", "chimes", "enabled", true,
         "A sound just before Blink, Frost Nova, and your other chosen spells are ready again."
             .. ChimesNote(MTF.SoundLibrary())), MTF.ChimesStandAside())

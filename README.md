@@ -178,6 +178,10 @@ the spell's name ("Blink ready"). Every spell starts on Talent ready. Pick how
 early it plays (default half a second) on the Cooldown Chimes settings page.
 Without Dyre's Sounds, the chimes play nothing.
 
+**Dyre's Shields Up** shows the shield display for every class. With it
+installed, MTF draws no shield ring of its own and greys out its shield
+settings; use `/dsu` for them.
+
 **Dyre's Buff Reminders** shows buff reminders for every class. With it
 installed, MTF hides its own reminder icons, so you never see two for one
 buff, and keeps its own reminder settings as they are. Use `/dbr` for them.

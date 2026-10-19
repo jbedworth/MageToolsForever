@@ -243,6 +243,17 @@ end
 -- Dyre's Buff Reminders shows buff reminders for every class (author-approved
 -- two-step move): while it is loaded, MTF's own reminder icons stay hidden and
 -- MTF's saved reminder settings stay as they are.
+-- The stand-alone Dyre's AddOn wins when it is installed (author-approved rule
+-- for every shared feature): while Dyre's Shields Up is loaded, MTF starts no
+-- shield display of its own and its shield settings stay as they are.
+function MTF.ShieldStandAside()
+    if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
+        return false
+    end
+    local loaded = C_AddOns.IsAddOnLoaded("DyresShieldsUp")
+    return loaded == true
+end
+
 function MTF.RemindersStandAside()
     if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
         return false
@@ -464,6 +475,10 @@ end
 -- The shield display (Shield.lua) is a component other AddOns may ship too; MTF
 -- hands it MTF's settings and chat, and it decides whether this copy draws.
 function MTF.InitializeShield()
+    -- Not even a candidate in the display's election: Dyre's Shields Up draws it.
+    if MTF.ShieldStandAside() then
+        return
+    end
     MTF.ShieldDisplay.Initialize({settings = function() return MTF.db.shield end, report = MTF.Report,
         unlockHint = "Drag to move · /mtf lock when done", missingSounds = MTF.ReportMissingSounds})
 end

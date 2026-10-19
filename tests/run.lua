@@ -92,6 +92,9 @@ local function fixture(options)
         equal(name, "MageToolsForever", "metadata uses the AddOn folder name")
         return state.toc[field] or ""
     end}
+    env.CreateSettingsListSectionHeaderInitializer = function(name, tooltip)
+        return {heading = name, tooltip = tooltip}
+    end
     env.UnitClass = function(unit)
         if unit ~= "player" then
             local data = state.units[unit]
@@ -634,7 +637,15 @@ local function fixture(options)
         env.Settings = {
             VarType = {Boolean = "boolean", Number = "number", String = "string"},
             RegisterVerticalLayoutCategory = function(name) return newCategory(name) end,
-            RegisterVerticalLayoutSubcategory = function(parent, name) return newCategory(name, parent) end,
+            -- Returns the page and its layout, as the client does; a heading the
+            -- layout gets is kept on the page.
+            RegisterVerticalLayoutSubcategory = function(parent, name)
+                local page = newCategory(name, parent)
+                page.headings = {}
+                local layout = {}
+                function layout:AddInitializer(heading) page.headings[#page.headings + 1] = heading end
+                return page, layout
+            end,
             RegisterCanvasLayoutSubcategory = function(parent, frame, name)
                 local page = newCategory(name, parent)
                 page.frame = frame
@@ -1826,12 +1837,57 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(text, "the absorb total shows above your character")
     equal(text:find("failed", 1, true), nil, "every debug step ran")
 end)
+test("with Dyre's Shields Up loaded, MTF draws no shield and greys out its shield settings", function()
+    local state = mage({loadedAddOns = {DyresShieldsUp = true}, db = {shield = {scale = 80, breakSound = true}}})
+    equal(state.mtf.ShieldDisplay.frame, nil, "no ring of its own: Dyre's Shields Up draws it")
+    equal(state.mtf.ShieldDisplay.IsOwner(), false, "not even a candidate")
+    state.cast(ICE_BARRIER)
+    state.slash("unlock")
+    state.slash("lock")
+    for _, message in ipairs(state.messages) do
+        equal(message:find("shown by", 1, true), nil, "no election message")
+    end
+    equal(state.mtf.db.shield.scale, 80, "its saved shield settings stay as they are")
+    equal(state.mtf.db.shield.breakSound, true)
+    local seen = 0
+    for _, page in pairs(state.categories) do
+        for _, initializer in ipairs(page.initializers) do
+            local variable = initializer.setting and initializer.setting.variable or ""
+            if variable:find("^MTF_SHIELD_") then
+                seen = seen + 1
+                equal(initializer.modifyPredicates[1](), false, variable .. " is greyed out")
+                contains(initializer.tooltip, "Dyre's Shields Up shows the shield display now")
+            end
+        end
+    end
+    equal(seen, 5, "the switch, number, sound, its choice, and the size")
+    equal(state.categories.Shield, nil, "the list name says who runs it")
+    local page = state.categories["Shield (Dyre's Shields Up)"]
+    equal(page.headings[1].heading, "Shields are now managed by Dyre's Shields Up")
+    contains(page.headings[1].tooltip, "/dsu")
+    equal(#mage().categories.Shield.headings, 0, "no heading without Dyre's Shields Up")
+end)
 test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
     local state = mage({shieldCopies = {{addon = "ShieldForever", version = 9}}})
     equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
+    local function shieldGreyed(want)
+        local seen = 0
+        for _, page in pairs(state.categories) do
+            for _, initializer in ipairs(page.initializers) do
+                local variable = initializer.setting and initializer.setting.variable or ""
+                if variable:find("^MTF_SHIELD_") then
+                    seen = seen + 1
+                    equal(initializer.modifyPredicates[1](), not want, variable .. (want and " is greyed out" or " is not greyed"))
+                end
+            end
+        end
+        equal(seen, 5, "the switch, number, sound, its choice, and the size")
+    end
+    shieldGreyed(false)
     local other = state.copies.ShieldForever.ShieldDisplay
     other.Initialize({settings = function() return other.Sanitize({}) end, report = function() end})
     equal(state.mtf.ShieldDisplay.IsOwner(), false)
+    shieldGreyed(true)
     equal(state.mtf.ShieldDisplay.frame, nil, "MTF stood down")
     local found = false
     for _, message in ipairs(state.messages) do
@@ -2091,7 +2147,10 @@ test("with Dyre's Cooldown Chimes loaded MTF plays no chimes and keeps its setti
     equal(chimes.spells.coldsnap, true)
     equal(chimes.sounds.blink, "shortbellstrike")
     equal(chimes.learned.blink, 14, "left for Dyre's Cooldown Chimes to copy")
-    local page = state.categories["Cooldown Chimes"]
+    equal(state.categories["Cooldown Chimes"], nil, "the list name says who runs them")
+    local page = state.categories["Cooldown Chimes (Dyre's Cooldown Chimes)"]
+    equal(page.headings[1].heading, "Cooldown chimes are now managed by Dyre's Cooldown Chimes")
+    contains(page.headings[1].tooltip, "/dcc")
     for _, initializer in ipairs(page.initializers) do
         equal(initializer.modifyPredicates[1](), false, initializer.setting.variable .. " is greyed out")
     end
@@ -2769,7 +2828,10 @@ test("with Dyre's Buff Reminders loaded, MTF's reminders stay hidden and keep th
     equal(reminderIcon(state, "intellect").shown, false, "not even to drag")
     equal(state.mtf.db.reminders.spells.intellect, true, "the saved switch is untouched")
     local greyed = 0
-    for _, name in ipairs({"Buff Reminders", "Mage Tools Forever"}) do
+    local page = state.categories["Buff Reminders (Dyre's Buff Reminders)"]
+    equal(page.headings[1].heading, "Buff reminders are now managed by Dyre's Buff Reminders")
+    contains(page.headings[1].tooltip, "/dbr")
+    for _, name in ipairs({"Buff Reminders (Dyre's Buff Reminders)", "Mage Tools Forever"}) do
         for _, initializer in ipairs(state.categories[name].initializers) do
             local variable = initializer.setting and initializer.setting.variable or ""
             if variable:find("^MTF_REMINDER") then

@@ -4,6 +4,11 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 0.3.1-beta
+
+- The Shield, Buff Reminders, and Cooldown Chimes settings pages say when one of Dyre's AddOns runs that feature: the name in the settings list names it, and a heading at the top says so.
+- With **Dyre's Shields Up** installed, MTF leaves the shield display to it: MTF draws no ring of its own, and its shield settings are greyed out and point you to `/dsu`. Your MTF shield settings stay as they are.
+
 ## 0.3.0-beta
 
 - With **Dyre's Buff Reminders** installed, MTF hides its own buff reminders, so you never see two icons for one buff. Your reminder settings in MTF stay as they are.
