@@ -103,7 +103,7 @@ The chimes and the shield sound come from **Dyre's Sounds**; the CurseForge app 
 - `/magetools` works the same, in case another AddOn uses `/mtf`.
 
 ### Compatibility
-Beta: tested on the Forever beta client 1.60.1, build 70450. MTF keeps working on later beta builds; if a client update removes an API it needs, it turns that feature off with one chat message.
+Tested on the Forever beta client 1.60.1, build 70450. MTF keeps working on later beta builds; if a client update removes an API it needs, it turns that feature off with one chat message.
 
 WowUp users (2.24.0 or later): install from the repository URL, and Dyre's Sounds and Dyre's Toolkit the same way; GitHub releases carry the Forever metadata WowUp needs.
 

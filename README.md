@@ -252,7 +252,7 @@ display snaps with them too.
 
 ## Compatibility
 
-Beta: tested on the Forever beta client 1.60.1, build 70450. MTF keeps working on later beta
+Tested on the Forever beta client 1.60.1, build 70450. MTF keeps working on later beta
 builds; if a client update removes an API it needs, it turns that feature off
 with one chat message. Spell and item IDs are Classic's; `/mtf debug_conjure`
 shows what your client knows.

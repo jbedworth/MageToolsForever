@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.0.0
+
+The first full release for WoW: Forever, no longer marked beta: it was play tested on the Forever beta client 1.60.1, build 70450. CurseForge now offers it as a release, so the app updates it and installs what it needs for every player.
+
+- The CurseForge app installs Dyre's Toolkit and Dyre's Sounds with it.
+
 ## 0.3.3-beta
 
 - Fixed: a Polymorph no longer brings up the game's "MageToolsForever has been blocked from an action" popup or a "protected function" error. The game does not let AddOns set raid markers, so MTF no longer marks by itself.
