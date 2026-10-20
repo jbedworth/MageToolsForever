@@ -262,6 +262,10 @@ Sounds (github.com/jbedworth/DyresSounds) and Dyre's Toolkit
 the same way; GitHub releases carry
 the Forever metadata WowUp needs.
 
+## Support
+
+Dyre's AddOns are free. If you enjoy them, you can support them on Ko-fi: https://ko-fi.com/dyre_janelle
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

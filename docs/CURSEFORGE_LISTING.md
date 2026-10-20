@@ -18,6 +18,7 @@ tested.
 | Logo | artwork/mage-tools-forever-logo.png (1024 x 1024) |
 | Source | https://github.com/jbedworth/MageToolsForever |
 | Issues | https://github.com/jbedworth/MageToolsForever/issues |
+| Donation | Ko-fi, https://ko-fi.com/dyre_janelle (the project's Donation field) |
 
 ## Summary
 
