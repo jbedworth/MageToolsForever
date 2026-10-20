@@ -66,7 +66,7 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 
 ### Polymorph bar
 - The sheeped mob's name and your Polymorph's time left, following the mob as you change target. If it breaks early, the bar empties so you see it.
-- As you start casting in a group: *"Sheeping Defias Pillager; you spank it, you tank it."* When it lands, the mob gets the moon marker.
+- As you start casting in a group: *"Sheeping Defias Pillager; you spank it, you tank it."* For the moon marker, use the "! Polymorph" macro or click the bar: they mark the mob as you press them, also in combat. A Polymorph from the plain spell button gets no moon (the game does not let AddOns set markers).
 - Click the bar to sheep your focus again. A "! Polymorph" macro focuses the mob under your mouse and sheeps it.
 
 ### Buff reminders
@@ -90,6 +90,9 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 ### Needs Dyre's Sounds
 The chimes and the shield sound come from **Dyre's Sounds**; the CurseForge app installs it for you. Without it, MTF says so once in chat and plays no sounds; everything else works.
 
+### Works with Dyre's Toolkit
+**Dyre's Toolkit** is the home of all of Dyre's AddOns; the CurseForge app installs it for you. With it, MTF's settings sit under Dyre's AddOns, and the frames of every Dyre's AddOn unlock, lock, and snap together. Without it, MTF works on its own and says so once in chat.
+
 ### Moving frames
 - `/mtf unlock` (or a switch on the main settings page) outlines every MTF frame so you can drag it, with a grid that marks the center of your screen. `/mtf lock` locks them again; `/mtf reset` puts them back.
 
@@ -100,9 +103,9 @@ The chimes and the shield sound come from **Dyre's Sounds**; the CurseForge app 
 - `/magetools` works the same, in case another AddOn uses `/mtf`.
 
 ### Compatibility
-Beta: tested on the Forever beta client 1.60.1. MTF keeps working on later beta builds; if a client update removes an API it needs, it turns that feature off with one chat message.
+Beta: tested on the Forever beta client 1.60.1, build 70450. MTF keeps working on later beta builds; if a client update removes an API it needs, it turns that feature off with one chat message.
 
-WowUp users (2.24.0 or later): install from the repository URL, and Dyre's Sounds the same way; GitHub releases carry the Forever metadata WowUp needs.
+WowUp users (2.24.0 or later): install from the repository URL, and Dyre's Sounds and Dyre's Toolkit the same way; GitHub releases carry the Forever metadata WowUp needs.
 
 Source, issues, and license (MIT): https://github.com/jbedworth/MageToolsForever
 ```

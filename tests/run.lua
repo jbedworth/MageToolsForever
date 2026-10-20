@@ -197,14 +197,10 @@ local function fixture(options)
         local data = state.units[unit]
         return data and state.marks[data.guid or data.name]
     end
-    -- As in client, setting the marker a unit already has clears it.
-    env.SetRaidTarget = function(unit, index)
-        local data = state.units[unit]
-        local key = data.guid or data.name
-        if state.marks[key] == index then index = nil end
-        state.marks[key] = index
+    -- As in client (BugGrabber, 0.3.3): AddOn code may never call it.
+    env.SetRaidTarget = function()
         state.markCount = (state.markCount or 0) + 1
-        state.markedUnit = unit
+        error("ADDON_ACTION_FORBIDDEN SetRaidTarget")
     end
     -- State drivers: "[@unit,harm,nodead] show; hide", evaluated by the game.
     state.drivers = {}
@@ -371,6 +367,49 @@ local function fixture(options)
         end
         function library.SetupMenu(initializer, filter) initializer.soundMenu = filter or "all" end
         env.DyresSounds = library
+    end
+    -- Dyre's Toolkit, faked (it has its own suite): options.toolkit adds it,
+    -- options.oldToolkit offers only a newer contract, and
+    -- options.toolkitNoSettings has no settings home to give.
+    if options.toolkit then
+        local toolkit = {locked = true, addons = {}, movables = {}, drags = {}, scaled = {}, opened = {}}
+        state.toolkit = toolkit
+        function toolkit.RequireContract(minimum)
+            if not options.oldToolkit and minimum <= 1 then return toolkit end
+        end
+        function toolkit.RegisterAddOn(info) toolkit.addons[#toolkit.addons + 1] = info; return true end
+        function toolkit.RegisterSettingsCategory(name)
+            if options.toolkitNoSettings or not env.Settings then return nil end
+            if not toolkit.home then
+                toolkit.home = env.Settings.RegisterVerticalLayoutCategory("Dyre's AddOns")
+                env.Settings.RegisterAddOnCategory(toolkit.home)
+            end
+            return env.Settings.RegisterVerticalLayoutSubcategory(toolkit.home, name)
+        end
+        function toolkit.RegisterMovable(frame, save) toolkit.movables[#toolkit.movables + 1] = {frame, save} end
+        function toolkit.BeginDrag(frame) toolkit.drags[#toolkit.drags + 1] = {"begin", frame} end
+        function toolkit.EndDrag(frame) toolkit.drags[#toolkit.drags + 1] = {"end", frame} end
+        function toolkit.ScaleKeepingCenter(frame, scale)
+            frame:SetScale(scale)
+            toolkit.scaled[#toolkit.scaled + 1] = {frame, scale}
+        end
+        function toolkit.IsLocked() return toolkit.locked end
+        function toolkit.SetLocked(locked)
+            toolkit.locked = locked == true
+            for _, info in ipairs(toolkit.addons) do
+                if info.setLocked then info.setLocked(toolkit.locked) end
+            end
+            state.messages[#state.messages + 1] = toolkit.locked and "Dyre: Frames locked." or "Dyre: Frames unlocked."
+        end
+        function toolkit.Lock() toolkit.SetLocked(true) end
+        function toolkit.Unlock() toolkit.SetLocked(false) end
+        function toolkit.OpenSettings(category)
+            if state.combat then return false end
+            toolkit.opened[#toolkit.opened + 1] = category
+            env.Settings.OpenToCategory(category:GetID())
+            return true
+        end
+        env.DyresToolkit = toolkit
     end
     -- Cooldowns: secret in combat, as the client's GetSpellCooldown is.
     state.cooldowns = {}
@@ -598,7 +637,9 @@ local function fixture(options)
             return state.plates[unit]
         end,
     }
-    env.UnitAffectingCombat = function(unit) return unit == "player" and state.combat end
+    env.UnitAffectingCombat = function(unit)
+        return unit == "player" and (state.combat or state.affectingCombat == true)
+    end
     if not options.noRestrictionAPI then
         env.Enum = env.Enum or {}
         env.Enum.AddOnRestrictionType = {Combat = 0, Encounter = 1, Chat = 5}
@@ -608,7 +649,7 @@ local function fixture(options)
         end}
         env.C_CombatLog = {IsCombatLogRestricted = function() return state.combatLogRestricted == true end}
         env.C_RestrictedActions.IsAddOnRestrictionActive = function(kind)
-            return kind == 1 and state.encounter == true
+            return (kind == 1 and state.encounter == true) or ((state.restrictions or {})[kind] or 0) == 2
         end
     end
 
@@ -719,7 +760,10 @@ local function fixture(options)
         end
         function object:SetClipsChildren(value) self.clips = value end
         function object:SetDesaturated(value) self.desaturated = value == true end
-        function object:EnableMouse(value) self.mouse = value == true end
+        function object:EnableMouse(value)
+            if state.combat and self.protected then error("EnableMouse in combat") end
+            self.mouse = value == true
+        end
         function object:SetAlpha(value) self.alpha = value end
         -- As in client, secure frames refuse layout changes in combat.
         function object:SetScale(value)
@@ -1545,7 +1589,7 @@ test("mana gems: right-click conjures one you do not carry; left-click uses your
     local gem = state.env[GEM_BUTTON]
     equal(gem.icon.desaturated, false)
     equal(gem.attributes.spell2, 759)
-    contains(macroBody(state, "! Mana Gem"), "/cast [btn:2] Conjure Mana Agate(Rank 1)")
+    contains(macroBody(state, "! Mana Gem"), "/use [btn:2] Conjure Mana Agate(Rank 1)")
     state.put(0, 1, 5514, 1)
     state.emit("BAG_UPDATE_DELAYED")
     equal(gem.attributes.item1, "item:5514")
@@ -1564,11 +1608,11 @@ test("MTF writes water and food macros in the character tab", function()
     state.emit("BAG_UPDATE_DELAYED")
     equal(macroBody(state, "! Water"), table.concat({
         "#showtooltip item:" .. WATER_PURIFIED,
-        "/cast [btn:2] Conjure Water(Rank 3)",
+        "/use [btn:2] Conjure Water(Rank 3)",
         "/stopmacro [btn:2]",
         "/use item:8079", "/use item:8078", "/use item:8077", "/use item:3772", "/use item:2136",
         "/use item:2288", "/use item:5350"}, "\n"))
-    contains(macroBody(state, "! Food"), "/cast [btn:2] Conjure Food(Rank 3)")
+    contains(macroBody(state, "! Food"), "/use [btn:2] Conjure Food(Rank 3)")
     equal(state.macros[1].icon, 134400)
 end)
 test("the macros follow your target's level, and turning them off deletes them", function()
@@ -1831,7 +1875,7 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(said[1], "shown by MageToolsForever")
     state.clear()
     state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v8 (running), ShieldForever v1 (running)")
+    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v9 (running), ShieldForever v1 (running)")
     contains(table.concat(state.messages, "|"), "minimumAbsorb=75")
     local text = table.concat(state.messages, "|")
     contains(text, "the absorb total shows above your character")
@@ -1868,7 +1912,7 @@ test("with Dyre's Shields Up loaded, MTF draws no shield and greys out its shiel
     equal(#mage().categories.Shield.headings, 0, "no heading without Dyre's Shields Up")
 end)
 test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 9}}})
+    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 10}}})
     equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
     local function shieldGreyed(want)
         local seen = 0
@@ -2378,20 +2422,18 @@ test("Polymorph tells the group as the cast starts, never when alone", function(
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-5", POLYMORPH)
     equal(#state.sent, 1, "its switch turns it off")
 end)
-test("a landed Polymorph marks the mob with the moon and shows the bar on its unit", function()
+test("a landed Polymorph shows the bar on its unit", function()
     local state = mage({known = {[POLYMORPH] = true}})
     local bar = state.env.MageToolsForeverPolymorphBar
     equal(bar.shown, false, "nothing sheeped")
     sheepTarget(state)
     castPolymorph(state)
-    equal(state.marks["mob-1"], 5, "the moon")
     equal(bar.shown, true)
     equal(bar.name.text, "Defias Pillager")
     equal(bar.container.unit, "target")
     equal(bar.container.slots[1].ids[POLYMORPH], true)
     equal(bar.container.slots[1].filter, "HARMFUL|PLAYER")
     castPolymorph(state)
-    equal(state.markCount, 1, "an existing moon is left alone, not toggled off")
     -- Tabbing away: the bar follows the mob's nameplate.
     state.units.nameplate3 = state.units.target
     state.units.target = {name = "Defias Bandit", guid = "mob-2", level = 20}
@@ -2401,7 +2443,7 @@ test("a landed Polymorph marks the mob with the moon and shows the bar on its un
     state.emit("UNIT_HEALTH", "nameplate3")
     equal(bar.shown, false, "gone when the mob dies")
 end)
-test("a Polymorph cast on the mob under the mouse is tracked and marked", function()
+test("a Polymorph cast on the mob under the mouse is tracked", function()
     local state = mage({known = {[POLYMORPH] = true}})
     state.units.mouseover = {name = "Defias Pillager", guid = "mob-7", level = 20}
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-m", POLYMORPH)
@@ -2409,38 +2451,104 @@ test("a Polymorph cast on the mob under the mouse is tracked and marked", functi
     local bar = state.env.MageToolsForeverPolymorphBar
     equal(bar.shown, true, "tracked")
     equal(bar.name.text, "Defias Pillager")
-    equal(state.marks["mob-7"], 5, "the moon, through mouseover")
     equal(bar.container.unit, "none", "the bar never binds to mouseover")
     state.units.nameplate5 = state.units.mouseover
     state.units.mouseover = nil
     state.emit("NAME_PLATE_UNIT_ADDED", "nameplate5")
     equal(bar.container.unit, "nameplate5", "it finds the mob on its nameplate")
 end)
-test("a Polymorph that lands in combat still gets the moon, on your target", function()
-    local state = mage({known = {[POLYMORPH] = true}})
-    sheepTarget(state)
-    state.units.nameplate2 = state.units.target
-    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-c", POLYMORPH)
-    state.combat = true
-    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-c", POLYMORPH)
-    equal(state.marks["mob-1"], 5, "marked although the marker cannot be read in combat")
-    equal(state.markedUnit, "target", "your target, as TankHelper marks")
-    -- A recast in combat on the same mob must not toggle the moon off.
-    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-d", POLYMORPH)
-    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-d", POLYMORPH)
-    equal(state.marks["mob-1"], 5, "still the moon after a recast")
-    equal(state.markCount, 1, "marked once")
-    state.clear()
-    state.combat = false
-    state.slash("debug_polymorph")
-    contains(table.concat(state.messages, "|"), "marked=target (marker unreadable)")
+test("MTF never calls SetRaidTarget: the moon comes only from /tm in the macro and the click", function()
+    -- In client (0.3.3, BugGrabber): ADDON_ACTION_FORBIDDEN for MTF's SetRaidTarget,
+    -- also out of combat. The mock forbids it the same way.
+    for _, setup in ipairs({
+        function() end,
+        function(state) state.combat = true end,
+        function(state) state.affectingCombat = true end,
+    }) do
+        local state = mage({known = {[POLYMORPH] = true}})
+        sheepTarget(state)
+        state.units.focus = state.units.target
+        state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-c", POLYMORPH)
+        setup(state)
+        state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-c", POLYMORPH)
+        equal(state.markCount, nil, "SetRaidTarget never called")
+        equal(state.env.MageToolsForeverPolymorphBar.shown, true, "the bar shows the sheep")
+        state.combat = false
+        state.emit("PLAYER_REGEN_ENABLED")
+        contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead,exists] !5")
+        contains(state.env.MageToolsForeverPolymorph.attributes.macrotext1, "/tm [@target,harm,nodead,exists] !5")
+        state.clear()
+        state.slash("debug_polymorph")
+        contains(table.concat(state.messages, "|"), "moon=from the macro and the click")
+    end
 end)
-test("the mark switch and the bar's switch are respected", function()
+test("an older \"! Polymorph\" without the moon is rewritten out of combat", function()
+    local old = "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
+        .. "/cast [@focus,harm,nodead] Polymorph"
     local state = mage({known = {[POLYMORPH] = true}})
-    state.settings.MTF_POLYMORPH_MARK:SetValue(false)
+    for _, macro in ipairs(state.macros) do
+        if macro.name == "! Polymorph" then macro.body = old end
+    end
+    state.combat = true
+    state.emit("SPELLS_CHANGED")
+    equal(macroBody(state, "! Polymorph"), old, "never in combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead,exists] !5", "updated when combat ends")
+    local count = 0
+    for _, macro in ipairs(state.macros) do
+        if macro.name == "! Polymorph" then count = count + 1 end
+    end
+    equal(count, 1, "edited in place, not added again")
+end)
+test("the invisible Polymorph click area lets clicks through unless it has a sheep or is unlocked", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder, bar = state.env.MageToolsForeverPolymorph, state.env.MageToolsForeverPolymorphBar
+    equal(holder.shown, true)
+    equal(bar.shown, false, "nothing to show")
+    equal(holder.mouse, false, "locked with no sheep: clicks pass through")
+    equal(bar.mouse, false, "the bar never takes the mouse")
+    state.slash("unlock")
+    equal(holder.mouse, true, "unlocked: it takes the mouse to be dragged")
+    state.slash("lock")
+    equal(holder.mouse, false)
     sheepTarget(state)
     castPolymorph(state)
-    equal(state.marks["mob-1"], nil)
+    equal(holder.mouse, true, "a sheep to click")
+    advance(state, 56)
+    equal(bar.shown, false)
+    equal(holder.mouse, false, "forgotten: clicks pass through again")
+    -- Forgotten in combat: the secure holder cannot change until combat ends.
+    castPolymorph(state)
+    equal(holder.mouse, true)
+    state.combat = true
+    advance(state, 56)
+    equal(bar.shown, false, "the bar hides at once")
+    equal(holder.mouse, true, "secure: unchanged in combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(holder.mouse, false, "clicks pass through after combat")
+end)
+test("the mark switch takes the /tm lines out of the macro and the click; the bar's switch hides it", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    sheepTarget(state)
+    castPolymorph(state)
+    contains(holder.attributes.macrotext1, "/tm ")
+    state.combat = true
+    state.settings.MTF_POLYMORPH_MARK:SetValue(false)
+    contains(macroBody(state, "! Polymorph"), "/tm ", "in combat the macro waits")
+    contains(holder.attributes.macrotext1, "/tm ", "and so does the click")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
+        .. "[nocombat,harm,nodead]\n/use [@focus,exists,harm,nodead] Polymorph", "no /tm line")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Pillager\n/use [@target,harm,nodead] Polymorph\n/targetlasttarget")
+    state.settings.MTF_POLYMORPH_MARK:SetValue(true)
+    contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead,exists] !5", "back at once out of combat")
+    contains(holder.attributes.macrotext1, "/tm [@target,harm,nodead,exists] !5")
+    equal(state.markCount, nil)
     equal(state.env.MageToolsForeverPolymorphBar.shown, true)
     state.settings.MTF_POLYMORPH_ENABLED:SetValue(false)
     equal(state.env.MageToolsForeverPolymorphBar.shown, false)
@@ -2463,8 +2571,9 @@ test("clicking the bar re-sheeps the mob by name and goes back to your target", 
     sheepTarget(state)
     castPolymorph(state)
     equal(holder.attributes.type1, "macro")
-    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
-        .. "\n/cleartarget\n/targetexact Defias Pillager\n/cast [@target,harm,nodead] Polymorph\n/targetlasttarget")
+    -- The click marks the mob it sheeps with /tm, which the game allows in combat.
+    equal(holder.attributes.macrotext1, "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Pillager\n/tm [@target,harm,nodead,exists] !5\n/use [@target,harm,nodead] Polymorph\n/targetlasttarget")
     -- In combat the click cannot change; it follows after combat.
     state.combat = true
     sheepTarget(state, "Defias Bandit", "mob-2")
@@ -2475,8 +2584,9 @@ test("clicking the bar re-sheeps the mob by name and goes back to your target", 
     contains(holder.attributes.macrotext1, "Defias Pillager")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
-    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph: Pig\n/stopmacro [@focus,exists]"
-        .. "\n/cleartarget\n/targetexact Defias Bandit\n/cast [@target,harm,nodead] Polymorph: Pig\n/targetlasttarget", "the same Polymorph you cast")
+    equal(holder.attributes.macrotext1, "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph: Pig\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Bandit\n/tm [@target,harm,nodead,exists] !5\n/use [@target,harm,nodead] Polymorph: Pig\n/targetlasttarget",
+        "the same Polymorph you cast")
 end)
 test("a Polymorph begun before combat sets the click before it lands in combat", function()
     local state = mage({known = {[POLYMORPH] = true}})
@@ -2485,8 +2595,9 @@ test("a Polymorph begun before combat sets the click before it lands in combat",
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-118", POLYMORPH)
     state.combat = true
     state.cast(POLYMORPH)
-    equal(holder.attributes.macrotext1, "/cast [@focus,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
-        .. "\n/cleartarget\n/targetexact Defias Pillager\n/cast [@target,harm,nodead] Polymorph\n/targetlasttarget", "ready for the whole fight")
+    equal(holder.attributes.macrotext1, "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
+        .. "\n/cleartarget\n/targetexact Defias Pillager\n/tm [@target,harm,nodead,exists] !5\n/use [@target,harm,nodead] Polymorph\n/targetlasttarget",
+        "ready for the whole fight")
     equal(state.env.MageToolsForeverPolymorphBar.shown, true)
 end)
 test("the click is there when the client knows Polymorph by its own spell ID", function()
@@ -2532,8 +2643,10 @@ test("\"! Polymorph\" focuses the mob and sheeps your focus, once you know Polym
     equal(macroBody(state, "! Polymorph"), nil, "not before you learn Polymorph")
     state.known[POLYMORPH] = true
     state.emit("SPELLS_CHANGED")
+    -- The moon from the key press (author: "/tm [@focus,harm,nodead,exists] !5"), legal in combat.
     equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
-        .. "[nocombat,harm,nodead]\n/cast [@focus,harm,nodead] Polymorph")
+        .. "[nocombat,harm,nodead]\n/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph")
+    equal(#macroBody(state, "! Polymorph") <= 255, true, "fits a macro")
     state.settings.MTF_POLYMORPH_MACRO:SetValue(false)
     equal(macroBody(state, "! Polymorph"), nil, "turning it off deletes it")
 end)
@@ -2915,6 +3028,214 @@ test("unlocked, a grid shows the screen's center; it follows its switch and the 
     equal(grid.shown, true)
     state.slash("lock")
     equal(grid.shown, false)
+end)
+
+-- Dyre's Toolkit ------------------------------------------------------------------
+
+local TOOLKIT_INSTALL = "Install Dyre's Toolkit from CurseForge"
+local function countMessages(state, fragment)
+    local found = 0
+    for _, message in ipairs(state.messages) do
+        if message:find(fragment, 1, true) then found = found + 1 end
+    end
+    return found
+end
+local function movable(state, frame)
+    for _, entry in ipairs(state.toolkit.movables) do
+        if entry[1] == frame then return entry[2] end
+    end
+end
+local function mainSwitch(state, variable)
+    for _, initializer in ipairs(state.categories["Mage Tools Forever"].initializers) do
+        if initializer.setting.variable == variable then return initializer end
+    end
+end
+
+test("without Dyre's Toolkit MTF keeps its own layout and page, and says once to install it", function()
+    local state = mage()
+    equal(state.mtf.toolkit, nil)
+    equal(countMessages(state, TOOLKIT_INSTALL), 1, "said once at login")
+    for _, message in ipairs(state.messages) do
+        if message:find(TOOLKIT_INSTALL, 1, true) then
+            contains(message, "MTF: ")
+            equal(message:lower():find("github", 1, true), nil, "CurseForge only")
+        end
+    end
+    equal(state.registered, state.categories["Mage Tools Forever"], "its own top-level page")
+    equal(state.categories["Dyre's AddOns"], nil)
+    equal(#mainSwitch(state, "MTF_GRID").modifyPredicates, 0, "its own grid switch works")
+    equal(mainSwitch(state, "MTF_UNLOCKED").setting.name, "Unlock frames to move them", "its own unlock switch")
+    contains(mainSwitch(state, "MTF_UNLOCKED").tooltip, "/mtf reset")
+    state.settings.MTF_UNLOCKED:SetValue(true)
+    equal(state.mtf.db.locked, false, "the switch unlocks MTF's frames")
+    state.settings.MTF_UNLOCKED:SetValue(false)
+    equal(state.mtf.db.locked, true)
+    state.slash("unlock")
+    equal(state.mtf.grid.shown, true, "its own grid")
+    contains(state.last(), "All MTF frames unlocked")
+    equal(countMessages(state, TOOLKIT_INSTALL), 1, "not again")
+    local old = mage({toolkit = true, oldToolkit = true})
+    equal(old.mtf.toolkit, nil, "a toolkit without contract 1 is not used")
+    equal(countMessages(old, TOOLKIT_INSTALL), 1)
+    equal(#old.toolkit.addons, 0)
+    equal(old.registered, old.categories["Mage Tools Forever"])
+end)
+test("with Dyre's Toolkit MTF registers, and its pages sit under Dyre's AddOns", function()
+    local state = mage({toolkit = true})
+    equal(countMessages(state, TOOLKIT_INSTALL), 0, "no install message")
+    local toolkit = state.toolkit
+    equal(#toolkit.addons, 1)
+    equal(toolkit.addons[1].addon, "MageToolsForever")
+    equal(toolkit.addons[1].title, "Mage Tools Forever")
+    local home, main = state.categories["Dyre's AddOns"], state.categories["Mage Tools Forever"]
+    equal(main.parent, home, "MTF's page is under the home")
+    equal(state.registered, home, "MTF registers no top-level page of its own")
+    for _, name in ipairs({"Conjure", "Shield", "Portals", "Polymorph", "Buff Reminders", "Cooldown Chimes",
+            "Announce"}) do
+        equal(state.categories[name].parent, main, name .. " is under MTF's page")
+    end
+    equal(main.initializers[1].setting.variable, "MTF_CONJURE_ENABLED", "the main page keeps its switches")
+    toolkit.addons[1].openSettings()
+    equal(state.opened, "id:Mage Tools Forever")
+    state.opened = nil
+    state.slash("")
+    equal(state.opened, "id:Mage Tools Forever", "/mtf opens MTF's page through the toolkit")
+    state.opened = nil
+    state.combat = true
+    state.slash("")
+    equal(state.opened, nil, "never in combat")
+    local own = mage({toolkit = true, toolkitNoSettings = true})
+    equal(own.registered, own.categories["Mage Tools Forever"], "no home: MTF's own top-level page")
+    equal(#own.toolkit.addons, 1)
+end)
+test("with Dyre's Toolkit every MTF frame moves and snaps through it", function()
+    local state = mage({toolkit = true})
+    local toolkit, env = state.toolkit, state.env
+    local bar = env.MageToolsForeverConjure
+    for _, frame in ipairs({bar, env.MageToolsForeverPortals, env.MageToolsForeverPolymorph,
+            reminderIcon(state, "intellect"), reminderIcon(state, "armor")}) do
+        equal(type(movable(state, frame)), "function", "registered with the toolkit")
+    end
+    movable(state, bar)({point = "CENTER", relativePoint = "BOTTOMLEFT", x = 300, y = 200})
+    equal(state.mtf.db.conjure.position.x, 300, "MTF saves its own positions")
+    bar.scripts.OnDragStart(bar)
+    bar.scripts.OnDragStop(bar)
+    equal(toolkit.drags[1][1], "begin")
+    equal(toolkit.drags[1][2], bar)
+    equal(toolkit.drags[2][1], "end")
+    local intellect = reminderIcon(state, "intellect")
+    intellect.scripts.OnDragStart(intellect)
+    equal(toolkit.drags[3][2], intellect)
+end)
+test("with Dyre's Toolkit the shield display drags and snaps through it; without, it moves freely", function()
+    local state = mage({toolkit = true})
+    local toolkit, ring = state.toolkit, state.mtf.ShieldDisplay.frame
+    local save = movable(state, ring)
+    equal(type(save), "function", "the ring is registered with the toolkit")
+    save({point = "CENTER", relativePoint = "BOTTOMLEFT", x = 640, y = 360})
+    equal(state.mtf.db.shield.position.x, 640, "MTF's shield settings keep the place")
+    ring.scripts.OnDragStart(ring)
+    equal(#toolkit.drags, 0, "locked: no drag")
+    state.slash("unlock")
+    ring.scripts.OnDragStart(ring)
+    ring.scripts.OnDragStop(ring)
+    equal(toolkit.drags[1][1], "begin")
+    equal(toolkit.drags[1][2], ring)
+    equal(toolkit.drags[2][1], "end")
+    equal(state.mtf.db.shield.position.x, 640, "the toolkit saves through save, not the ring's own point")
+    local alone = mage()
+    local own = alone.mtf.ShieldDisplay.frame
+    alone.slash("unlock")
+    own.scripts.OnDragStart(own)
+    own:ClearAllPoints()
+    own:SetPoint("LEFT", alone.env.UIParent, "LEFT", 10, 0)
+    own.scripts.OnDragStop(own)
+    equal(alone.mtf.db.shield.position.point, "LEFT", "without the toolkit the ring saves its own point")
+    local aside = mage({toolkit = true, loadedAddOns = {DyresShieldsUp = true}})
+    for _, entry in ipairs(aside.toolkit.movables) do
+        equal(entry[1] == aside.mtf.ShieldDisplay.frame, false, "Dyre's Shields Up registers its own ring")
+    end
+end)
+test("with Dyre's Toolkit one lock serves every Dyre's AddOn, quietly, and the toolkit draws the grid", function()
+    local state = mage({toolkit = true, db = {locked = false}})
+    local toolkit = state.toolkit
+    equal(state.mtf.db.locked, true, "frames start locked, as the toolkit's")
+    state.clear()
+    state.slash("unlock")
+    equal(toolkit.locked, false, "/mtf unlock unlocks every Dyre's AddOn")
+    equal(state.mtf.db.locked, false)
+    equal(state.mtf.db.conjure.locked, false)
+    equal(state.mtf.db.shield.locked, false)
+    equal(state.env.MageToolsForeverConjure.mover.shown, true)
+    equal(state.mtf.ShieldDisplay.frame.mover.shown, true)
+    equal(state.mtf.grid, nil, "no MTF grid: the toolkit draws one")
+    equal(countMessages(state, "MTF:"), 0, "quiet: the toolkit says one line for all")
+    equal(state.last(), "Dyre: Frames unlocked.")
+    state.slash("lock")
+    equal(toolkit.locked, true)
+    equal(state.env.MageToolsForeverConjure.mover.shown, false)
+    -- Another Dyre's AddOn, or the toolkit's own switch, locks every AddOn.
+    state.clear()
+    toolkit.SetLocked(true)
+    equal(state.mtf.db.locked, true)
+    equal(state.env.MageToolsForeverConjure.mover.shown, false)
+    equal(countMessages(state, "MTF:"), 0)
+    -- The toolkit's page has the one unlock switch and the grid: none on MTF's pages.
+    equal(state.settings.MTF_UNLOCKED, nil, "no MTF unlock switch")
+    equal(state.settings.MTF_GRID, nil, "no MTF grid switch")
+    for _, page in pairs(state.categories) do
+        for _, initializer in ipairs(page.initializers) do
+            local name = initializer.setting and initializer.setting.name or ""
+            equal(name:lower():find("unlock", 1, true), nil, page.name .. " has no unlock switch")
+        end
+    end
+    local intellect = reminderIcon(state, "intellect")
+    toolkit.SetLocked(false)
+    intellect.scripts.OnMouseWheel(intellect, 1)
+    equal(toolkit.scaled[1][1], intellect, "resizing keeps the center through the toolkit")
+end)
+
+-- MTF's macro text ------------------------------------------------------------------
+
+-- Every macro body and click macrotext MTF writes, after a Mage who knows
+-- every kind has sheeped a mob.
+local function writtenMacroText()
+    local state = mage({known = {[759] = true, [POLYMORPH] = true}})
+    sheepTarget(state)
+    castPolymorph(state)
+    local texts = {}
+    for _, macro in ipairs(state.macros) do
+        texts[#texts + 1] = {where = "macro " .. macro.name, text = macro.body}
+    end
+    for _, frame in ipairs(state.frames) do
+        for key, value in pairs(frame.attributes or {}) do
+            if type(key) == "string" and key:find("^macrotext") and type(value) == "string" then
+                texts[#texts + 1] = {where = tostring(frame.name) .. " " .. key, text = value}
+            end
+        end
+    end
+    return texts
+end
+test("MTF's macros use /use, never /cast, and every @focus checks exists", function()
+    -- Author: "use /use instead of cast; every character counts", and @focus needs exists.
+    local texts = writtenMacroText()
+    local seen = {}
+    for _, entry in ipairs(texts) do
+        seen[entry.where] = true
+        for line in entry.text:gmatch("[^\n]+") do
+            equal(line:find("^/cast "), nil, entry.where .. ": " .. line)
+            for clause in line:gmatch("%[([^%]]*)%]") do
+                if clause:find("@focus", 1, true) then
+                    equal(clause:find("exists", 1, true) ~= nil, true, entry.where .. ": " .. line)
+                end
+            end
+        end
+        equal(#entry.text <= 255 or not entry.where:find("^macro "), true, entry.where .. " fits a macro")
+    end
+    for _, where in ipairs({"macro ! Water", "macro ! Food", "macro ! Food & Water", "macro ! Mana Gem",
+            "macro ! Polymorph", "MageToolsForeverPolymorph macrotext1"}) do
+        equal(seen[where], true, where .. " was checked")
+    end
 end)
 
 -- Settings pages ----------------------------------------------------------------

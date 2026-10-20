@@ -124,8 +124,10 @@ local function AddPolymorphPage(parent)
             .. "the hostile mob under your mouse (or your target, out of combat) and sheeps your focus, which the "
             .. "bar's click recasts on. Turning this off deletes it.", function() MTF.ApplyPolymorphMacro() end)
     Flag(page, "MTF_POLYMORPH_MARK", "Mark the sheep with the moon", "polymorph", "mark", true,
-        "When your Polymorph cast succeeds, put the moon raid marker on the mob. In a raid the game "
-            .. "lets only the leader and assistants mark.")
+        "\"! Polymorph\" and a click on the bar put the moon raid marker on the mob as you press them, also in "
+            .. "combat. A Polymorph from the plain spell button gets no moon: the game does not let AddOns set "
+            .. "markers. In a raid the game lets only the leader and assistants mark.",
+        function() MTF.RefreshPolymorph() end)
     local scale = Proxy(page, "MTF_POLYMORPH_SCALE", Settings.VarType.Number, "Bar size (%)", MTF.DEFAULT_SCALE,
         function() return MTF.db.polymorph.scale end,
         function(value)
@@ -464,7 +466,15 @@ function MTF.InitializeOptions()
     if not HasSettingsAPI() then
         return
     end
-    category = Settings.RegisterVerticalLayoutCategory(TITLE)
+    -- With Dyre's Toolkit, MTF's page sits under its "Dyre's AddOns" home,
+    -- and MTF's pages under that (the settings list draws any depth).
+    if MTF.toolkit then
+        category = MTF.toolkit.RegisterSettingsCategory(TITLE)
+    end
+    local ownCategory = category == nil
+    if ownCategory then
+        category = Settings.RegisterVerticalLayoutCategory(TITLE)
+    end
     Flag(category, "MTF_CONJURE_ENABLED", "Conjure bar", "conjure", "enabled", true,
         "A bar with water, food, and mana gem buttons: left-click uses or trades, right-click conjures.",
         RefreshConjure)
@@ -484,21 +494,28 @@ function MTF.InitializeOptions()
     Grey(Flag(category, "MTF_CHIMES_ENABLED", "Cooldown chimes", "chimes", "enabled", true,
         "A sound just before Blink, Frost Nova, and your other chosen spells are ready again."
             .. ChimesNote(MTF.SoundLibrary())), MTF.ChimesStandAside())
-    local unlocked = Proxy(category, "MTF_UNLOCKED", Settings.VarType.Boolean, "Unlock frames to move them", false,
-        function() return not MTF.db.locked end,
-        function(value) MTF.SetFramesLocked(value ~= true) end)
-    Settings.CreateCheckbox(category, unlocked,
-        "Outline every MTF frame (the conjure, portal, and Polymorph bars, the buff reminders, and the "
-            .. "shield display) so you can drag them, and scroll a buff reminder to resize it; untick to lock them again. "
-            .. "/mtf unlock and /mtf lock do the same, and /mtf reset moves them back to their default places.")
-    local grid = Proxy(category, "MTF_GRID", Settings.VarType.Boolean, "Show a grid while unlocked", true,
-        function() return MTF.db.grid end,
-        function(value)
-            MTF.db.grid = value == true
-            MTF.RefreshGrid()
-        end)
-    Settings.CreateCheckbox(category, grid, "While frames are unlocked, draw a faint grid over the screen with "
-        .. "the center lines in red, so you can line frames up.")
+    -- With Dyre's Toolkit, its "Dyre's AddOns" page has the one unlock switch
+    -- and the grid for every Dyre's AddOn (author-approved: no redundant
+    -- switches here); /mtf unlock and /mtf lock still work.
+    if not MTF.toolkit then
+        local unlocked = Proxy(category, "MTF_UNLOCKED", Settings.VarType.Boolean, "Unlock frames to move them",
+            false,
+            function() return not MTF.db.locked end,
+            function(value) MTF.SetFramesLocked(value ~= true) end)
+        Settings.CreateCheckbox(category, unlocked,
+            "Outline every MTF frame (the conjure, portal, and Polymorph bars, the buff reminders, and the "
+                .. "shield display) so you can drag them, and scroll a buff reminder to resize it; untick to lock "
+                .. "them again. /mtf unlock and /mtf lock do the same, and /mtf reset moves them back to their "
+                .. "default places.")
+        local grid = Proxy(category, "MTF_GRID", Settings.VarType.Boolean, "Show a grid while unlocked", true,
+            function() return MTF.db.grid end,
+            function(value)
+                MTF.db.grid = value == true
+                MTF.RefreshGrid()
+            end)
+        Settings.CreateCheckbox(category, grid, "While frames are unlocked, draw a faint grid over the screen with "
+            .. "the center lines in red, so you can line frames up.")
+    end
     AddConjurePage(category)
     AddShieldPage(category)
     AddPortalsPage(category)
@@ -508,12 +525,19 @@ function MTF.InitializeOptions()
     local announcePage = CreateAnnouncePage()
     MTF.announcePage = announcePage
     Settings.RegisterCanvasLayoutSubcategory(category, announcePage, ANNOUNCE_TITLE)
-    Settings.RegisterAddOnCategory(category)
+    if ownCategory then
+        Settings.RegisterAddOnCategory(category)
+    end
 end
 
 function MTF.OpenSettings()
     if not category then
         MTF.Report(UNAVAILABLE)
+        return
+    end
+    if MTF.toolkit then
+        -- The toolkit opens it, never in combat.
+        MTF.toolkit.OpenSettings(category)
         return
     end
     Settings.OpenToCategory(category:GetID())

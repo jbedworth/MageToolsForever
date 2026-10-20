@@ -12,6 +12,12 @@ CurseForge app installs it with Mage Tools Forever; otherwise get it from
 CurseForge or [GitHub](https://github.com/jbedworth/DyresSounds). Without it,
 MTF works but plays no sounds, and says so once in chat.
 
+**Dyre's Toolkit** is the home of all of Dyre's AddOns: one layout mode for
+every Dyre's AddOn's frames, a grid, and one settings page. The CurseForge app
+installs it with Mage Tools Forever. With it, MTF's settings are under
+**Options → AddOns → Dyre's AddOns → Mage Tools Forever**. Without it, MTF
+works as before and says so once in chat.
+
 ## Conjure
 
 A small bar with **Water**, **Food**, **Food & Water**, and **Mana Gem**
@@ -64,7 +70,7 @@ buttons. **Bar size** on the Conjure settings page shrinks or grows it
 them from the Macros window to a bar: left-click eats, drinks, or uses;
 right-click conjures, also in combat. Turn **Keep conjure macros** off to
 remove them. (On Forever, `/click` macros do not press AddOn buttons, so these
-use the game's own `/use` and `/cast`.)
+use the game's own `/use` and `/castsequence`.)
 
 The game lets the buttons change only out of combat, so a target or bag change
 in combat updates them when combat ends.
@@ -90,8 +96,12 @@ target, and if the Polymorph breaks early, the bar empties so you see it.
 
 - As you start casting in a group, MTF tells your party or raid: "Sheeping
   Defias Pillager; you spank it, you tank it."
-- When the cast lands, MTF marks the mob with the moon. (In a raid, only the
-  leader and assistants can mark.)
+- The moon marker: for the moon, use the **"! Polymorph"** macro or click
+  the bar. They mark the mob as you press them, also in combat, and a second
+  press never toggles the moon off. A Polymorph from the plain spell button
+  gets no moon: the game does not let AddOns set markers. (In a raid, only
+  the leader and assistants can mark.)
+- With no sheep to click, the bar lets your clicks through to the world.
 - **"! Polymorph"** in your character macros (once you know Polymorph) focuses
   the hostile mob under your mouse (or your target, out of combat) and sheeps
   your focus. The bar follows your focus, so it keeps the timer while you fight
@@ -101,9 +111,10 @@ target, and if the Polymorph breaks early, the bar empties so you see it.
   click change only out of combat, so after sheeping a different mob in
   combat, the click catches up when combat ends. With several mobs of the same
   name, it picks the nearest.
-- The marker switch and **Bar size** are on the Polymorph settings page. If you
-  mark with your own `/tm` macro, turn MTF's marker off: the game toggles a
-  marker that is set twice, and in combat MTF cannot see yours.
+- The marker switch and **Bar size** are on the Polymorph settings page. The
+  switch takes the `/tm` line out of "! Polymorph" and the bar's click (or
+  puts it back). If you mark with your own `/tm` macro, use `!` the same way
+  (`!5`), or turn MTF's marker off.
 
 ## Buff reminders
 
@@ -211,6 +222,15 @@ While unlocked, a faint grid covers the screen, with red lines through its
 center, so you can line frames up. Turn off **Show a grid while unlocked** on
 the main settings page if you'd rather not see it.
 
+With **Dyre's Toolkit** installed, the frames of every Dyre's AddOn unlock
+and lock together: `/mtf unlock`, `/mtf lock`, `/dyre unlock`, `/dyre lock`,
+the minimap button, and the **Unlock frames** switch on the Dyre's AddOns
+settings page all do the same. MTF's own unlock and grid switches are then
+left out, since the toolkit's page has them. MTF's frames snap to the
+frames of your other Dyre's AddOns too, and the toolkit draws the grid; use
+its settings (`/dyre`) for the grid and "Snap to the grid". The shield
+display snaps with them too.
+
 ## Commands
 
 | Command | What it does |
@@ -224,7 +244,7 @@ the main settings page if you'd rather not see it.
 | `/mtf debug_shield` | Diagnostics: the absorb APIs and the shields MTF tracks |
 | `/mtf debug_chimes` | Diagnostics: each chime spell, its cooldown, and the sound |
 | `/mtf debug_portals` | Diagnostics: each teleport and portal as the client knows it, and your runes |
-| `/mtf debug_polymorph` | Diagnostics: the Polymorph IDs, the sheeped mob, the click, and the marker |
+| `/mtf debug_polymorph` | Diagnostics: the Polymorph IDs, the sheeped mob, the click, and the moon setting |
 | `/mtf debug_reminders` | Diagnostics: each buff reminder and who lacks the buff |
 | `/mtf debug_click` | Diagnostics: what each conjure button does for each mouse button |
 
@@ -232,13 +252,14 @@ the main settings page if you'd rather not see it.
 
 ## Compatibility
 
-Beta: tested on the Forever beta client 1.60.1. MTF keeps working on later beta
+Beta: tested on the Forever beta client 1.60.1, build 70450. MTF keeps working on later beta
 builds; if a client update removes an API it needs, it turns that feature off
 with one chat message. Spell and item IDs are Classic's; `/mtf debug_conjure`
 shows what your client knows.
 
 WowUp users (2.24.0 or later): install from the repository URL, and Dyre's
-Sounds (github.com/jbedworth/DyresSounds) the same way; GitHub releases carry
+Sounds (github.com/jbedworth/DyresSounds) and Dyre's Toolkit
+the same way; GitHub releases carry
 the Forever metadata WowUp needs.
 
 ## License

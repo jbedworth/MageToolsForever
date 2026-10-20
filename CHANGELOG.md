@@ -4,6 +4,19 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 0.3.3-beta
+
+- Fixed: a Polymorph no longer brings up the game's "MageToolsForever has been blocked from an action" popup or a "protected function" error. The game does not let AddOns set raid markers, so MTF no longer marks by itself.
+- For the moon marker, use the **"! Polymorph"** macro or click the Polymorph bar: they mark the mob with `/tm` as you press them, also in combat, and a second press never toggles the moon off. A Polymorph from the plain spell button gets no moon. MTF updates your "! Polymorph" macro out of combat. The "Mark the sheep with the moon" switch now adds or removes the `/tm` line in the macro and the bar's click.
+- MTF's macros ("! Water", "! Food", "! Food & Water", "! Mana Gem", "! Polymorph") and the Polymorph bar's click now use `/use` instead of `/cast`, so they are shorter, and every `@focus` check also checks that you have a focus. MTF updates your macros out of combat.
+- Fixed: the Polymorph bar's spot no longer catches your clicks when no bar shows. It takes clicks only while it shows a sheep to click again, or while frames are unlocked.
+
+- Mage Tools Forever works with **Dyre's Toolkit**, a small AddOn that all of Dyre's AddOns share. The CurseForge app installs it with Mage Tools Forever.
+- With Dyre's Toolkit, MTF's settings are under **Options > AddOns > Dyre's AddOns > Mage Tools Forever**, and MTF is listed under Dyre's Toolkit in the AddOn list.
+- With Dyre's Toolkit, `/mtf unlock`, `/mtf lock`, and MTF's unlock switch unlock and lock the frames of every Dyre's AddOn together, frames snap to the frames of your other Dyre's AddOns, and the toolkit draws the grid (with its own "Snap to the grid"). The shield display snaps with the other frames too.
+- With Dyre's Toolkit, MTF's settings no longer have their own "Unlock frames to move them" and grid switches: use the **Unlock frames** switch and the grid settings on the Dyre's AddOns page, `/dyre unlock`, the minimap button, or `/mtf unlock` and `/mtf lock`.
+- Without Dyre's Toolkit, MTF works as before and says once in chat to install it.
+
 ## 0.3.2-beta
 
 - With **Dyre's Buff Reminders** installed, MTF plays no cooldown chimes: Dyre's Buff Reminders plays them, so you never hear two, and on its first run it copies your MTF chime settings. MTF's chime settings are greyed out and point you to `/dbr`, and MTF keeps them as they are.

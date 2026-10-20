@@ -4,7 +4,7 @@
 
 1. **Pinned source review.** Client behavior is read from Blizzard's FrameXML
    and generated API documentation at Gethe/wow-ui-source commit
-   `943764493e6b16d63ded3ab304150d1f05e58b57` (`1.60.1.70338`). Source
+   `943764493e6b16d63ded3ab304150d1f05e58b57` (`1.60.1.70338`; the client was tested on build 70450). Source
    establishes declared APIs, templates, and code paths, not operational behavior.
 2. **Automated mock tests.** `tests/run.lua` exercises commands, saved settings,
    the conjure buttons, trades, and macros, the shield display, the chimes, and
@@ -126,8 +126,31 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       once, nothing when alone; a teleport emotes at the first key press or
       click after the loading screen; a spell learned in combat joins after combat;
       `/mtf debug_portals` lists the IDs (check Forever's IDs match Classic's).
+- [ ] After `/reload` out of combat, the "! Polymorph" macro (Macros,
+      character tab) has the line `/tm [@focus,harm,nodead,exists] !5` after
+      the `/focus` line.
+- [ ] Every MTF macro (Water, Food, Food & Water, Mana Gem, Polymorph) reads
+      `/use`, not `/cast`; right-click of each conjure macro still conjures
+      the shown rank, and "! Polymorph" and the bar click still sheep (`/use`
+      casts a spell by name).
+- [ ] With BugGrabber (or the taint log) on: sheep in and out of combat with
+      the macro, the bar click, and the plain spell button. No "blocked from
+      an action" popup, no ADDON_ACTION_FORBIDDEN, and no taint line names
+      MageToolsForever.
+- [ ] The moon: "! Polymorph" puts it on as you press it, in and out of
+      combat, and pressing it again keeps it; a bar click marks the mob it
+      sheeps; the plain Polymorph spell button gives no moon, and the bar
+      still shows the sheep. `/mtf debug_polymorph` says
+      `moon=from the macro and the click`.
+- [ ] "Mark the sheep with the moon" off: after combat (or at once out of
+      combat) "! Polymorph" and the bar's click have no `/tm` line, and no
+      moon goes on; on again puts the line back.
+- [ ] Locked, with no sheep up: left- and right-click the empty spot where
+      the Polymorph bar sits; the clicks reach the world (target a mob or
+      turn the camera behind it). With a sheep up, the bar's click sheeps
+      it again; after it ends out of combat, clicks pass through again.
 - [ ] Polymorph: in a party, the group message as the cast starts; the moon
-      on the mob when it lands (also solo; in a raid as assistant); the bar
+      from the macro or the bar click (also solo; in a raid as assistant); the bar
       shows the name and drains, follows the mob when you tab away, empties
       when it breaks, and goes when the mob dies. Click the bar after the
       Polymorph breaks (out of combat sheep): it re-sheeps that mob and
@@ -160,7 +183,27 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] Unlocked: the grid covers the screen under every frame, red lines
       cross at the center, clicks pass through it, it rebuilds after a UI
       scale change, and its switch hides it.
-- [ ] "Unlock frames to move them" and `/mtf unlock` outline the conjure bar,
+- [ ] With Dyre's Toolkit enabled: MTF is listed under Dyre's Toolkit in the
+      AddOn list; no "Install Dyre's Toolkit" line at login; MTF's page is
+      under Options > AddOns > Dyre's AddOns, with Conjure, Shield, Portals,
+      Polymorph, Buff Reminders, Cooldown Chimes, and Announce under it;
+      `/mtf` opens it (and says out of combat in combat). `/mtf unlock` and
+      `/dyre unlock` outline MTF's frames and the other Dyre's AddOns' with
+      one "Dyre:" line and no "MTF:" line; the toolkit's grid shows and MTF
+      draws none; MTF's pages have no unlock or grid switch, and the
+      toolkit's "Unlock frames" switch unlocks MTF's frames too. A dropped MTF bar snaps
+      beside another Dyre's AddOn's frame; with "Snap to the grid" on, a bar
+      dropped alone centers on a grid point; Shift-drag moves a snapped group;
+      positions and reminder sizes survive `/reload`. `/mtf lock` and the
+      toolkit's minimap button lock every AddOn. The shield display (its
+      full sample) drags, snaps beside an MTF bar, joins a Shift-drag group,
+      and keeps its place after `/reload`.
+- [ ] With Dyre's Toolkit disabled: MTF says once at login to install it
+      from CurseForge; its page is top level again, with its "Unlock frames
+      to move them" and grid switches, and its own grid and lock work as
+      before (the shield display drags freely and saves its place),
+      and positions saved with the toolkit stay.
+- [ ] Without Dyre's Toolkit: "Unlock frames to move them" and `/mtf unlock` outline the conjure bar,
       the portal bar, and the shield display (with a full sample); all drag; unticking or
       `/mtf lock` locks both, and the switch and commands stay in step;
       `/mtf reset` puts them back.

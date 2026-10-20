@@ -261,7 +261,10 @@ local function CharacterMacroLimit()
     end
 end
 
--- The name /cast needs for an exact rank: "Conjure Water(Rank 4)".
+-- The name /use needs for an exact rank: "Conjure Water(Rank 4)". MTF's macros
+-- use /use, not /cast (author: every letter counts): /use tries an item of
+-- that exact name first, then casts the spell (pinned SlashCommands.lua), and
+-- no item is named like a Conjure spell.
 local function CastName(spellID)
     local name = C_Spell.GetSpellName(spellID)
     local subtext = type(C_Spell.GetSpellSubtext) == "function" and C_Spell.GetSpellSubtext(spellID)
@@ -278,7 +281,7 @@ function MTF.ConjureMacroBody(kind, rank)
     local lines = {"#showtooltip item:" .. shown}
     local castName = rank and CastName(rank.spell)
     if castName then
-        lines[#lines + 1] = "/cast [btn:2] " .. castName
+        lines[#lines + 1] = "/use [btn:2] " .. castName
         lines[#lines + 1] = "/stopmacro [btn:2]"
     end
     -- Every rank, best first: the first one you carry is used.
@@ -301,7 +304,7 @@ local function ConjureBothLine(waterRank, foodRank)
     if #names == 2 then
         return "/castsequence " .. table.concat(names, ", ")
     elseif #names == 1 then
-        return "/cast " .. names[1]
+        return "/use " .. names[1]
     end
 end
 

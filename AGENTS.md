@@ -83,10 +83,16 @@ frameworks without agreement.
 - Macros live in the character tab with the question-mark icon (134400), are
   rewritten out of combat only when the body changes, leave the last 2
   character slots free, and are deleted when "Keep conjure macros" is turned
-  off. Bodies: `#showtooltip`, `/cast [btn:2] <rank>`, `/stopmacro [btn:2]`,
+  off. Bodies: `#showtooltip`, `/use [btn:2] <rank>`, `/stopmacro [btn:2]`,
   then `/use item:` for every rank, best first. Ranks are cast by exact name,
   "Conjure Water(Rank 3)", from `C_Spell.GetSpellSubtext`.
-  `Constants.MacroConsts.MAX_CHARACTER_MACROS` gives the slot limit; the global
+- Every macro and click macrotext MTF writes casts with `/use`, never `/cast`
+  (author: "every character counts"): the pinned SlashCommands.lua `/use`
+  uses an item of that exact name, else `CastSpellByName`, and no spell MTF
+  names ("Conjure Water(Rank N)", "Conjure Mana Agate", "Polymorph",
+  "Polymorph: Pig") is an item name. `/castsequence` stays. Every `@focus`
+  condition has `exists` (author). A test checks every body MTF writes.
+- `Constants.MacroConsts.MAX_CHARACTER_MACROS` gives the slot limit; the global
   exists only after Blizzard's Macro window loads.
 - Secure attributes change only out of combat; changes wait for
   `PLAYER_REGEN_ENABLED`.
@@ -113,8 +119,10 @@ frameworks without agreement.
   ring; a copy that was drawing stands down when a newer one joins (protocol
   2: each copy's start and stop are in the registry); the others draw
   nothing and say once which AddOn shows it. Version 1 copies elect among
-  every registered copy. WTF ships the same file: keep both copies identical
-  and bump `VERSION` in both with every behavior change.
+  every registered copy. WTF and DSU ship the same file: keep every copy
+  byte-identical and bump `VERSION` in all with every behavior change
+  (through the coordinator; tests pin MTF's version in the debug_shield
+  text and use a newer one for the take-over test).
 - Version 3: bubbles (Divine Shield, Divine Protection: Paladin; Blessing
   of Protection: anyone) are timed, drawing a gold innermost crescent
   (Textures/ShieldArcInnermost.tga) that drains with their time left
@@ -159,6 +167,11 @@ frameworks without agreement.
   chat to install Dyre's Sounds. Shield.lua is byte-identical to DSU's copy.
   MTF passes `missingSounds = MTF.ReportMissingSounds` to `Initialize`, so the
   shield sound and the chimes share one line (author-approved: one per AddOn).
+- Version 9 (with MTF, WTF, and DSU; coordinator-approved): an optional
+  `layout = {register(frame, save), beginDrag(frame), endDrag(frame)}` in
+  `Initialize` moves the ring through the host's layout (Dyre's Toolkit);
+  `save` stores `{point, relativePoint, x, y}` in the shield settings.
+  Without it the ring moves freely and saves its own point.
 - The icon row holds the player's own class's shields (`class` on each
   entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
   Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
@@ -219,11 +232,45 @@ frameworks without agreement.
 - A plain frame, locked by default; it takes the mouse only while unlocked, to
   show a sample of every part to drag, so it never blocks world clicks.
 
+### Dyre's Toolkit (built; author-approved, 2026-10-19)
+
+- Dyre's Toolkit (`src/DyresToolkit`, owned by the coordinator; never edit
+  it, ask there) is the home of every Dyre's AddOn: one layout mode, the
+  grid and snap to grid, snapping across AddOns, and the "Dyre's AddOns"
+  settings home. MTF keeps its name (author). TOC `## OptionalDeps:
+  DyresSounds, DyresToolkit` (never `## Dependencies`) and `## Group:
+  DyresToolkit`; CurseForge required dependency `dyres-toolkit`
+  (`RELATIONS`).
+- Core's `MTF.Toolkit()` is `DyresToolkit.RequireContract(1)` with the
+  functions MTF uses checked. At login (`UseToolkit`, before the modules
+  start) MTF's `RegisterMovable`, `BeginDrag`, `EndDrag`, and
+  `ScaleKeepingCenter` become the toolkit's, so every movable frame (conjure,
+  portal, and Polymorph bars, buff reminders) registers, drags, and snaps
+  there, and MTF's lock starts as the toolkit's (locked). After the modules
+  start, `RegisterAddOn` with `setLocked` (shows or hides MTF's outlines and
+  samples, quietly) and `openSettings`. `MTF.SetFramesLocked` (`/mtf unlock`,
+  `/mtf lock`) calls the toolkit's `SetLocked`, which says
+  one line for all. MTF draws no grid, and its settings have no unlock or
+  grid switch (author-approved: the toolkit's "Dyre's AddOns" page has
+  them); without the toolkit both stay on MTF's main page.
+- Settings: MTF's page is `RegisterSettingsCategory("Mage Tools Forever")`
+  under "Dyre's AddOns", its pages under that; `/mtf` opens it through the
+  toolkit's `OpenSettings` (never in combat). With no page from the toolkit,
+  MTF makes its own top-level page.
+- Without the toolkit (or a newer contract only), MTF keeps Layout.lua, its
+  grid, its lock lines, and its top-level page, and says once at login to
+  install Dyre's Toolkit, naming only CurseForge.
+- The shield display (Shield.lua v9) gets `layout = {register =
+  RegisterMovable, beginDrag = BeginDrag, endDrag = EndDrag}` from the
+  toolkit in `MTF.InitializeShield`, so the ring drags and snaps with the
+  other frames; without the toolkit MTF passes no layout and the ring moves
+  freely, as before.
+
 ### Moving frames (built)
 
 - One lock for every MTF frame (author-approved): `db.locked`, default
   locked, copied to each frame's own `locked` (the shield component reads its
-  settings). The main page's "Unlock frames to move them" and `/mtf unlock`
+  settings). Without Dyre's Toolkit, the main page's "Unlock frames to move them" and `/mtf unlock`
   and `/mtf lock` set it; there are no per-frame lock switches. Every frame
   shows a gold outline and a "Drag to move · /mtf lock when done" hint while
   unlocked (the shield display also a full sample). Every new movable frame
@@ -336,6 +383,14 @@ frameworks without agreement.
 
 ### Polymorph bar (built)
 
+- Click-through (players reported it in 0.3.2): the secure holder is
+  invisible, so it takes the mouse only while it holds a sheep to click or
+  frames are unlocked (`EnableMouse` in `ApplyClick`, out of combat only;
+  after a sheep forgotten in combat, clicks pass through again when combat
+  ends). The bar on top never takes the mouse. Every other MTF frame that
+  takes the mouse is visible (the conjure and portal bars and their buttons,
+  the buff reminder icons, which hide when not needed) or takes it only while
+  unlocked (the shield display).
 - One block in WTF's Bars format (author-approved; only one Polymorph of
   yours is up at a time): the mob's name above one bar line, an
   AuraContainer slot (`HARMFUL|PLAYER`, `includeSpellIDs` = Classic Polymorph,
@@ -350,35 +405,47 @@ frameworks without agreement.
   range and comes back, its GUID does not. It forgets the mob when it dies
   (`UNIT_HEALTH` through any unit showing it, by GUID), after the longest
   Polymorph (50 s) plus 5 s, or on the next Polymorph. A cast on the mob
-  under the mouse counts (mouseover checks the cast and takes the moon); the
+  under the mouse counts (mouseover checks the cast); the
   bar binds once the mob is your focus, target, or a nameplate. MTF never reads the aura; a resist cannot be seen (the
   combat log is closed), so a successful cast counts as landed.
 - On cast start (`UNIT_SPELLCAST_SENT`, author-approved), the group message
   "Sheeping %T; you spank it, you tank it" (the author's classic line, no
   credit), raid or party only, at most once per 3 s; switch and text on the
   Announce page.
-- When the cast succeeds, the moon raid marker (index 5) via `SetRaidTarget`;
-  switch on the Polymorph page, on by default. In a raid only leaders and
-  assistants can mark. SetRaidTarget toggles: a unit that already has the marker loses it (the
-  pinned /tm source; its "!" prefix skips an equal marker). GetRaidTargetIndex
-  is secret to AddOn code in combat, so the mark is skipped when the index is
-  readable and equal, or, unreadable, when this AddOn marked that mob (by GUID)
-  already. The mark goes on your target or focus when it is the mob, as
-  TankHelper marks `TARGET`. A player's own `/tm` macro would clash in combat
-  (the AddOn cannot see that mark), so the README says to turn the AddOn's
-  marking off when using one.
+- The moon (index 5, author-approved) comes only from secure `/tm` (author:
+  "put the /tm [@focus,harm,nodead,exists] !5 back into the macro";
+  Blizzard's /tm runs untainted from the key press, pinned
+  SlashCommands.lua): "! Polymorph" and the bar's click mark at the press,
+  also in combat; "!" keeps a second press from toggling it off. The
+  "Mark the sheep with the moon" switch (on by default) decides whether the
+  macro and the click have their /tm lines; a change rebuilds both out of
+  combat. A plain spell-button Polymorph gets no moon. MTF never calls
+  `SetRaidTarget` (coordinator, 0.3.3): in John's client, with MTF's
+  out-of-combat guard in place, BugGrabber showed "4x
+  [ADDON_ACTION_FORBIDDEN] AddOn 'MageToolsForever' tried to call the
+  protected function 'SetRaidTarget()'" (Polymorph.lua Mark <-
+  OnCastSucceeded <- the event handler), and the taint log "An action was
+  blocked because of taint from MageToolsForever - SetRaidTarget()". In 0.3.2
+  players saw the "blocked from an action" popup. The exact rule is unknown
+  (TankHelper's direct call on an unmarked TARGET from a C_Timer callback
+  works for John); do not work around it. The mock forbids `SetRaidTarget`
+  always, and a test checks MTF never calls it.
 - "! Polymorph" (author-approved, after the author's own, `polymorph.macro`):
   once you know Polymorph, `#showtooltip`, `/focus [@mouseover,harm,nodead]
-  [nocombat,harm,nodead]`, `/cast [@focus,harm,nodead] Polymorph`. It does not
-  `/tm`: MTF marks on landing, and a second mark would toggle it off.
+  [nocombat,harm,nodead]`, `/tm [@focus,harm,nodead,exists] !5` (author's
+  line, exactly), `/use [@focus,exists,harm,nodead] Polymorph`. The "!" keeps a
+  second press from toggling the moon off. A body change is written out of
+  combat (`WriteMacro` edits a macro whose body differs), so older copies
+  update.
   The bar finds the sheep through your focus, then target, then its nameplate.
 - Click to re-sheep (author-approved, "if we can"; on your focus first since
-  the author's focus workflow: `/cast [@focus,harm,nodead] <spell>`,
+  the author's focus workflow: `/use [@focus,exists,harm,nodead] <spell>`,
   `/stopmacro [@focus,exists]`, then by name): the bar sits on a secure
   button (`MageToolsForeverPolymorph`, the drag anchor); the visible bar is an
   ordinary frame anchored to it, so it shows and hides in combat. The macro is
-  `/cleartarget`, `/targetexact <mob>`, `/cast [@target,harm,nodead]
-  <the Polymorph you cast>`, `/targetlasttarget`: a missing mob leaves no
+  `/tm [@focus,harm,nodead,exists] !5` before the focus cast, then
+  `/cleartarget`, `/targetexact <mob>`, `/tm [@target,harm,nodead,exists] !5`,
+  `/use [@target,harm,nodead] <the Polymorph you cast>`, `/targetlasttarget`: a missing mob leaves no
   target, so nothing else is sheeped. Attributes change only out of combat;
   a Polymorph begun in combat on another mob updates the click when combat
   ends, and until then the bar names the mob its click still sheeps. A cast
@@ -445,7 +512,8 @@ frameworks without agreement.
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, loaded in that order, plus
   Textures/ShieldArc.tga, Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga. Shield.lua is the
   shared component above; keep it free of MTF references. Commands parses `/mtf`; Core owns saved settings and
-  their defaults, the Dyre's Sounds check and the stand-aside checks,
+  their defaults, the Dyre's Sounds check, the Dyre's Toolkit link, and the
+  stand-aside checks,
   the login banner, class and install checks, slash conflict
   reporting, the hardware-input hooks trade placement waits for, and startup;
   Conjure, Shield, and Chimes own their modules and `/mtf debug_*` commands;
@@ -464,8 +532,10 @@ frameworks without agreement.
 - The project uses the MIT License. The public author name is `Dyre` (TOC
   `## Author`, login banner, listings); LICENSE keeps the legal name, John
   Bedworth, and the release builder requires that exact notice.
-- The TOC uses `## Category: Mage`; keep it identical to the CurseForge main
-  category, because the in-game AddOn list groups by exact text.
+- The TOC uses `## Group: DyresToolkit`, so the in-game AddOn list nests MTF
+  under Dyre's Toolkit (the family groups there). `## Category: Mage` stays
+  identical to the CurseForge main category; it matters only without the
+  toolkit, when the list groups by its exact text.
 - The runtime assets are Textures/ShieldArc.tga, ShieldArcInner.tga, and
   ShieldArcInnermost.tga; regenerate them with scripts/build_arc.py. MTF ships no
   sounds (Dyre's Sounds does). Add no other runtime assets
@@ -475,9 +545,10 @@ frameworks without agreement.
 
 ## Client and API verification
 
-- Target: Forever beta 1.60.1, build 70338 (author now on 70425, same version
-  and Interface), Interface 16001, Lua 5.1. Pin source review to
-  Gethe/wow-ui-source commit `943764493e6b16d63ded3ab304150d1f05e58b57`. Treat
+- Target: Forever beta 1.60.1, build 70450 (tested in client), Interface
+  16001, Lua 5.1. Pin source review to Gethe/wow-ui-source commit
+  `943764493e6b16d63ded3ab304150d1f05e58b57` (the 70338 source; the client
+  was tested on 70450, same version and Interface). Treat
   target-client documentation and FrameXML as authoritative; Retail and
   Classic examples are references only.
 - Do not gate the runtime on client version, build, or Interface. Gate only on

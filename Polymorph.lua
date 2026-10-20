@@ -12,8 +12,11 @@ local _, MTF = ...
 -- forgets it when it dies or the longest Polymorph could have ended. A dim
 -- line stays behind the bar, so a Polymorph that broke early shows as gone.
 --
--- On cast, MTF can tell the group (Announce). When the cast succeeds, it marks
--- the mob with the moon (author-approved). The combat log is closed to
+-- On cast, MTF can tell the group (Announce). The moon (author-approved) comes
+-- only from the "! Polymorph" macro and the bar's click: their /tm runs at the
+-- key press, which the game allows, also in combat. MTF never calls
+-- SetRaidTarget: from AddOn code the game forbade it even out of combat
+-- (ADDON_ACTION_FORBIDDEN in client, 0.3.3). The combat log is closed to
 -- AddOns, so a resist cannot be seen; a successful cast counts as landed.
 --
 -- Clicking the bar re-sheeps your focus (author-approved: single-target
@@ -31,6 +34,18 @@ local POLYMORPH_IDS = {118, 12824, 12825, 12826, 28272, 28271, 28270}
 local LONGEST_SECONDS = 50
 local FORGET_SLACK = 5
 local MOON = 5
+-- Blizzard's /tm runs from the key press, untainted, so it marks in combat too
+-- (pinned SlashCommands.lua). "!" keeps a second press from toggling the moon
+-- off; "exists" keeps it from marking with nothing there. The macros cast with
+-- /use, which casts a spell of that name (author: every letter counts), and
+-- every @focus condition has exists (author). The mark switch decides
+-- whether the macro and the click have their /tm line.
+local MARK_FOCUS = "/tm [@focus,harm,nodead,exists] !" .. MOON .. "\n"
+local MARK_TARGET = "/tm [@target,harm,nodead,exists] !" .. MOON .. "\n"
+
+local function MarkLine(line)
+    return MTF.db.polymorph.mark and line or ""
+end
 local AURA_FILTER = "HARMFUL|PLAYER"
 local CONTAINER_TEMPLATE = "CustomAuraContainerTemplate"
 local MAX_NAMEPLATE_UNITS = 40
@@ -214,9 +229,9 @@ local function ApplyClick()
     if name and spell then
         -- A missing mob leaves no target, so nothing else gets sheeped.
         holder:SetAttribute("type1", "macro")
-        holder:SetAttribute("macrotext1", "/cast [@focus,harm,nodead] " .. spell
+        holder:SetAttribute("macrotext1", MarkLine(MARK_FOCUS) .. "/use [@focus,exists,harm,nodead] " .. spell
             .. "\n/stopmacro [@focus,exists]\n/cleartarget\n/targetexact " .. name
-            .. "\n/cast [@target,harm,nodead] " .. spell .. "\n/targetlasttarget")
+            .. "\n" .. MarkLine(MARK_TARGET) .. "/use [@target,harm,nodead] " .. spell .. "\n/targetlasttarget")
     else
         holder:SetAttribute("type1", nil)
         holder:SetAttribute("macrotext1", nil)
@@ -224,6 +239,12 @@ local function ApplyClick()
     holder.mobName, holder.spellName = name, spell
     -- Shown while unlocked even before you learn Polymorph, so it can be placed.
     holder:SetShown(settings.enabled and (KnowsPolymorph() or not MTF.db.locked))
+    -- The holder is invisible: it takes the mouse only while it has a sheep
+    -- to click or is unlocked to drag, so clicks pass through to the world
+    -- (players could not click through it with no bar shown). Secure: out of
+    -- combat only, so after a sheep forgotten in combat the clicks pass
+    -- through again when combat ends.
+    holder:EnableMouse(not MTF.db.locked or (name ~= nil and spell ~= nil))
     Layout()
 end
 
@@ -365,9 +386,9 @@ end
 -- The macro -----------------------------------------------------------------------
 -- (author-approved, after the author's own): "! Polymorph" for your action
 -- bars, once you know Polymorph. It focuses the hostile mob under the mouse
--- (or, out of combat, your target) and sheeps your focus, so the macro, the
--- bar's click, and the moon agree on one mob. MTF marks the moon when the
--- cast lands, so the macro does not /tm (a second mark would toggle it off).
+-- (or, out of combat, your target), marks it with the moon (with the mark
+-- switch on), and sheeps your focus, so the macro, the bar's click, and the
+-- moon agree on one mob. The /tm "!" never toggles the moon off.
 
 local MACRO_NAME = "! Polymorph"
 
@@ -376,8 +397,8 @@ function MTF.PolymorphMacroBody()
     if not spell then
         return nil
     end
-    return "#showtooltip " .. spell .. "\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n/cast "
-        .. "[@focus,harm,nodead] " .. spell
+    return "#showtooltip " .. spell .. "\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
+        .. MarkLine(MARK_FOCUS) .. "/use [@focus,exists,harm,nodead] " .. spell
 end
 
 -- Out of combat only; turning the macro off deletes it.
@@ -444,34 +465,6 @@ local function OnCastSent(target, castGUID, spellID)
     end
 end
 
--- The unit to mark: your target or focus when it is this mob (as TankHelper
--- marks your target), else the unit that shows it. SetRaidTarget toggles: a
--- unit that already has the marker loses it (the pinned /tm code's "!" prefix
--- exists to skip that). GetRaidTargetIndex returns a secret to AddOn code in
--- combat (pinned RaidMarkersDocumentation: SecretReturns), so MTF cannot
--- always ask. It skips the mark when the index is readable and already
--- equal, or, when it is not, when it marked this mob with it before.
-local function Mark(guid, unit)
-    if not MTF.db.polymorph.mark or type(SetRaidTarget) ~= "function" then
-        return
-    end
-    for _, candidate in ipairs({"target", "focus"}) do
-        if ReadGUID(candidate) == guid then
-            unit = candidate
-            break
-        end
-    end
-    local index = GetRaidTargetIndex(unit)
-    local unreadable = MTF.IsSecret(index)
-    if (not unreadable and index == MOON) or (unreadable and sheep.markedGUID == guid) then
-        sheep.markedGUID = guid
-        return
-    end
-    SetRaidTarget(unit, MOON)
-    sheep.markedGUID = guid
-    sheep.lastMark = unit .. (unreadable and " (marker unreadable)" or "")
-end
-
 local function OnCastSucceeded(castGUID)
     if MTF.IsSecret(castGUID) then
         return
@@ -487,8 +480,8 @@ local function OnCastSucceeded(castGUID)
         guid = unit and ReadGUID(unit)
     end
     -- A Polymorph cast on the mob under the mouse counts: mouseover checks the
-    -- cast and takes the moon, though the bar never binds to it; the bar finds
-    -- the mob when it becomes your focus, target, or a nameplate.
+    -- cast, though the bar never binds to it; the bar finds the mob when it
+    -- becomes your focus, target, or a nameplate.
     local unit = FindUnit(guid)
     if not unit and guid and ReadGUID("mouseover") == guid then
         unit = "mouseover"
@@ -496,7 +489,6 @@ local function OnCastSucceeded(castGUID)
     if not unit or not UnitCanAttack("player", unit) then
         return
     end
-    Mark(guid, unit)
     Track(guid, cast.target, C_Spell.GetSpellName(cast.spellID))
 end
 
@@ -601,7 +593,7 @@ function MTF.InitializePolymorph()
     MTF.ApplyPolymorphMacro()
 end
 
--- /mtf debug_polymorph: the IDs, the tracked mob, the click, and the marker.
+-- /mtf debug_polymorph: the IDs, the tracked mob, and the click.
 function MTF.ReportPolymorphDebug()
     MTF.Report(string.format("debug_polymorph available=%s known=%s", tostring(sheep.available),
         tostring(KnowsPolymorph())))
@@ -618,8 +610,8 @@ function MTF.ReportPolymorphDebug()
     if last then
         MTF.Report(string.format("debug_polymorph lastCast spell=%d target=%s", last.spellID, last.target))
     end
-    MTF.Report(string.format("debug_polymorph mob=%s unit=%s marked=%s", tostring(sheep.mobName),
-        tostring(bar.boundUnit), tostring(sheep.lastMark)))
+    MTF.Report(string.format("debug_polymorph mob=%s unit=%s moon=%s", tostring(sheep.mobName),
+        tostring(bar.boundUnit), MTF.db.polymorph.mark and "from the macro and the click" or "off"))
     MTF.Report(string.format("debug_polymorph click shown=%s type=%s macro=%s", tostring(holder:IsShown()),
         tostring(holder:GetAttribute("type1")), tostring(holder:GetAttribute("macrotext1")):gsub("\n", " | ")))
 end

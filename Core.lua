@@ -495,8 +495,14 @@ function MTF.InitializeShield()
     if MTF.ShieldStandAside() then
         return
     end
+    -- With Dyre's Toolkit the ring drags and snaps with every Dyre's AddOn's
+    -- frames; without it, it moves freely, as before.
+    local toolkit = MTF.toolkit
+    local layout = toolkit and {register = toolkit.RegisterMovable, beginDrag = toolkit.BeginDrag,
+        endDrag = toolkit.EndDrag}
     MTF.ShieldDisplay.Initialize({settings = function() return MTF.db.shield end, report = MTF.Report,
-        unlockHint = "Drag to move · /mtf lock when done", missingSounds = MTF.ReportMissingSounds})
+        unlockHint = "Drag to move · /mtf lock when done", missingSounds = MTF.ReportMissingSounds,
+        layout = layout})
 end
 
 function MTF.RefreshShield()
@@ -573,7 +579,8 @@ local function BuildGrid()
 end
 
 function MTF.RefreshGrid()
-    local wanted = not MTF.db.locked and MTF.db.grid
+    -- With Dyre's Toolkit, it draws the one grid for every Dyre's AddOn.
+    local wanted = not MTF.toolkit and not MTF.db.locked and MTF.db.grid
     if not grid then
         if not wanted then
             return
@@ -594,7 +601,8 @@ function MTF.RefreshGrid()
     MTF.grid = grid
 end
 
-function MTF.SetFramesLocked(locked)
+-- Shows or hides every MTF frame's outline and sample, quietly.
+local function ApplyFramesLocked(locked)
     MTF.db.locked = locked
     MTF.db.conjure.locked = locked
     MTF.db.shield.locked = locked
@@ -603,6 +611,16 @@ function MTF.SetFramesLocked(locked)
     MTF.RefreshPolymorph()
     MTF.RefreshReminders()
     MTF.RefreshShield()
+end
+
+-- With Dyre's Toolkit, one layout mode for every Dyre's AddOn: the toolkit
+-- calls each AddOn's setLocked and says one line for all.
+function MTF.SetFramesLocked(locked)
+    if MTF.toolkit then
+        MTF.toolkit.SetLocked(locked)
+        return
+    end
+    ApplyFramesLocked(locked)
     MTF.RefreshGrid()
     if locked then
         MTF.Report("All MTF frames locked.")
@@ -630,6 +648,68 @@ function MTF.ResetPositions()
     if InCombatLockdown() then
         MTF.Report("MTF frames move back to their default places after combat.")
     end
+end
+
+-- Dyre's Toolkit (author-approved, shared by every Dyre's AddOn): one layout
+-- mode, the grid, snapping across AddOns, and the "Dyre's AddOns" settings
+-- home. Optional: without it MTF keeps its own Layout.lua, grid, and top-level
+-- settings page, and says once to install it.
+local TOOLKIT_CONTRACT = 1
+local TOOLKIT_FUNCTIONS = {
+    "RegisterAddOn", "RegisterSettingsCategory", "RegisterMovable", "BeginDrag", "EndDrag",
+    "ScaleKeepingCenter", "IsLocked", "SetLocked", "OpenSettings",
+}
+local TOOLKIT_MISSING = "Install Dyre's Toolkit from CurseForge for one layout mode and settings home "
+    .. "for all Dyre's AddOns."
+
+-- Dyre's Toolkit with the contract and functions MTF uses, else nil.
+function MTF.Toolkit()
+    local toolkit = rawget(_G, "DyresToolkit")
+    if type(toolkit) ~= "table" or type(toolkit.RequireContract) ~= "function" then
+        return nil
+    end
+    toolkit = toolkit.RequireContract(TOOLKIT_CONTRACT)
+    if type(toolkit) ~= "table" then
+        return nil
+    end
+    for _, name in ipairs(TOOLKIT_FUNCTIONS) do
+        if type(toolkit[name]) ~= "function" then
+            return nil
+        end
+    end
+    return toolkit
+end
+
+-- Before the modules start: their frames register with, and drag through,
+-- the toolkit instead of Layout.lua, and MTF's lock follows the toolkit's.
+local function UseToolkit()
+    local toolkit = MTF.Toolkit()
+    MTF.toolkit = toolkit
+    if not toolkit then
+        MTF.Report(TOOLKIT_MISSING)
+        return
+    end
+    MTF.RegisterMovable = toolkit.RegisterMovable
+    MTF.BeginDrag = toolkit.BeginDrag
+    MTF.EndDrag = toolkit.EndDrag
+    MTF.ScaleKeepingCenter = toolkit.ScaleKeepingCenter
+    local locked = toolkit.IsLocked() ~= false
+    MTF.db.locked = locked
+    MTF.db.conjure.locked = locked
+    MTF.db.shield.locked = locked
+end
+
+-- After the modules start, so the toolkit can show their frames at once.
+local function RegisterWithToolkit()
+    if not MTF.toolkit then
+        return
+    end
+    MTF.toolkit.RegisterAddOn({
+        addon = addonName,
+        title = DEFAULT_TITLE,
+        setLocked = function(locked) ApplyFramesLocked(locked == true) end,
+        openSettings = function() MTF.OpenSettings() end,
+    })
 end
 
 SLASH_MAGETOOLSFOREVER1 = PRIMARY_SLASH
@@ -680,6 +760,7 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     -- Called directly rather than from each file's own PLAYER_LOGIN handler,
     -- so startup never depends on event handler order.
     InstallInputHooks()
+    UseToolkit()
     MTF.InitializeConjure()
     MTF.InitializePortals()
     MTF.InitializePolymorph()
@@ -688,4 +769,5 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     MTF.InitializeChimes()
     MTF.InitializeOptions()
     MTF.RefreshGrid()
+    RegisterWithToolkit()
 end)

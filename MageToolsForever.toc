@@ -2,11 +2,12 @@
 ## Title: Mage Tools Forever
 ## Notes: Quality-of-life tools for Mages in WoW Forever
 ## Author: Dyre
-## Version: 0.3.2-beta
+## Version: 0.3.3-beta
 ## IconTexture: Interface\Icons\Spell_Holy_MagicalSentry
 ## Category: Mage
+## Group: DyresToolkit
 ## SavedVariablesPerCharacter: MageToolsForeverDB
-## OptionalDeps: DyresSounds
+## OptionalDeps: DyresSounds, DyresToolkit
 
 Commands.lua
 Core.lua
