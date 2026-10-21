@@ -24,7 +24,8 @@ local function contains(actual, fragment, context)
     end
 end
 
-local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Layout.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua", "Chimes.lua", "Options.lua"}
+local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua"}
+local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua", "Chimes.lua", "Options.lua"}
 local SPELLS = {
     [5504] = "Conjure Water", [5505] = "Conjure Water", [5506] = "Conjure Water", [6127] = "Conjure Water",
     [587] = "Conjure Food", [597] = "Conjure Food", [990] = "Conjure Food", [6129] = "Conjure Food",
@@ -92,6 +93,9 @@ local function fixture(options)
         equal(name, "MageToolsForever", "metadata uses the AddOn folder name")
         return state.toc[field] or ""
     end}
+    env.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip)
+        return {button = true, name = name, buttonText = buttonText, onClick = onClick, tooltip = tooltip}
+    end
     env.CreateSettingsListSectionHeaderInitializer = function(name, tooltip)
         return {heading = name, tooltip = tooltip}
     end
@@ -367,49 +371,6 @@ local function fixture(options)
         end
         function library.SetupMenu(initializer, filter) initializer.soundMenu = filter or "all" end
         env.DyresSounds = library
-    end
-    -- Dyre's Toolkit, faked (it has its own suite): options.toolkit adds it,
-    -- options.oldToolkit offers only a newer contract, and
-    -- options.toolkitNoSettings has no settings home to give.
-    if options.toolkit then
-        local toolkit = {locked = true, addons = {}, movables = {}, drags = {}, scaled = {}, opened = {}}
-        state.toolkit = toolkit
-        function toolkit.RequireContract(minimum)
-            if not options.oldToolkit and minimum <= 1 then return toolkit end
-        end
-        function toolkit.RegisterAddOn(info) toolkit.addons[#toolkit.addons + 1] = info; return true end
-        function toolkit.RegisterSettingsCategory(name)
-            if options.toolkitNoSettings or not env.Settings then return nil end
-            if not toolkit.home then
-                toolkit.home = env.Settings.RegisterVerticalLayoutCategory("Dyre's AddOns")
-                env.Settings.RegisterAddOnCategory(toolkit.home)
-            end
-            return env.Settings.RegisterVerticalLayoutSubcategory(toolkit.home, name)
-        end
-        function toolkit.RegisterMovable(frame, save) toolkit.movables[#toolkit.movables + 1] = {frame, save} end
-        function toolkit.BeginDrag(frame) toolkit.drags[#toolkit.drags + 1] = {"begin", frame} end
-        function toolkit.EndDrag(frame) toolkit.drags[#toolkit.drags + 1] = {"end", frame} end
-        function toolkit.ScaleKeepingCenter(frame, scale)
-            frame:SetScale(scale)
-            toolkit.scaled[#toolkit.scaled + 1] = {frame, scale}
-        end
-        function toolkit.IsLocked() return toolkit.locked end
-        function toolkit.SetLocked(locked)
-            toolkit.locked = locked == true
-            for _, info in ipairs(toolkit.addons) do
-                if info.setLocked then info.setLocked(toolkit.locked) end
-            end
-            state.messages[#state.messages + 1] = toolkit.locked and "Dyre: Frames locked." or "Dyre: Frames unlocked."
-        end
-        function toolkit.Lock() toolkit.SetLocked(true) end
-        function toolkit.Unlock() toolkit.SetLocked(false) end
-        function toolkit.OpenSettings(category)
-            if state.combat then return false end
-            toolkit.opened[#toolkit.opened + 1] = category
-            env.Settings.OpenToCategory(category:GetID())
-            return true
-        end
-        env.DyresToolkit = toolkit
     end
     -- Cooldowns: secret in combat, as the client's GetSpellCooldown is.
     state.cooldowns = {}
@@ -787,7 +748,19 @@ local function fixture(options)
         function object:GetAlpha() return self.alpha or 1 end
         function object:SetColorTexture(...) self.color = {...} end
         function object:SetHeight(height) self.height = height end
-        function object:SetSize(width, height) self.width, self.height = width, height end
+        function object:SetSize(width, height)
+            if state.combat and self.protected then error("SetSize in combat") end
+            self.width, self.height = width, height
+        end
+        -- Fonts: a template's own size is 10; SetFont sets the size. As the
+        -- worst case of the client (1.1.0: the Polymorph label grew with each
+        -- slider step), SetFontObject does not reset a size SetFont set.
+        function object:SetFontObject(template) self.fontTemplate = template end
+        function object:GetFont() return "Fonts\\FRIZQT__.TTF", self.fontSize or 10, "" end
+        function object:SetFont(_, size) self.fontSize = size end
+        function object:SetIgnoreParentAlpha(value) self.ignoreParentAlpha = value end
+        function object:GetNumPoints() return #self.points end
+        function object:GetScale() return self.scale or 1 end
         function object:SetFrameLevel(level) self.level = level end
         function object:SetParent(newParent) self.parent = newParent end
         function object:IsForbidden() return self.forbidden == true end
@@ -880,8 +853,31 @@ local function fixture(options)
             function button:SetDurationCooldown(region) self.display.cooldown = region end
             function button:SetDurationBar(region, barOptions) self.display.bar, self.display.barOptions = region, barOptions end
             function button:SetDurationText(region) self.display.text = region end
+            function button:SetSpellName(region) self.display.spellName = region end
             function button:SetMouseClickEnabled(value) self.clicks = value end
             slotOptions.initializeFrame(button)
+            -- As in client (WTF, 1.1.0): once handed to the engine, the slot's
+            -- button and the regions given to it are the engine's; any later
+            -- change from AddOn code is a forbidden access. Reads still work.
+            local function forbid(region)
+                if type(region) ~= "table" then return end
+                region.handed = true
+                local function refuse() error("Attempt to access forbidden object from code tainted by an AddOn") end
+                for key, value in pairs(region) do
+                    if type(value) == "function" and type(key) == "string" and not key:match("^Get")
+                            and not key:match("^Is") then
+                        region[key] = refuse
+                    end
+                end
+                setmetatable(region, {__index = function(_, key)
+                    if type(key) == "string" and key:match("^%u") then
+                        if key:match("^Get") or key:match("^Is") then return function() end end
+                        return refuse
+                    end
+                end})
+            end
+            forbid(button)
+            for _, region in pairs(button.display) do forbid(region) end
             self.slots[#self.slots + 1] = {key = key, filter = filter, button = button,
                 ids = slotOptions.candidateFilters.includeSpellIDs, candidates = slotOptions.candidateFilters}
             return button
@@ -917,6 +913,7 @@ local function fixture(options)
     env.UIParent = widget("Frame", "UIParent")
     env.UIParent.width, env.UIParent.height = 1000, 800
     env.IsShiftKeyDown = function() return state.shift == true end
+    env.IsControlKeyDown = function() return state.ctrl == true end
     local SPOTS = {CENTER = {0.5, 0.5}, BOTTOMLEFT = {0, 0}, TOP = {0.5, 1}, TOPLEFT = {0, 1}, LEFT = {0, 0.5}}
     -- Screen position of a frame's center, from its last point.
     function state.absCenter(frame)
@@ -929,7 +926,8 @@ local function fixture(options)
         local width = (relative.width or 0) * relativeScale
         local height = (relative.height or 0) * relativeScale
         local scale = frame:GetEffectiveScale()
-        return rx + (spot[1] - 0.5) * width + point[4] * scale, ry + (spot[2] - 0.5) * height + point[5] * scale
+        return rx + (spot[1] - 0.5) * width + (point[4] or 0) * scale,
+            ry + (spot[2] - 0.5) * height + (point[5] or 0) * scale
     end
     function state.emit(event, ...)
         for _, frame in ipairs(state.frames) do
@@ -956,6 +954,27 @@ local function fixture(options)
     for _, spec in ipairs(options.shieldCopies or {}) do
         if spec.before then loadShieldCopy(spec) end
     end
+    -- Dyre's Toolkit, its real files (a copy in tests/toolkit, checked against
+    -- ../DyresToolkit when that folder is there): MTF requires it. Not the
+    -- minimap, which needs the embedded libraries. options.noToolkit leaves it
+    -- out; options.oldToolkit offers contract 1 only.
+    if not options.noToolkit then
+        state.toolkitNS = {InitializeMinimap = function() end}
+        for _, path in ipairs(TOOLKIT_FILES) do
+            local chunk = assert(loadfile("tests/toolkit/" .. path))
+            setfenv(chunk, env)
+            chunk("DyresToolkit", state.toolkitNS)
+        end
+        state.toolkit = env.DyresToolkit
+        if options.oldToolkit then
+            local require = env.DyresToolkit.RequireContract
+            env.DyresToolkit.RequireContract = function(n)
+                if n >= 2 then return nil end
+                return require(n)
+            end
+        end
+        env.DyresToolkitDB = options.toolkitDB
+    end
     state.mtf = {}
     for _, path in ipairs(options.files or RUNTIME_FILES) do
         local chunk, message = loadfile(path)
@@ -968,6 +987,7 @@ local function fixture(options)
     end
     env.MageToolsForeverDB = options.db
     state.env = env
+    state.emit("ADDON_LOADED", "DyresToolkit")
     state.emit("ADDON_LOADED", "MageToolsForever")
     state.emit("PLAYER_LOGIN")
 
@@ -1098,7 +1118,7 @@ test("a missing client API disables MTF with one message naming it", function()
     equal(state.categories["Mage Tools Forever"], nil, "no settings page")
 end)
 test("a mixed install of old and new files is reported at login", function()
-    local state = fixture({files = {"Commands.lua", "Core.lua", "Layout.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua",
+    local state = fixture({files = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua",
         "Options.lua"}})
     equal(state.mtf.available, false)
     contains(state.last(), "missing InitializeChimes")
@@ -1111,7 +1131,6 @@ test("saved settings get defaults and are repaired on load", function()
     local db = state.mtf.db
     equal(db.conjure.enabled, true)
     equal(db.locked, true, "every frame locked by default")
-    equal(db.conjure.locked, true)
     equal(db.conjure.macros, true)
     equal(db.conjure.shareSize, 10)
     equal(db.shield.enabled, true)
@@ -1644,14 +1663,14 @@ test("the conjure bar and the shield display each have a size setting", function
     state.settings.MTF_SHIELD_SCALE:SetValue(60)
     equal(ring.scale, 0.6)
     state.combat = true
-    state.settings.MTF_CONJURE_SCALE:SetValue(60)
-    equal(bar.scale, 1, "the bar holds secure buttons: not in combat")
+    state.settings.DYRE_MAGETOOLSFOREVER_CONJURE_SCALE:SetValue(60)
+    equal(bar.scale or 1, 1, "the bar holds secure buttons: not in combat")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
     equal(bar.scale, 0.6)
     state.settings.MTF_SHIELD_SCALE:SetValue(999)
     equal(state.mtf.db.shield.scale, 150, "at most 150%")
-    state.settings.MTF_CONJURE_SCALE:SetValue(62)
+    state.settings.DYRE_MAGETOOLSFOREVER_CONJURE_SCALE:SetValue(62)
     equal(state.mtf.db.conjure.scale, 60, "in steps of 5")
     local saved = mage({db = {conjure = {scale = "huge"}, shield = {scale = 10}}})
     equal(saved.mtf.db.conjure.scale, 100)
@@ -1660,7 +1679,6 @@ end)
 test("one lock for every frame; older saved per-frame locks give way to it", function()
     local state = mage({db = {conjure = {locked = false}, shield = {locked = true}}})
     equal(state.mtf.db.locked, true)
-    equal(state.mtf.db.conjure.locked, true, "the bar follows the one lock")
     equal(state.settings.MTF_CONJURE_LOCKED, nil, "no per-frame switches")
     equal(state.settings.MTF_SHIELD_LOCKED, nil)
     local bar = state.env.MageToolsForeverConjure
@@ -1731,7 +1749,7 @@ end)
 test("unlocked, the ring shows a sample and can be dragged", function()
     local state = mage()
     local ring = state.mtf.ShieldDisplay.frame
-    state.settings.MTF_UNLOCKED:SetValue(true)
+    state.settings.DYRE_UNLOCKED:SetValue(true)
     equal(ring.shown, true)
     equal(ring.mouse, true)
     equal(ring.bar.value, 1, "the sample shows full")
@@ -1743,8 +1761,9 @@ test("unlocked, the ring shows a sample and can be dragged", function()
     equal(ring.moving, true)
     ring:SetPoint("LEFT", state.env.UIParent, "LEFT", 10, 0)
     ring.scripts.OnDragStop(ring)
-    equal(state.mtf.db.shield.position.point, "LEFT")
-    state.settings.MTF_UNLOCKED:SetValue(false)
+    equal(state.mtf.db.shield.position.point, "CENTER", "dropped and saved through Dyre's Toolkit")
+    equal(state.mtf.db.shield.position.relativePoint, "BOTTOMLEFT")
+    state.settings.DYRE_UNLOCKED:SetValue(false)
     equal(ring.sample.shown, false)
     equal(ring.shown, false)
     equal(ring.mouse, false)
@@ -1754,9 +1773,8 @@ test("/mtf unlock and /mtf lock move the shield display and the conjure bar toge
     local ring = state.mtf.ShieldDisplay.frame
     state.slash("unlock")
     equal(state.mtf.db.shield.locked, false)
-    equal(state.mtf.db.conjure.locked, false)
-    equal(state.env.MageToolsForeverConjure.mover.shown, true, "the bar is outlined too")
-    equal(state.settings.MTF_UNLOCKED:GetValue(), true, "the main page's switch follows")
+    equal(state.env.MageToolsForeverConjure.dyre.mover.shown, true, "the bar is outlined too")
+    equal(state.settings.DYRE_UNLOCKED:GetValue(), true, "the toolkit's switch follows")
     equal(ring.shown, true, "a sample to drag")
     equal(ring.mouse, true)
     equal(ring.mover.shown, true, "outlined, with a hint")
@@ -1764,9 +1782,8 @@ test("/mtf unlock and /mtf lock move the shield display and the conjure bar toge
     contains(state.last(), "drag them where you want")
     state.slash("lock")
     equal(state.mtf.db.shield.locked, true)
-    equal(state.mtf.db.conjure.locked, true)
-    equal(state.env.MageToolsForeverConjure.mover.shown, false)
-    equal(state.settings.MTF_UNLOCKED:GetValue(), false)
+    equal(state.env.MageToolsForeverConjure.dyre.mover.shown, false)
+    equal(state.settings.DYRE_UNLOCKED:GetValue(), false)
     equal(ring.shown, false)
     equal(ring.mouse, false)
     equal(ring.mover.shown, false)
@@ -2619,9 +2636,9 @@ test("a recast from the bar that lands in combat leaves the click working", func
     state.combat = true
     state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-again", POLYMORPH)
     state.emit("PLAYER_TARGET_CHANGED")
-    state.settings.MTF_POLYMORPH_SCALE:SetValue(80)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE:SetValue(80)
     equal(holder.attributes.macrotext1, macro, "the click still sheeps the mob")
-    equal(holder.scale, 1, "nothing secure changed in combat")
+    equal(holder.scale or 1, 1, "nothing secure changed in combat")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
     equal(holder.scale, 0.8, "the size applies after combat")
@@ -3009,30 +3026,8 @@ test("unlocked, each reminder shows to drag and resizes with the mouse wheel", f
     contains(state.messages[1], "debug_reminders intellect on=true known=false")
 end)
 
-test("unlocked, a grid shows the screen's center; it follows its switch and the lock", function()
-    local state = mage()
-    equal(state.mtf.grid, nil, "nothing built while locked")
-    state.slash("unlock")
-    local grid = state.mtf.grid
-    equal(grid.shown, true)
-    equal(grid.mouse, false, "never takes clicks")
-    -- A 1000 x 800 screen, lines every 32 from the center: 15 + 15 + 12 + 12, then the two center lines.
-    equal(#grid.lines, 56)
-    local center = grid.lines[#grid.lines]
-    equal(center.color[1], 1)
-    equal(center.color[2], 0.2, "the center lines are red")
-    equal(center.height, 2)
-    state.settings.MTF_GRID:SetValue(false)
-    equal(grid.shown, false)
-    state.settings.MTF_GRID:SetValue(true)
-    equal(grid.shown, true)
-    state.slash("lock")
-    equal(grid.shown, false)
-end)
+-- Dyre's Toolkit widgets (2.0) -------------------------------------------------------
 
--- Dyre's Toolkit ------------------------------------------------------------------
-
-local TOOLKIT_INSTALL = "Install Dyre's Toolkit from CurseForge"
 local function countMessages(state, fragment)
     local found = 0
     for _, message in ipairs(state.messages) do
@@ -3040,159 +3035,460 @@ local function countMessages(state, fragment)
     end
     return found
 end
-local function movable(state, frame)
-    for _, entry in ipairs(state.toolkit.movables) do
-        if entry[1] == frame then return entry[2] end
+local function widgets(state)
+    local byKey = {}
+    for _, widget in ipairs(state.toolkit.Widgets("MageToolsForever")) do
+        byKey[widget.dyre.widgetKey] = widget
     end
+    return byKey
 end
-local function mainSwitch(state, variable)
-    for _, initializer in ipairs(state.categories["Mage Tools Forever"].initializers) do
-        if initializer.setting.variable == variable then return initializer end
+local function same(actual, expected, what)
+    for key, value in pairs(expected) do
+        if type(value) == "table" then
+            same(actual[key], value, what .. "." .. key)
+        else
+            equal(actual and actual[key], value, what .. "." .. key)
+        end
     end
 end
 
-test("without Dyre's Toolkit MTF keeps its own layout and page, and says once to install it", function()
-    local state = mage()
-    equal(state.mtf.toolkit, nil)
-    equal(countMessages(state, TOOLKIT_INSTALL), 1, "said once at login")
-    for _, message in ipairs(state.messages) do
-        if message:find(TOOLKIT_INSTALL, 1, true) then
-            contains(message, "MTF: ")
-            equal(message:lower():find("github", 1, true), nil, "CurseForge only")
+test("the toolkit copy the tests load matches ../DyresToolkit when it is there", function()
+    -- CI has only this repository, so the tests load a copy; on a developer's
+    -- machine it must be the toolkit's own files, byte for byte.
+    for _, path in ipairs(TOOLKIT_FILES) do
+        local own = io.open("../DyresToolkit/" .. path, "rb")
+        if own then
+            local copy = assert(io.open("tests/toolkit/" .. path, "rb"))
+            equal(copy:read("*a") == own:read("*a"), true, "tests/toolkit/" .. path .. " is stale: copy it again")
+            copy:close()
+            own:close()
         end
     end
-    equal(state.registered, state.categories["Mage Tools Forever"], "its own top-level page")
-    equal(state.categories["Dyre's AddOns"], nil)
-    equal(#mainSwitch(state, "MTF_GRID").modifyPredicates, 0, "its own grid switch works")
-    equal(mainSwitch(state, "MTF_UNLOCKED").setting.name, "Unlock frames to move them", "its own unlock switch")
-    contains(mainSwitch(state, "MTF_UNLOCKED").tooltip, "/mtf reset")
-    state.settings.MTF_UNLOCKED:SetValue(true)
-    equal(state.mtf.db.locked, false, "the switch unlocks MTF's frames")
-    state.settings.MTF_UNLOCKED:SetValue(false)
-    equal(state.mtf.db.locked, true)
-    state.slash("unlock")
-    equal(state.mtf.grid.shown, true, "its own grid")
-    contains(state.last(), "All MTF frames unlocked")
-    equal(countMessages(state, TOOLKIT_INSTALL), 1, "not again")
-    local old = mage({toolkit = true, oldToolkit = true})
-    equal(old.mtf.toolkit, nil, "a toolkit without contract 1 is not used")
-    equal(countMessages(old, TOOLKIT_INSTALL), 1)
-    equal(#old.toolkit.addons, 0)
-    equal(old.registered, old.categories["Mage Tools Forever"])
 end)
-test("with Dyre's Toolkit MTF registers, and its pages sit under Dyre's AddOns", function()
-    local state = mage({toolkit = true})
-    equal(countMessages(state, TOOLKIT_INSTALL), 0, "no install message")
-    local toolkit = state.toolkit
-    equal(#toolkit.addons, 1)
-    equal(toolkit.addons[1].addon, "MageToolsForever")
-    equal(toolkit.addons[1].title, "Mage Tools Forever")
-    local home, main = state.categories["Dyre's AddOns"], state.categories["Mage Tools Forever"]
-    equal(main.parent, home, "MTF's page is under the home")
-    equal(state.registered, home, "MTF registers no top-level page of its own")
-    for _, name in ipairs({"Conjure", "Shield", "Portals", "Polymorph", "Buff Reminders", "Cooldown Chimes",
-            "Announce"}) do
-        equal(state.categories[name].parent, main, name .. " is under MTF's page")
-    end
-    equal(main.initializers[1].setting.variable, "MTF_CONJURE_ENABLED", "the main page keeps its switches")
-    toolkit.addons[1].openSettings()
-    equal(state.opened, "id:Mage Tools Forever")
-    state.opened = nil
-    state.slash("")
-    equal(state.opened, "id:Mage Tools Forever", "/mtf opens MTF's page through the toolkit")
-    state.opened = nil
-    state.combat = true
-    state.slash("")
-    equal(state.opened, nil, "never in combat")
-    local own = mage({toolkit = true, toolkitNoSettings = true})
-    equal(own.registered, own.categories["Mage Tools Forever"], "no home: MTF's own top-level page")
-    equal(#own.toolkit.addons, 1)
-end)
-test("with Dyre's Toolkit every MTF frame moves and snaps through it", function()
-    local state = mage({toolkit = true})
-    local toolkit, env = state.toolkit, state.env
-    local bar = env.MageToolsForeverConjure
-    for _, frame in ipairs({bar, env.MageToolsForeverPortals, env.MageToolsForeverPolymorph,
-            reminderIcon(state, "intellect"), reminderIcon(state, "armor")}) do
-        equal(type(movable(state, frame)), "function", "registered with the toolkit")
-    end
-    movable(state, bar)({point = "CENTER", relativePoint = "BOTTOMLEFT", x = 300, y = 200})
-    equal(state.mtf.db.conjure.position.x, 300, "MTF saves its own positions")
-    bar.scripts.OnDragStart(bar)
-    bar.scripts.OnDragStop(bar)
-    equal(toolkit.drags[1][1], "begin")
-    equal(toolkit.drags[1][2], bar)
-    equal(toolkit.drags[2][1], "end")
-    local intellect = reminderIcon(state, "intellect")
-    intellect.scripts.OnDragStart(intellect)
-    equal(toolkit.drags[3][2], intellect)
-end)
-test("with Dyre's Toolkit the shield display drags and snaps through it; without, it moves freely", function()
-    local state = mage({toolkit = true})
-    local toolkit, ring = state.toolkit, state.mtf.ShieldDisplay.frame
-    local save = movable(state, ring)
-    equal(type(save), "function", "the ring is registered with the toolkit")
-    save({point = "CENTER", relativePoint = "BOTTOMLEFT", x = 640, y = 360})
-    equal(state.mtf.db.shield.position.x, 640, "MTF's shield settings keep the place")
-    ring.scripts.OnDragStart(ring)
-    equal(#toolkit.drags, 0, "locked: no drag")
-    state.slash("unlock")
-    ring.scripts.OnDragStart(ring)
-    ring.scripts.OnDragStop(ring)
-    equal(toolkit.drags[1][1], "begin")
-    equal(toolkit.drags[1][2], ring)
-    equal(toolkit.drags[2][1], "end")
-    equal(state.mtf.db.shield.position.x, 640, "the toolkit saves through save, not the ring's own point")
-    local alone = mage()
-    local own = alone.mtf.ShieldDisplay.frame
-    alone.slash("unlock")
-    own.scripts.OnDragStart(own)
-    own:ClearAllPoints()
-    own:SetPoint("LEFT", alone.env.UIParent, "LEFT", 10, 0)
-    own.scripts.OnDragStop(own)
-    equal(alone.mtf.db.shield.position.point, "LEFT", "without the toolkit the ring saves its own point")
-    local aside = mage({toolkit = true, loadedAddOns = {DyresShieldsUp = true}})
-    for _, entry in ipairs(aside.toolkit.movables) do
-        equal(entry[1] == aside.mtf.ShieldDisplay.frame, false, "Dyre's Shields Up registers its own ring")
+test("without Dyre's Toolkit 2.0 MTF stays off and says once what to install", function()
+    for _, options in ipairs({{noToolkit = true}, {oldToolkit = true}}) do
+        local state = mage(options)
+        equal(state.mtf.available, false)
+        equal(countMessages(state, "needs Dyre's Toolkit 2.0"), 1, "said once")
+        for _, message in ipairs(state.messages) do
+            if message:find("Dyre's Toolkit 2.0", 1, true) then
+                contains(message, "MTF: ")
+                contains(message, "CurseForge")
+                equal(message:lower():find("github", 1, true), nil, "CurseForge only")
+            end
+        end
+        equal(state.env.MageToolsForeverConjure, nil, "no frames")
+        equal(state.env.MageToolsForeverPolymorph, nil)
     end
 end)
-test("with Dyre's Toolkit one lock serves every Dyre's AddOn, quietly, and the toolkit draws the grid", function()
-    local state = mage({toolkit = true, db = {locked = false}})
-    local toolkit = state.toolkit
-    equal(state.mtf.db.locked, true, "frames start locked, as the toolkit's")
-    state.clear()
-    state.slash("unlock")
-    equal(toolkit.locked, false, "/mtf unlock unlocks every Dyre's AddOn")
-    equal(state.mtf.db.locked, false)
-    equal(state.mtf.db.conjure.locked, false)
-    equal(state.mtf.db.shield.locked, false)
-    equal(state.env.MageToolsForeverConjure.mover.shown, true)
-    equal(state.mtf.ShieldDisplay.frame.mover.shown, true)
-    equal(state.mtf.grid, nil, "no MTF grid: the toolkit draws one")
-    equal(countMessages(state, "MTF:"), 0, "quiet: the toolkit says one line for all")
-    equal(state.last(), "Dyre: Frames unlocked.")
-    state.slash("lock")
-    equal(toolkit.locked, true)
-    equal(state.env.MageToolsForeverConjure.mover.shown, false)
-    -- Another Dyre's AddOn, or the toolkit's own switch, locks every AddOn.
-    state.clear()
-    toolkit.SetLocked(true)
-    equal(state.mtf.db.locked, true)
-    equal(state.env.MageToolsForeverConjure.mover.shown, false)
-    equal(countMessages(state, "MTF:"), 0)
-    -- The toolkit's page has the one unlock switch and the grid: none on MTF's pages.
-    equal(state.settings.MTF_UNLOCKED, nil, "no MTF unlock switch")
-    equal(state.settings.MTF_GRID, nil, "no MTF grid switch")
-    for _, page in pairs(state.categories) do
-        for _, initializer in ipairs(page.initializers) do
-            local name = initializer.setting and initializer.setting.name or ""
-            equal(name:lower():find("unlock", 1, true), nil, page.name .. " has no unlock switch")
+test("every movable MTF frame is a Dyre's Toolkit widget with the right mouse", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local env, byKey = state.env, widgets(state)
+    local want = {
+        conjure = {env.MageToolsForeverConjure, "always"},
+        portals = {env.MageToolsForeverPortals, "always"},
+        polymorph = {env.MageToolsForeverPolymorph, "client"},
+        reminder_intellect = {env.MageToolsForeverReminder_intellect, "always"},
+        reminder_armor = {env.MageToolsForeverReminder_armor, "always"},
+        reminder_dampen = {env.MageToolsForeverReminder_dampen, "always"},
+    }
+    local count = 0
+    for key, entry in pairs(want) do
+        count = count + 1
+        equal(byKey[key], entry[1], key .. " is the frame MTF made")
+        equal(byKey[key].dyre.mouseMode, entry[2], key .. " mouse")
+    end
+    equal(#state.toolkit.Widgets("MageToolsForever"), count, "no others")
+    local member
+    for _, info in ipairs(state.toolkit.AddOns()) do
+        if info.addon == "MageToolsForever" then member = info end
+    end
+    equal(member.title, "Mage Tools Forever", "registered with the toolkit")
+    equal(state.mtf.CreateMover, nil, "no layout code of MTF's own")
+    equal(state.mtf.RegisterMovable, nil)
+    equal(state.mtf.ResizeFromCenter, nil)
+    equal(state.mtf.RefreshGrid, nil)
+end)
+test("existing saved places and sizes load unchanged", function()
+    local saved = {
+        conjure = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 600, y = 250}, scale = 80},
+        portals = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 300, y = 200}, scale = 120},
+        polymorph = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 250, y = 500}, scale = 110,
+            width = 300, height = 24, textScale = 150, opacity = 60},
+        reminders = {icons = {intellect = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 480,
+            y = 600}, scale = 150}}},
+    }
+    local copy = {
+        conjure = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 600, y = 250}, scale = 80},
+        portals = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 300, y = 200}, scale = 120},
+        polymorph = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 250, y = 500}, scale = 110,
+            width = 300, height = 24, textScale = 150, opacity = 60},
+        reminders = {icons = {intellect = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 480,
+            y = 600}, scale = 150}}},
+    }
+    local state = mage({known = {[POLYMORPH] = true, [TELEPORT_STORMWIND] = true}, db = saved})
+    same(state.mtf.db, copy, "db")
+    local env = state.env
+    local function at(frame, entry, what)
+        local point = frame.points[#frame.points]
+        equal(point[3], entry.position.relativePoint, what .. " relative point")
+        equal(point[4], entry.position.x, what .. " x")
+        equal(point[5], entry.position.y, what .. " y")
+        equal(frame:GetScale(), entry.scale / 100, what .. " scale")
+    end
+    at(env.MageToolsForeverConjure, copy.conjure, "conjure")
+    at(env.MageToolsForeverPortals, copy.portals, "portals")
+    at(env.MageToolsForeverPolymorph, copy.polymorph, "polymorph")
+    at(env.MageToolsForeverReminder_intellect, copy.reminders.icons.intellect, "intellect")
+    equal(env.MageToolsForeverPolymorph.width, 300)
+    equal(env.MageToolsForeverPolymorph.height, 27 + 24 + 6, "the frame height from the bar's settings")
+    equal(env.MageToolsForeverPolymorphBar.alpha, 0.6)
+end)
+test("MTF never places, sizes, drags, or sets the mouse of a widget itself, but the Polymorph click area", function()
+    local state = mage({known = {[POLYMORPH] = true, [TELEPORT_STORMWIND] = true}})
+    local calls = {}
+    for _, widget in ipairs(state.toolkit.Widgets("MageToolsForever")) do
+        for _, method in ipairs({"SetScale", "SetSize", "SetPoint", "ClearAllPoints", "StartMoving", "EnableMouse"}) do
+            local original = widget[method]
+            widget[method] = function(self, ...)
+                local source = debug.getinfo(2, "S").short_src
+                if not source:find("toolkit", 1, true) then
+                    calls[#calls + 1] = {widget = self.dyre.widgetKey, method = method, source = source}
+                end
+                if original then return original(self, ...) end
+            end
         end
     end
+    state.slash("unlock")
+    state.settings.DYRE_MAGETOOLSFOREVER_CONJURE_SCALE:SetValue(120)
+    state.settings.DYRE_MAGETOOLSFOREVER_PORTALS_SCALE:SetValue(80)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(260)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE:SetValue(120)
     local intellect = reminderIcon(state, "intellect")
-    toolkit.SetLocked(false)
     intellect.scripts.OnMouseWheel(intellect, 1)
-    equal(toolkit.scaled[1][1], intellect, "resizing keeps the center through the toolkit")
+    state.known[TELEPORT_IRONFORGE] = true
+    state.emit("SPELLS_CHANGED")
+    advance(state, 1)
+    state.slash("lock")
+    sheepTarget(state)
+    castPolymorph(state)
+    advance(state, 56)
+    state.slash("reset")
+    for _, call in ipairs(calls) do
+        equal(call.widget == "polymorph" and call.method == "EnableMouse", true,
+            call.source .. " called " .. call.method .. " on " .. call.widget)
+    end
+end)
+test("the secure Polymorph click area never resizes, moves, or changes its mouse in combat", function()
+    -- The mock raises on any of those for a secure frame in combat.
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    state.combat = true
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(300)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE:SetValue(130)
+    state.slash("unlock")
+    sheepTarget(state)
+    castPolymorph(state)
+    state.slash("reset")
+    advance(state, 1)
+    equal(holder.width, 200, "waits")
+    equal(holder:GetScale(), 1)
+    equal(holder.mouse, false)
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(holder.width, 300, "when combat ends")
+    equal(holder:GetScale(), 1.3)
+    equal(holder.mouse, true, "unlocked: it takes the mouse to be dragged")
+end)
+test("a drag that starts on a conjure or portal button drags its bar", function()
+    local state = mage({known = {[TELEPORT_STORMWIND] = true}})
+    local bar, water = state.env.MageToolsForeverConjure, state.env.MageToolsForeverWater
+    water.scripts.OnDragStart(water)
+    equal(bar.moving, nil, "locked: no drag")
+    state.slash("unlock")
+    water.scripts.OnDragStart(water)
+    equal(bar.moving, true, "the bar moves")
+    water.scripts.OnDragStop(water)
+    equal(state.mtf.db.conjure.position.point, "CENTER", "saved by the toolkit")
+    local portals, button = state.env.MageToolsForeverPortals, state.env.MageToolsForeverPortal1
+    button.scripts.OnDragStart(button)
+    equal(portals.moving, true)
+    button.scripts.OnDragStop(button)
+    equal(water.scripts.PostClick ~= nil, true, "the buttons still click")
+    contains(reminderIcon(state, "intellect").dyre.mover.hint.text, "scroll to resize")
+end)
+
+-- Polymorph bar look (1.1.0) --------------------------------------------------------
+
+local function polymorphSlot(state)
+    local container = state.env.MageToolsForeverPolymorphBar.container
+    return container, container.slots[1].button
+end
+local function polymorphPage(state)
+    return state.categories["Polymorph"]
+end
+
+test("the Polymorph bar draws as before at its default sizes", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder, bar = state.env.MageToolsForeverPolymorph, state.env.MageToolsForeverPolymorphBar
+    local settings = state.mtf.db.polymorph
+    equal(settings.width, 200)
+    equal(settings.height, 16)
+    equal(settings.textScale, 100)
+    equal(settings.opacity, 100)
+    equal(holder.width, 200)
+    equal(holder.height, 40, "name line 18, bar line 16, padding 6")
+    equal(bar.width, 200)
+    equal(bar.height, 40)
+    local _, button = polymorphSlot(state)
+    equal(button.width, 188)
+    equal(button.height, 16)
+    equal(button.points[1][5], -18)
+    equal(button.display.icon.width, 14, "the icon follows the height")
+    equal(button.display.bar.barColor[4], 1, "solid")
+    equal(button.display.bar.ignoreParentAlpha, true, "carries the opacity itself")
+    equal(button.display.spellName.fontSize, 10)
+    equal(bar.name.fontSize, 10)
+    equal(bar.alpha, 1)
+end)
+test("Polymorph bar sizes rebuild it out of combat, keeping the sheep and the click", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder, bar = state.env.MageToolsForeverPolymorph, state.env.MageToolsForeverPolymorphBar
+    sheepTarget(state)
+    castPolymorph(state)
+    local click = holder.attributes.macrotext1
+    local old = bar.container
+    equal(old.unit, "target")
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(300)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_BARHEIGHT:SetValue(24)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE:SetValue(150)
+    equal(bar.width, 300, "the look follows each step at once")
+    equal(old.unit, "target", "the rebuild waits until the slider rests")
+    advance(state, 1)
+    equal(old.unit, "none", "the old container lets its mob go")
+    equal(old.shown, false)
+    local container, button = polymorphSlot(state)
+    equal(container ~= old, true, "a new container")
+    equal(container.unit, "target", "bound again to the sheep")
+    equal(holder.width, 300)
+    equal(holder.height, 27 + 24 + 6, "name line 18 x 150%")
+    equal(bar.width, 300)
+    equal(button.width, 288)
+    equal(button.height, 24)
+    equal(button.points[1][5], -27)
+    equal(button.display.icon.width, 22)
+    equal(button.display.spellName.fontSize, 15)
+    equal(button.display.text.fontSize, 15)
+    equal(bar.name.fontSize, 15)
+    equal(bar.name.width, 288)
+    equal(holder.attributes.macrotext1, click, "the click is unchanged")
+    equal(bar.shown, true)
+    local built = bar.container
+    for width = 210, 260, 10 do
+        state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(width)
+    end
+    advance(state, 1)
+    equal(bar.container ~= built, true)
+    equal(state.mtf.db.polymorph.width, 260)
+    local count = 0
+    for _, frame in ipairs(state.frames) do
+        if frame.kind == "AuraContainer" and frame.parent == bar then count = count + 1 end
+    end
+    equal(count, 3, "one rebuild for a dragged slider (the first build, the 300 build, this one)")
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(1000)
+    equal(state.mtf.db.polymorph.width, 400, "within the slider's range")
+end)
+test("Polymorph bar text size up and down never makes the fonts grow", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local bar = state.env.MageToolsForeverPolymorphBar
+    for _, percent in ipairs({105, 110, 150, 200, 150, 100, 200, 100}) do
+        state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE:SetValue(percent)
+        advance(state, 1)
+    end
+    equal(bar.name.fontSize, 10, "the mob name is back at its own size")
+    equal(bar.label.fontSize, 10, "the dim label too")
+    local _, button = polymorphSlot(state)
+    equal(button.display.spellName.fontSize, 10)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE:SetValue(150)
+    advance(state, 1)
+    equal(bar.label.fontSize, 15)
+end)
+test("resizing or rescaling the Polymorph bar keeps it where it is, centered", function()
+    local state = mage({known = {[POLYMORPH] = true},
+        db = {polymorph = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 300, y = 600}}}})
+    local holder, bar = state.env.MageToolsForeverPolymorph, state.env.MageToolsForeverPolymorphBar
+    local function near(a, b, what) equal(math.abs(a - b) < 0.01, true, what .. ": " .. a .. " vs " .. b) end
+    local function same(what)
+        local hx, hy = state.absCenter(holder)
+        local bx, by = state.absCenter(bar)
+        near(hx, 300, what .. " x")
+        near(hy, 600, what .. " y")
+        near(bx, hx, what .. ": the bar on the holder, x")
+        near(by, hy, what .. ": the bar on the holder, y")
+    end
+    same("at first")
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE:SetValue(150)
+    same("Bar size 150%")
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE:SetValue(60)
+    same("Bar size 60%")
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(380)
+    local bx, by = state.absCenter(bar)
+    near(bx, 300, "the bar grows around its middle at once")
+    advance(state, 1)
+    same("width 380")
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_BARHEIGHT:SetValue(10)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE:SetValue(200)
+    advance(state, 1)
+    same("height 10, text 200%")
+    local saved = state.mtf.db.polymorph.position
+    equal(saved.point, "CENTER")
+    near(saved.x * 0.6, 300, "saved where it is")
+end)
+test("the conjure and portal bars resize from their centers, and their Bar size has a mark at 100", function()
+    local here = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 700, y = 300}
+    local state = mage({known = {[TELEPORT_STORMWIND] = true},
+        db = {conjure = {position = here}, portals = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT",
+            x = 200, y = 150}}}})
+    local function near(a, b, what) equal(math.abs(a - b) < 0.01, true, what .. ": " .. a .. " vs " .. b) end
+    local function at(frame, x, y, what)
+        local fx, fy = state.absCenter(frame)
+        near(fx, x, what .. " x")
+        near(fy, y, what .. " y")
+    end
+    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
+    at(conjure, 700, 300, "conjure at first")
+    state.settings.DYRE_MAGETOOLSFOREVER_CONJURE_SCALE:SetValue(150)
+    at(conjure, 700, 300, "conjure at 150%")
+    state.settings.DYRE_MAGETOOLSFOREVER_CONJURE_SCALE:SetValue(50)
+    at(conjure, 700, 300, "conjure at 50%")
+    near(state.mtf.db.conjure.position.x * 0.5, 700, "conjure saved where it is")
+    at(portals, 200, 150, "portals at first")
+    state.settings.DYRE_MAGETOOLSFOREVER_PORTALS_SCALE:SetValue(130)
+    at(portals, 200, 150, "portals at 130%")
+    local width = portals.width
+    state.known[TELEPORT_IRONFORGE] = true
+    state.known[PORTAL_IRONFORGE] = true
+    state.emit("SPELLS_CHANGED")
+    equal(portals.width > width, true, "wider with more spells")
+    at(portals, 200, 150, "portals with more spells grow from the center")
+    for _, name in ipairs({"Conjure", "Portals"}) do
+        local mark
+        for _, initializer in ipairs(state.categories[name].initializers) do
+            if initializer.setting.name == "Bar size (%)" then mark = initializer.dyreDefault end
+        end
+        equal(mark and mark.default, 100, name .. ": Bar size (%) has its mark at 100")
+    end
+end)
+test("a Polymorph bar size changed in combat waits; the secure holder never resizes in combat", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    local old = state.env.MageToolsForeverPolymorphBar.container
+    state.combat = true
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(250)
+    advance(state, 1)
+    equal(state.mtf.db.polymorph.width, 250, "saved at once")
+    equal(holder.width, 200, "not in combat")
+    equal(state.env.MageToolsForeverPolymorphBar.container, old, "no rebuild in combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(holder.width, 250, "when combat ends")
+    advance(state, 1)
+    equal(state.env.MageToolsForeverPolymorphBar.container ~= old, true, "rebuilt once the slider rests")
+end)
+test("Polymorph bar opacity fades the whole bar at once; its timer bar follows with the rebuild", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local bar = state.env.MageToolsForeverPolymorphBar
+    local _, oldButton = polymorphSlot(state)
+    state.combat = true
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_OPACITY:SetValue(40)
+    equal(bar.alpha, 0.4, "at once, also in combat")
+    advance(state, 1)
+    equal(oldButton.display.bar.barColor[4], 1, "the engine's bar is not touched")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    local _, button = polymorphSlot(state)
+    equal(button ~= oldButton, true, "rebuilt")
+    equal(button.display.bar.barColor[4], 0.4, "the timer bar carries the opacity")
+    equal(button.display.spellName.alpha, 0.4)
+    equal(button.display.text.alpha, 0.4)
+    equal(bar.alpha, 0.4)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_OPACITY:SetValue(0)
+    equal(state.mtf.db.polymorph.opacity, 10, "never invisible")
+end)
+test("what MTF hands to the aura engine is never touched after initializeFrame", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local _, button = polymorphSlot(state)
+    local ok, message = pcall(function() button.display.bar:SetStatusBarColor(1, 1, 1) end)
+    equal(ok, false, "the mock refuses it, as the client does")
+    contains(message, "forbidden object")
+    -- Every change goes through a rebuild, so none raises.
+    sheepTarget(state)
+    castPolymorph(state)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(260)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE:SetValue(130)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_OPACITY:SetValue(70)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE:SetValue(120)
+    advance(state, 1)
+    state.slash("unlock")
+    state.slash("lock")
+    state.units.target = nil
+    state.emit("PLAYER_TARGET_CHANGED")
+    advance(state, 56)
+    state.emit("SPELLS_CHANGED")
+    state.clear()
+    state.slash("debug_polymorph")
+    equal(table.concat(state.messages, "|"):find("forbidden", 1, true), nil)
+end)
+test("the Polymorph page has the sizes and opacity with gold default marks, and Reset size", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local page = polymorphPage(state)
+    local marks = {}
+    for _, initializer in ipairs(page.initializers) do
+        if initializer.dyreDefault then marks[initializer.setting.variable] = initializer.dyreDefault end
+    end
+    equal(marks.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH.default, 200)
+    equal(marks.DYRE_MAGETOOLSFOREVER_POLYMORPH_BARHEIGHT.default, 16)
+    equal(marks.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE.default, 100)
+    equal(marks.DYRE_MAGETOOLSFOREVER_POLYMORPH_OPACITY.default, 100)
+    equal(marks.DYRE_MAGETOOLSFOREVER_POLYMORPH_OPACITY.min, 10)
+    local labels = {}
+    for _, initializer in ipairs(page.initializers) do
+        if initializer.dyreDefault then labels[#labels + 1] = initializer.setting.name end
+    end
+    equal(table.concat(labels, ","), "Bar size (%),Bar width,Bar height,Text size,Opacity", "in this order")
+    equal(marks.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE.default, 100, "Bar size (%) has its mark too")
+    local reset
+    for _, item in ipairs(page.headings) do
+        if item.button then reset = item end
+    end
+    equal(reset.buttonText, "Reset size")
+    equal(reset.tooltip, "Back to the bar's own width, height, and text size. Bar size (%) and Opacity stay as they are.")
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(320)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_BARHEIGHT:SetValue(30)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE:SetValue(80)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_OPACITY:SetValue(50)
+    state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE:SetValue(120)
+    advance(state, 1)
+    equal(state.env.MageToolsForeverPolymorph.width, 320)
+    state.notified = {}
+    reset.onClick()
+    advance(state, 1)
+    local settings = state.mtf.db.polymorph
+    equal(settings.width, 200)
+    equal(settings.height, 16)
+    equal(settings.textScale, 100)
+    equal(settings.opacity, 50, "opacity stays")
+    equal(settings.scale, 120, "Bar size (%) stays (John-approved)")
+    equal(state.env.MageToolsForeverPolymorph.width, 200)
+    equal(state.env.MageToolsForeverPolymorph:GetScale(), 1.2, "Bar size (%) still scales on top")
+end)
+test("damaged Polymorph bar sizes and opacity are repaired on load", function()
+    local state = mage({db = {polymorph = {width = "wide", height = 99, textScale = 33, opacity = -5}}})
+    local settings = state.mtf.db.polymorph
+    equal(settings.width, 200)
+    equal(settings.height, 40)
+    equal(settings.textScale, 50)
+    equal(settings.opacity, 10)
 end)
 
 -- MTF's macro text ------------------------------------------------------------------
@@ -3243,7 +3539,8 @@ end)
 test("the settings have a main page and a page per module", function()
     local state = mage()
     local main = state.categories["Mage Tools Forever"]
-    equal(state.registered, main)
+    equal(main.parent, state.categories["Dyre's AddOns"], "under Dyre's Toolkit's home")
+    equal(state.registered, state.categories["Dyre's AddOns"])
     equal(main.initializers[1].setting.variable, "MTF_CONJURE_ENABLED")
     equal(main.initializers[2].setting.variable, "MTF_PORTALS_ENABLED")
     equal(main.initializers[3].setting.variable, "MTF_POLYMORPH_ENABLED")

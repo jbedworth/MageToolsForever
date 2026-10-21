@@ -232,56 +232,65 @@ frameworks without agreement.
 - A plain frame, locked by default; it takes the mouse only while unlocked, to
   show a sample of every part to drag, so it never blocks world clicks.
 
-### Dyre's Toolkit (built; author-approved, 2026-10-19)
+### Dyre's Toolkit widgets (built; author-approved, 2026-10-20)
 
 - Dyre's Toolkit (`src/DyresToolkit`, owned by the coordinator; never edit
-  it, ask there) is the home of every Dyre's AddOn: one layout mode, the
-  grid and snap to grid, snapping across AddOns, and the "Dyre's AddOns"
-  settings home. MTF keeps its name (author). TOC `## OptionalDeps:
-  DyresSounds, DyresToolkit` (never `## Dependencies`) and `## Group:
-  DyresToolkit`; CurseForge required dependency `dyres-toolkit`
-  (`RELATIONS`).
-- Core's `MTF.Toolkit()` is `DyresToolkit.RequireContract(1)` with the
-  functions MTF uses checked. At login (`UseToolkit`, before the modules
-  start) MTF's `RegisterMovable`, `BeginDrag`, `EndDrag`, and
-  `ScaleKeepingCenter` become the toolkit's, so every movable frame (conjure,
-  portal, and Polymorph bars, buff reminders) registers, drags, and snaps
-  there, and MTF's lock starts as the toolkit's (locked). After the modules
-  start, `RegisterAddOn` with `setLocked` (shows or hides MTF's outlines and
-  samples, quietly) and `openSettings`. `MTF.SetFramesLocked` (`/mtf unlock`,
-  `/mtf lock`) calls the toolkit's `SetLocked`, which says
-  one line for all. MTF draws no grid, and its settings have no unlock or
-  grid switch (author-approved: the toolkit's "Dyre's AddOns" page has
-  them); without the toolkit both stay on MTF's main page.
+  it, ask there) is required, contract 2 (Toolkit 2.0): TOC `## Dependencies:
+  DyresToolkit` and `## OptionalDeps: DyresSounds`, `## Group:
+  DyresToolkit`; CurseForge required dependencies `dyres-sounds` and
+  `dyres-toolkit` (`RELATIONS`). John: all widget layout is centralized in the
+  toolkit; MTF was its first client and keeps no layout code of its own
+  (no Layout.lua, mover, grid, unlock or grid switches, resize helper, or
+  fallback).
+- Core's `MTF.Toolkit()` is `DyresToolkit.RequireContract(2)` with the
+  functions MTF uses checked. Without it (no toolkit, or an older one) MTF
+  stays off at login with one line naming CurseForge
+  (`TOOLKIT_MISSING`). After the modules start, `RegisterAddOn` with
+  `setLocked` (MTF refreshes its samples and visibility, quietly; the
+  toolkit says one line for all and draws the outlines) and `openSettings`.
+  `MTF.db.locked` and `db.shield.locked` are copies of the toolkit's lock.
+- Every movable frame is a widget (`DyresToolkit.CreateWidget`), with
+  `store` = its saved table, so the saved keys carry over unchanged
+  (`position` as {point, relativePoint, x, y}, `scale`, and the Polymorph
+  bar's own keys):
+  - the conjure bar `MageToolsForeverConjure`: mouse "always", content 174 x
+    48, Bar size 50-150%; it holds secure buttons, so the toolkit changes it
+    only out of combat;
+  - the portal bar `MageToolsForeverPortals`: mouse "always", Bar size,
+    `SetContentSize` with one button per known spell;
+  - the Polymorph holder `MageToolsForeverPolymorph` (secure): mouse "client"
+    (MTF's click-through rule), sizes scale (Bar size), width, barHeight
+    (saved as "height": the toolkit reserves "height" for a frame height),
+    textScale, opacity; `measure` gives the frame size; `onLayout` and
+    `onOpacity` lay out the visible bar and rebuild the engine slot;
+  - each buff reminder icon `MageToolsForeverReminder_<key>`: mouse "always",
+    store `reminders.icons[key]`, scale 50-200% in steps of 10 (mouse wheel
+    while unlocked: `SetSetting("scale")`; no slider).
+  Every conjure and portal button is a drag handle of its bar
+  (`widget:AddDragHandle(button)`: the buttons cover most of it; clicks
+  still reach them). The reminder icons' outline hint says "scroll to
+  resize" (`spec.hint`).
+- The toolkit owns placement, dragging, snapping (also to other AddOns'
+  frames), the grid, Shift and Ctrl, the gold outline and hint, resizing
+  from the center, waiting out combat for protected widgets, repairing the
+  saved numbers, and the size sliders with gold marks and "Reset size"
+  (`AddWidgetSettings`, labels "Bar size (%)" and "Bar width"; the
+  Polymorph bar's "Reset size" restores width, bar height, and text size
+  only, `spec.resetSizes`, John-approved; Bar size and Opacity stay). MTF never calls SetScale, SetSize, SetPoint,
+  StartMoving, or EnableMouse on a widget, except EnableMouse on the
+  Polymorph holder (a test wraps those methods and checks).
+- `/mtf unlock` and `/mtf lock` call the toolkit's `SetLocked`. `/mtf reset`
+  resets the reminder sizes, then `ResetWidgets("MageToolsForever")`, then
+  the shield display's place.
 - Settings: MTF's page is `RegisterSettingsCategory("Mage Tools Forever")`
   under "Dyre's AddOns", its pages under that; `/mtf` opens it through the
-  toolkit's `OpenSettings` (never in combat). With no page from the toolkit,
-  MTF makes its own top-level page.
-- Without the toolkit (or a newer contract only), MTF keeps Layout.lua, its
-  grid, its lock lines, and its top-level page, and says once at login to
-  install Dyre's Toolkit, naming only CurseForge.
-- The shield display (Shield.lua v9) gets `layout = {register =
-  RegisterMovable, beginDrag = BeginDrag, endDrag = EndDrag}` from the
-  toolkit in `MTF.InitializeShield`, so the ring drags and snaps with the
-  other frames; without the toolkit MTF passes no layout and the ring moves
-  freely, as before.
-
-### Moving frames (built)
-
-- One lock for every MTF frame (author-approved): `db.locked`, default
-  locked, copied to each frame's own `locked` (the shield component reads its
-  settings). Without Dyre's Toolkit, the main page's "Unlock frames to move them" and `/mtf unlock`
-  and `/mtf lock` set it; there are no per-frame lock switches. Every frame
-  shows a gold outline and a "Drag to move · /mtf lock when done" hint while
-  unlocked (the shield display also a full sample). Every new movable frame
-  joins this lock.
-- While unlocked, an alignment grid (author-approved; main-page switch "Show
-  a grid while unlocked", on by default, `db.grid`): a mouse-transparent
-  BACKGROUND-strata frame over UIParent with faint white lines every 32 units
-  from the center out and the two center lines in red, 2 thick. Built on
-  first unlock and rebuilt on `DISPLAY_SIZE_CHANGED` and `UI_SCALE_CHANGED`.
-- Optional sound when a shield ends (off by default): `C_UnitAuras.AddAuraSound`
-  with trigger Removed for every Classic rank ID, deferred during encounters.
+  toolkit's `OpenSettings` (never in combat).
+- The shield display (shared Shield.lua v9) is not a widget yet: it gets
+  `layout = {register = RegisterMovable, beginDrag = BeginDrag, endDrag =
+  EndDrag}` (contract-1 functions, still in contract 2), so it drags and
+  snaps with the others; DSU's step moves it. Optional sound when a shield
+  ends (off by default): `C_UnitAuras.AddAuraSound` with trigger Removed for
+  every Classic rank ID, deferred during encounters.
 
 ### Cooldown chimes (built)
 
@@ -383,6 +392,34 @@ frameworks without agreement.
 
 ### Polymorph bar (built)
 
+- Look (author-approved, 1.1.0, after WTF 1.1.0's DoT tracker): Bar width
+  (120-400, step 10, default 200), Bar height (the bar line, 10-40, default
+  16; the icon is 2 less), and Text size (50-200%, step 5, default 100: a
+  share of each font string's own size, read once when it is new; found in
+  client: setting the template again did not reset a size set before, so
+  each slider step multiplied the label until it was huge)
+  (Core's `POLYMORPH_SIZE_SPECS`), and Opacity (10-100%, step 5, default
+  100), each slider with a gold default mark (Dyre's Toolkit's widget
+  settings, see above), and "Reset size". The defaults draw the old bar
+  exactly (name line 18, height 40). "Bar size (%)" is the widget's scale on
+  top. The toolkit sizes the secure holder from the center (out of combat);
+  its `onLayout` scales and lays out the visible bar (`ApplyLook`) and
+  rebuilds the engine slot once, 0.2 s after a slider rests (`BuildBar`: a
+  new AuraContainer, the old one `SetUnit("none")` and hidden, bound again
+  to the sheep), only when the slot's sizes or opacity changed. The visible
+  bar is not the holder's child (a secure parent would stop it showing and
+  hiding in combat): it is anchored CENTER to the holder. Opacity: the
+  toolkit fades the holder, and `onOpacity` fades the visible bar, at once,
+  also in combat.
+- Engine-owned objects (family rule, found in WTF): the slot button and what
+  MTF hands to it (`SetIcon`, `SetDurationBar`, `SetSpellName`,
+  `SetDurationText`) are set up only in `initializeFrame`
+  (`SlotInitializer`); any later change from AddOn code raises "Attempt to
+  access forbidden object from code tainted by an AddOn". The engine's
+  duration bar ignored its parent's opacity in WTF, so MTF's calls
+  `SetIgnoreParentAlpha(true)` and carries the opacity in its color and its
+  texts, set in `initializeFrame`. The mock refuses every change to handed
+  objects after `initializeFrame` (reads still work).
 - Click-through (players reported it in 0.3.2): the secure holder is
   invisible, so it takes the mouse only while it holds a sheep to click or
   frames are unlocked (`EnableMouse` in `ApplyClick`, out of combat only;
@@ -483,22 +520,10 @@ frameworks without agreement.
   combat. Secure icons change only out of combat, so they sit in a holder
   (`MageToolsForeverReminders`) hidden for combat by
   `RegisterStateDriver(holder, "visibility", "[combat] hide; show")`; changes
-  asked for in combat wait for `PLAYER_REGEN_ENABLED`. Each icon has its own position and size (50-200%, mouse
-  wheel while unlocked, 10% steps), saved per character, and joins the one
-  frame lock; `/mtf reset` restores places and sizes (a row, 20 apart).
-- Magnetic frames (author-approved, Layout.lua, the same as WTF's): every
-  movable MTF frame (the conjure, portal, and Polymorph bars and the buff
-  reminders; the shield display drags itself) registers a save function.
-  While unlocked, a frame dropped within 24 UIParent units of a spot beside
-  another shown frame snaps there, 20 apart, lined up by tops, centers, or
-  bottoms (lefts, centers, or rights when stacked), whichever is nearest.
-  Frames that far apart and overlapping are snapped; Shift-drag moves the
-  group (the others anchored to the dragged frame for the drag; every
-  center read before any moves, so the snap applies once), which snaps as
-  one. Positions save as centers from UIParent's bottom left; resizing keeps
-  the center. A drop after combat began waits: the group stays together and
-  snaps and saves on `PLAYER_REGEN_ENABLED`. A reset in combat says once that
-  MTF frames move back after combat.
+  asked for in combat wait for `PLAYER_REGEN_ENABLED`. Each icon is a Dyre's
+  Toolkit widget with its own place and size (50-200%, mouse wheel while
+  unlocked, 10% steps), saved per character; `/mtf reset` restores sizes and
+  places (a row, 20 apart).
 
 ### Planned (pass 2, agreed)
 
@@ -506,9 +531,18 @@ frameworks without agreement.
   Forever's new procs, via `AddAuraSound`), and conjure emotes on the next
   hardware input, with flavor and credit.
 
+### Resizing (built; author's rule, 1.1.0)
+
+- Every MTF frame resizes from its center: the toolkit's widgets do it
+  (`DyresToolkit.ResizeFromCenter`). Found in client: a frame placed by an
+  offset from a screen corner moved right and up as it grew, because the
+  offset scales with the frame. The shield display (shared Shield.lua) still
+  scales by its corner offset; a fix goes through the coordinator to DSU,
+  MTF, and WTF together.
+
 ## Project structure
 
-- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
+- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, loaded in that order, plus
   Textures/ShieldArc.tga, Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga. Shield.lua is the
   shared component above; keep it free of MTF references. Commands parses `/mtf`; Core owns saved settings and
@@ -518,7 +552,11 @@ frameworks without agreement.
   reporting, the hardware-input hooks trade placement waits for, and startup;
   Conjure, Shield, and Chimes own their modules and `/mtf debug_*` commands;
   Options owns the settings pages.
-- tests/run.lua holds the Lua 5.1 mock suite. tests/test_*.py cover the release
+- tests/run.lua holds the Lua 5.1 mock suite. It loads Dyre's Toolkit's real
+  Core, Layout, Widgets, and Settings files from a copy in tests/toolkit (CI
+  has only this repository); a test fails when that copy differs from
+  ../DyresToolkit, so copy the toolkit's files again after it changes.
+  tests/test_*.py cover the release
   helpers in scripts/, including that the committed ShieldArc.tga matches
   scripts/build_arc.py. .github/workflows/ holds CI, opt-in publishing, and the
   approval gate check.
@@ -534,8 +572,7 @@ frameworks without agreement.
   Bedworth, and the release builder requires that exact notice.
 - The TOC uses `## Group: DyresToolkit`, so the in-game AddOn list nests MTF
   under Dyre's Toolkit (the family groups there). `## Category: Mage` stays
-  identical to the CurseForge main category; it matters only without the
-  toolkit, when the list groups by its exact text.
+  identical to the CurseForge main category.
 - The runtime assets are Textures/ShieldArc.tga, ShieldArcInner.tga, and
   ShieldArcInnermost.tga; regenerate them with scripts/build_arc.py. MTF ships no
   sounds (Dyre's Sounds does). Add no other runtime assets
@@ -613,7 +650,7 @@ frameworks without agreement.
 - Every release needs a `## <version>` section in CHANGELOG.md with player-facing
   changes; the builder puts it at the top of release-notes.md and fails
   without it.
-- Package only MageToolsForever.toc, Commands.lua, Core.lua, Layout.lua, Conjure.lua,
+- Package only MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
   Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga,
   Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga (no sounds: they come from Dyre's Sounds) under the top-level `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format

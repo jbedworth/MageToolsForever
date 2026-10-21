@@ -56,13 +56,13 @@ end
 -- files otherwise fails silently, because the client hides Lua errors by default.
 local REQUIRED_NAMESPACE = {
     "ParseCommand", "HandleCommand",
-    "CheckConjureCapabilities", "InitializeConjure", "RefreshConjure", "ResetConjurePosition",
+    "CheckConjureCapabilities", "InitializeConjure", "RefreshConjure",
     "ApplyConjureMacros", "ReportConjureStatus", "ReportConjureDebug", "ReportClickDebug",
     "CharacterMacrosAvailable", "WriteCharacterMacro", "DeleteCharacterMacro", "ApplyPolymorphMacro",
-    "AddInputHandler", "RunOnNextInput", "RegisterMovable", "BeginDrag", "EndDrag", "ScaleKeepingCenter",
-    "InitializePortals", "RefreshPortals", "ResetPortalsPosition", "ReportPortalsDebug",
-    "InitializePolymorph", "RefreshPolymorph", "ResetPolymorphPosition", "ReportPolymorphDebug",
-    "InitializeReminders", "RefreshReminders", "ResetRemindersPosition", "ReportRemindersDebug",
+    "AddInputHandler", "RunOnNextInput",
+    "InitializePortals", "RefreshPortals", "ReportPortalsDebug",
+    "InitializePolymorph", "RefreshPolymorph", "ReportPolymorphDebug",
+    "InitializeReminders", "RefreshReminders", "ResetRemindersSize", "ReportRemindersDebug",
     "SanitizeReminderScale",
     "InitializeChimes", "PreviewChime", "ReportChimesDebug",
     "InitializeOptions", "OpenSettings",
@@ -105,6 +105,19 @@ MTF.SCALE_MIN = 50
 MTF.SCALE_MAX = 150
 MTF.SCALE_STEP = 5
 MTF.DEFAULT_SCALE = 100
+
+-- The Polymorph bar's own sizes and opacity (author-approved, 1.1.0, after
+-- WTF's DoT tracker): the defaults draw the bar as it always looked. "Bar
+-- size" above stays a scale on top of them.
+MTF.POLYMORPH_SIZE_SPECS = {
+    {key = "width", label = "Bar width", min = 120, max = 400, step = 10, default = 200},
+    {key = "height", label = "Bar height", min = 10, max = 40, step = 1, default = 16},
+    {key = "textScale", label = "Text size", min = 50, max = 200, step = 5, default = 100, percent = true},
+}
+MTF.POLYMORPH_OPACITY_MIN = 10
+MTF.POLYMORPH_OPACITY_MAX = 100
+MTF.POLYMORPH_OPACITY_STEP = 5
+MTF.DEFAULT_POLYMORPH_OPACITY = 100
 
 -- Messages (Announce), each with its own switch and editable text
 -- (author-approved). Trade whispers: %C the count, %I the item (for Food &
@@ -297,6 +310,24 @@ function MTF.SanitizeScale(value)
     return math.max(MTF.SCALE_MIN, math.min(MTF.SCALE_MAX, stepped))
 end
 
+-- A whole number on the slider's steps, within its range, else the default.
+function MTF.SanitizeStepped(value, minValue, maxValue, step, default)
+    if not IsWholeNumber(value) then
+        return default
+    end
+    local stepped = minValue + math.floor((value - minValue) / step + 0.5) * step
+    return math.max(minValue, math.min(maxValue, stepped))
+end
+
+function MTF.SanitizePolymorphSize(spec, value)
+    return MTF.SanitizeStepped(value, spec.min, spec.max, spec.step, spec.default)
+end
+
+function MTF.SanitizePolymorphOpacity(value)
+    return MTF.SanitizeStepped(value, MTF.POLYMORPH_OPACITY_MIN, MTF.POLYMORPH_OPACITY_MAX,
+        MTF.POLYMORPH_OPACITY_STEP, MTF.DEFAULT_POLYMORPH_OPACITY)
+end
+
 function MTF.SanitizeChimeLead(value)
     if type(value) ~= "number" or value ~= value then
         return MTF.DEFAULT_CHIME_LEAD
@@ -354,7 +385,11 @@ function MTF.SanitizeDB(db)
         scale = MTF.SanitizeScale(polymorph.scale),
         mark = polymorph.mark ~= false,
         macro = polymorph.macro ~= false,
+        opacity = MTF.SanitizePolymorphOpacity(polymorph.opacity),
     }
+    for _, spec in ipairs(MTF.POLYMORPH_SIZE_SPECS) do
+        db.polymorph[spec.key] = MTF.SanitizePolymorphSize(spec, polymorph[spec.key])
+    end
     local reminders = type(db.reminders) == "table" and db.reminders or {}
     local reminderSpells = type(reminders.spells) == "table" and reminders.spells or {}
     local reminderIcons = type(reminders.icons) == "table" and reminders.icons or {}
@@ -395,11 +430,9 @@ function MTF.SanitizeDB(db)
     if MTF.ShieldDisplay then
         db.shield = MTF.ShieldDisplay.Sanitize(db.shield)
     end
-    -- One lock for every frame (author-approved), locked by default; each
-    -- frame reads its own copy, the shield component from its settings.
+    -- The lock is Dyre's Toolkit's (one for every Dyre's AddOn); MTF keeps a
+    -- copy for its modules, and the shield component reads its own.
     db.locked = db.locked ~= false
-    db.grid = db.grid ~= false
-    db.conjure.locked = db.locked
     if type(db.shield) == "table" then
         db.shield.locked = db.locked
     end
@@ -518,149 +551,19 @@ function MTF.ReportShieldDebug()
     MTF.ShieldDisplay.ReportDebug(MTF.Report)
 end
 
--- /mtf unlock and /mtf lock, and the main page's "Unlock frames to move them":
--- one lock for the conjure bar and the shield display together.
--- While unlocked, a frame shows a gold outline and a hint (author-approved).
--- A plain child, so it can show and hide also in combat.
-function MTF.CreateMover(frame)
-    local mover = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    mover:SetPoint("TOPLEFT", -4, 4)
-    mover:SetPoint("BOTTOMRIGHT", 4, -4)
-    mover:SetBackdrop({edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14})
-    mover:SetBackdropBorderColor(1, 0.82, 0)
-    mover.hint = mover:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    mover.hint:SetPoint("BOTTOM", mover, "TOP", 0, 2)
-    mover.hint:SetText("Drag to move · /mtf lock when done")
-    mover:SetShown(not MTF.db.locked)
-    return mover
-end
-
--- While unlocked, an alignment grid over the screen (author-approved): faint
--- lines every GRID_SPACING from the center out, and the center lines in red,
--- so frames line up with the middle of the screen. Under every frame, it takes
--- no mouse. Rebuilt when the screen size or UI scale changes.
-local GRID_SPACING = 32
-local GRID_LINE = {1, 1, 1, 0.12}
-local GRID_CENTER = {1, 0.2, 0.2, 0.7}
-local grid
-
-local function GridLine(vertical, offset, color, thickness)
-    local line = grid:CreateTexture(nil, "BACKGROUND")
-    line:SetColorTexture(color[1], color[2], color[3], color[4])
-    if vertical then
-        line:SetPoint("TOP", grid, "TOP", offset, 0)
-        line:SetPoint("BOTTOM", grid, "BOTTOM", offset, 0)
-        line:SetWidth(thickness)
-    else
-        line:SetPoint("LEFT", grid, "LEFT", 0, offset)
-        line:SetPoint("RIGHT", grid, "RIGHT", 0, offset)
-        line:SetHeight(thickness)
-    end
-    grid.lines[#grid.lines + 1] = line
-end
-
-local function BuildGrid()
-    for _, line in ipairs(grid.lines) do
-        line:Hide()
-    end
-    grid.lines = {}
-    local halfWidth, halfHeight = UIParent:GetWidth() / 2, UIParent:GetHeight() / 2
-    for step = 1, math.floor(halfWidth / GRID_SPACING) do
-        GridLine(true, step * GRID_SPACING, GRID_LINE, 1)
-        GridLine(true, -step * GRID_SPACING, GRID_LINE, 1)
-    end
-    for step = 1, math.floor(halfHeight / GRID_SPACING) do
-        GridLine(false, step * GRID_SPACING, GRID_LINE, 1)
-        GridLine(false, -step * GRID_SPACING, GRID_LINE, 1)
-    end
-    GridLine(true, 0, GRID_CENTER, 2)
-    GridLine(false, 0, GRID_CENTER, 2)
-    grid.built = true
-end
-
-function MTF.RefreshGrid()
-    -- With Dyre's Toolkit, it draws the one grid for every Dyre's AddOn.
-    local wanted = not MTF.toolkit and not MTF.db.locked and MTF.db.grid
-    if not grid then
-        if not wanted then
-            return
-        end
-        grid = CreateFrame("Frame", nil, UIParent)
-        grid:SetAllPoints(UIParent)
-        grid:SetFrameStrata("BACKGROUND")
-        grid:EnableMouse(false)
-        grid.lines = {}
-        grid:SetScript("OnEvent", function() grid.built = false; MTF.RefreshGrid() end)
-        grid:RegisterEvent("DISPLAY_SIZE_CHANGED")
-        grid:RegisterEvent("UI_SCALE_CHANGED")
-    end
-    if wanted and not grid.built then
-        BuildGrid()
-    end
-    grid:SetShown(wanted)
-    MTF.grid = grid
-end
-
--- Shows or hides every MTF frame's outline and sample, quietly.
-local function ApplyFramesLocked(locked)
-    MTF.db.locked = locked
-    MTF.db.conjure.locked = locked
-    MTF.db.shield.locked = locked
-    MTF.RefreshConjure()
-    MTF.RefreshPortals()
-    MTF.RefreshPolymorph()
-    MTF.RefreshReminders()
-    MTF.RefreshShield()
-end
-
--- With Dyre's Toolkit, one layout mode for every Dyre's AddOn: the toolkit
--- calls each AddOn's setLocked and says one line for all.
-function MTF.SetFramesLocked(locked)
-    if MTF.toolkit then
-        MTF.toolkit.SetLocked(locked)
-        return
-    end
-    ApplyFramesLocked(locked)
-    MTF.RefreshGrid()
-    if locked then
-        MTF.Report("All MTF frames locked.")
-    else
-        MTF.Report("All MTF frames unlocked: drag them where you want (Shift-drag moves a snapped group; "
-            .. "scroll over a buff reminder to resize it), then type /mtf lock.")
-    end
-end
-
-function MTF.Unlock()
-    MTF.SetFramesLocked(false)
-end
-
-function MTF.Lock()
-    MTF.SetFramesLocked(true)
-end
-
--- /mtf reset: the conjure bar and the shield display back to their default places.
-function MTF.ResetPositions()
-    MTF.ResetConjurePosition()
-    MTF.ResetPortalsPosition()
-    MTF.ResetPolymorphPosition()
-    MTF.ResetRemindersPosition()
-    MTF.ResetShieldPosition()
-    if InCombatLockdown() then
-        MTF.Report("MTF frames move back to their default places after combat.")
-    end
-end
-
--- Dyre's Toolkit (author-approved, shared by every Dyre's AddOn): one layout
--- mode, the grid, snapping across AddOns, and the "Dyre's AddOns" settings
--- home. Optional: without it MTF keeps its own Layout.lua, grid, and top-level
--- settings page, and says once to install it.
-local TOOLKIT_CONTRACT = 1
+-- Dyre's Toolkit (required, contract 2; author-approved 2026-10-20: "all the
+-- widget layout ... centralized in Dyre's Tools"). Every movable MTF frame is
+-- a toolkit widget: the toolkit places, drags, snaps, resizes from the
+-- center, outlines, saves, and resets it, and draws the grid and the size
+-- sliders. MTF only fills the widgets with its content. Without contract 2
+-- (no toolkit, or an older one) MTF stays off and says what to install.
+local TOOLKIT_CONTRACT = 2
 local TOOLKIT_FUNCTIONS = {
-    "RegisterAddOn", "RegisterSettingsCategory", "RegisterMovable", "BeginDrag", "EndDrag",
-    "ScaleKeepingCenter", "IsLocked", "SetLocked", "OpenSettings",
+    "RegisterAddOn", "RegisterSettingsCategory", "IsLocked", "SetLocked", "OpenSettings", "CreateWidget",
+    "AddWidgetSettings", "ResetWidgets", "BeginDrag", "EndDrag", "RegisterMovable",
 }
-local TOOLKIT_MISSING = "Install Dyre's Toolkit from CurseForge for one layout mode and settings home "
-    .. "for all Dyre's AddOns."
+local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit 2.0 or later: install or update it from "
+    .. "CurseForge. MTF stays off until then."
 
 -- Dyre's Toolkit with the contract and functions MTF uses, else nil.
 function MTF.Toolkit()
@@ -680,30 +583,46 @@ function MTF.Toolkit()
     return toolkit
 end
 
--- Before the modules start: their frames register with, and drag through,
--- the toolkit instead of Layout.lua, and MTF's lock follows the toolkit's.
-local function UseToolkit()
-    local toolkit = MTF.Toolkit()
-    MTF.toolkit = toolkit
-    if not toolkit then
-        MTF.Report(TOOLKIT_MISSING)
-        return
-    end
-    MTF.RegisterMovable = toolkit.RegisterMovable
-    MTF.BeginDrag = toolkit.BeginDrag
-    MTF.EndDrag = toolkit.EndDrag
-    MTF.ScaleKeepingCenter = toolkit.ScaleKeepingCenter
-    local locked = toolkit.IsLocked() ~= false
+-- The toolkit's lock changed: MTF's samples (the Polymorph sample, every buff
+-- reminder, the portal bar with nothing known, the shield sample) show or
+-- hide, quietly; the toolkit says one line for all and draws the outlines.
+local function ApplyFramesLocked(locked)
     MTF.db.locked = locked
-    MTF.db.conjure.locked = locked
     MTF.db.shield.locked = locked
+    MTF.RefreshConjure()
+    MTF.RefreshPortals()
+    MTF.RefreshPolymorph()
+    MTF.RefreshReminders()
+    MTF.RefreshShield()
+end
+
+-- /mtf unlock and /mtf lock: one layout mode for every Dyre's AddOn.
+function MTF.SetFramesLocked(locked)
+    MTF.toolkit.SetLocked(locked)
+end
+
+function MTF.Unlock()
+    MTF.SetFramesLocked(false)
+end
+
+function MTF.Lock()
+    MTF.SetFramesLocked(true)
+end
+
+-- /mtf reset: every MTF widget back to its default place (the toolkit waits
+-- out combat for those holding secure buttons), the buff reminders back to
+-- their size, and the shield display (not a widget yet) to its place.
+function MTF.ResetPositions()
+    MTF.ResetRemindersSize()
+    MTF.toolkit.ResetWidgets(addonName)
+    MTF.ResetShieldPosition()
+    if InCombatLockdown() then
+        MTF.Report("MTF frames move back to their default places after combat.")
+    end
 end
 
 -- After the modules start, so the toolkit can show their frames at once.
 local function RegisterWithToolkit()
-    if not MTF.toolkit then
-        return
-    end
     MTF.toolkit.RegisterAddOn({
         addon = addonName,
         title = DEFAULT_TITLE,
@@ -741,6 +660,11 @@ events:SetScript("OnEvent", function(self, event, loadedName)
         available, message = CheckClass()
     end
     if available then
+        MTF.toolkit = MTF.Toolkit()
+        available = MTF.toolkit ~= nil
+        message = TOOLKIT_MISSING
+    end
+    if available then
         available, message = MTF.CheckConjureCapabilities()
         if not available then
             message = "This client lacks " .. message .. ", so Mage Tools Forever stays off."
@@ -760,7 +684,9 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     -- Called directly rather than from each file's own PLAYER_LOGIN handler,
     -- so startup never depends on event handler order.
     InstallInputHooks()
-    UseToolkit()
+    local locked = MTF.toolkit.IsLocked() ~= false
+    MTF.db.locked = locked
+    MTF.db.shield.locked = locked
     MTF.InitializeConjure()
     MTF.InitializePortals()
     MTF.InitializePolymorph()
@@ -768,6 +694,5 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     MTF.InitializeShield()
     MTF.InitializeChimes()
     MTF.InitializeOptions()
-    MTF.RefreshGrid()
     RegisterWithToolkit()
 end)

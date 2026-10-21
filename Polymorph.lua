@@ -51,19 +51,23 @@ local CONTAINER_TEMPLATE = "CustomAuraContainerTemplate"
 local MAX_NAMEPLATE_UNITS = 40
 local ANNOUNCE_REPEAT_SECONDS = 3
 
--- WTF's Bars theme: the name line, then a bar line with an icon.
-local WIDTH = 200
+-- WTF's Bars theme: the name line, then a bar line with an icon. The width,
+-- the bar line's height, and the text size are settings (Core's
+-- POLYMORPH_SIZE_SPECS); at the defaults the name line is 18, the icon 14.
 local HEADER = 18
-local LINE = 16
-local ICON = 14
+local ICON_INSET = 2
 local PADDING = 6
-local HEIGHT = HEADER + LINE + PADDING
+local NAME_FONT = "GameFontHighlightSmall"
+local LABEL_FONT = "GameFontDisableSmall"
+-- Slider steps come quickly while a slider is dragged: the look follows each
+-- at once, and the rebuild runs once, this long after the last.
+local BUILD_DELAY = 0.2
 local BROWN = {0.28, 0.16, 0.07, 0.85}
 local IDLE_BORDER = {0.45, 0.35, 0.2}
 local LINE_BACKGROUND = {0.1, 0.1, 0.1, 0.6}
 local BAR_COLOR = {0.75, 0.45, 0.95}
 local PLACEHOLDER_ALPHA = 0.3
-local DEFAULT_POINT = {"CENTER", "CENTER", -260, 60}
+local DEFAULT_POINT = {point = "CENTER", relativePoint = "CENTER", x = -260, y = 60}
 local SAMPLE_NAME = "Polymorph (sample)"
 
 local sheep = {available = false, casts = {}, ids = {}, names = {}}
@@ -176,7 +180,7 @@ end
 
 local function Bind(unit)
     local wanted = unit or "none"
-    if bar.boundUnit == wanted then
+    if not bar.container or bar.boundUnit == wanted then
         return
     end
     bar.boundUnit = wanted
@@ -189,7 +193,6 @@ end
 local function Layout()
     local settings = MTF.db.polymorph
     local sample = not MTF.db.locked
-    bar.mover:SetShown(sample)
     if not settings.enabled then
         bar:Hide()
         return
@@ -219,12 +222,10 @@ local function ApplyClick()
     end
     sheep.clickDirty = false
     local settings = MTF.db.polymorph
-    -- The holder is secure: it changes only here, out of combat. A secure
-    -- change in combat is blocked, and in client a Polymorph that landed in
-    -- combat once rescaled it there, after which its clicks failed. The bar
-    -- scales with it, so they never drift apart.
-    holder:SetScale(settings.scale / 100)
-    bar:SetScale(settings.scale / 100)
+    -- The holder is secure: its click, whether it is there, and its mouse
+    -- change only here, out of combat (in client a Polymorph that landed in
+    -- combat once rescaled it there, after which its clicks failed). Its
+    -- place and size are Dyre's Toolkit's, which also waits out combat.
     local name, spell = sheep.clickName, sheep.clickSpell
     if name and spell then
         -- A missing mob leaves no target, so nothing else gets sheeped.
@@ -282,104 +283,165 @@ local function ShowTooltip(button)
     GameTooltip:Show()
 end
 
--- Dragging and snapping: Layout.lua. The holder moves; the bar rides on it.
-local function StartDrag()
-    MTF.BeginDrag(holder)
+-- The bar's sizes now, from its settings.
+local function Sizes()
+    local settings = MTF.db.polymorph
+    local text = settings.textScale / 100
+    local header = math.floor(HEADER * text + 0.5)
+    local line = settings.height
+    return {width = settings.width, header = header, line = line, icon = line - ICON_INSET,
+        height = header + line + PADDING, text = text, alpha = settings.opacity / 100}
 end
 
-local function StopDrag()
-    MTF.EndDrag(holder)
-end
-
-local function Place()
-    local position = MTF.db.polymorph.position
-    holder:ClearAllPoints()
-    if position then
-        holder:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
-    else
-        holder:SetPoint(DEFAULT_POINT[1], UIParent, DEFAULT_POINT[2], DEFAULT_POINT[3], DEFAULT_POINT[4])
+-- A font string at the text size: its template's own size, read once when
+-- the font string is new, times the setting. Found in client (1.1.0): setting
+-- the template again did not reset a size set before, so each slider step
+-- multiplied the last size and the bar's label grew huge.
+local function ScaleFont(text, scale)
+    local base = text.mtfBaseFont
+    if not base then
+        local font, size, flags = text:GetFont()
+        base = {font = font, size = size, flags = flags}
+        text.mtfBaseFont = base
+    end
+    if base.font and type(base.size) == "number" then
+        text:SetFont(base.font, base.size * scale, base.flags)
     end
 end
 
--- The engine slot's regions; only here may MTF place the engine's button.
-local function InitializeSlot(button)
-    button:ClearAllPoints()
-    button:SetPoint("TOPLEFT", bar, "TOPLEFT", PADDING, -HEADER)
-    button:SetSize(WIDTH - PADDING * 2, LINE)
-    button:SetMouseClickEnabled(false)
-    local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(ICON, ICON)
-    icon:SetPoint("LEFT", 1, 0)
-    icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    local status = CreateFrame("StatusBar", nil, button)
-    status:SetPoint("TOPLEFT", button, "TOPLEFT", ICON + 4, 0)
-    status:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
-    status:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-    status:SetStatusBarColor(BAR_COLOR[1], BAR_COLOR[2], BAR_COLOR[3])
-    local spellName = status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    spellName:SetPoint("LEFT", 4, 0)
-    spellName:SetJustifyH("LEFT")
-    local timeLeft = status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    timeLeft:SetPoint("RIGHT", -4, 0)
-    button:SetIcon(icon)
-    local direction = Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.RemainingTime
-    button:SetDurationBar(status, {direction = direction})
-    button:SetSpellName(spellName)
-    button:SetDurationText(timeLeft, {})
+-- The engine slot's regions, at the sizes of this build. Only here may MTF
+-- touch what it hands to the engine (SetIcon, SetDurationBar, SetSpellName,
+-- SetDurationText): afterwards each is the engine's, and a later call raised
+-- "Attempt to access forbidden object from code tainted by an AddOn" in WTF
+-- (found in client). So a new size or opacity rebuilds the slot. The engine's
+-- duration bar ignored its parent's opacity in WTF, so it ignores it here on
+-- purpose and carries the opacity in its color, its texts too.
+local function SlotInitializer(size)
+    return function(button)
+        button:ClearAllPoints()
+        button:SetPoint("TOPLEFT", bar, "TOPLEFT", PADDING, -size.header)
+        button:SetSize(size.width - PADDING * 2, size.line)
+        button:SetMouseClickEnabled(false)
+        local icon = button:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(size.icon, size.icon)
+        icon:SetPoint("LEFT", 1, 0)
+        icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        local status = CreateFrame("StatusBar", nil, button)
+        status:SetPoint("TOPLEFT", button, "TOPLEFT", size.icon + 4, 0)
+        status:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
+        status:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+        if type(status.SetIgnoreParentAlpha) == "function" then
+            status:SetIgnoreParentAlpha(true)
+        end
+        status:SetStatusBarColor(BAR_COLOR[1], BAR_COLOR[2], BAR_COLOR[3], size.alpha)
+        local spellName = status:CreateFontString(nil, "OVERLAY", NAME_FONT)
+        ScaleFont(spellName, size.text)
+        spellName:SetPoint("LEFT", 4, 0)
+        spellName:SetJustifyH("LEFT")
+        spellName:SetAlpha(size.alpha)
+        local timeLeft = status:CreateFontString(nil, "OVERLAY", NAME_FONT)
+        ScaleFont(timeLeft, size.text)
+        timeLeft:SetPoint("RIGHT", -4, 0)
+        timeLeft:SetAlpha(size.alpha)
+        button:SetIcon(icon)
+        local direction = Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.RemainingTime
+        button:SetDurationBar(status, {direction = direction})
+        button:SetSpellName(spellName)
+        button:SetDurationText(timeLeft, {})
+    end
+end
+
+-- The whole bar fades with its opacity setting. SetAlpha is no protected
+-- action, so this applies at once, also in combat; the engine's duration bar
+-- follows with the next build.
+local function ApplyOpacity()
+    bar:SetAlpha(MTF.db.polymorph.opacity / 100)
+end
+
+-- The bar's own regions at its size settings. The bar is no secure frame, so
+-- this applies at once, also in combat.
+local function ApplyLook()
+    local size = Sizes()
+    bar:SetSize(size.width, size.height)
+    ScaleFont(bar.name, size.text)
+    bar.name:SetWidth(size.width - PADDING * 2)
+    bar.line:ClearAllPoints()
+    bar.line:SetPoint("TOPLEFT", bar, "TOPLEFT", PADDING, -size.header)
+    bar.line:SetSize(size.width - PADDING * 2, size.line)
+    bar.placeholder:SetSize(size.icon, size.icon)
+    ScaleFont(bar.label, size.text)
+    bar.label:ClearAllPoints()
+    bar.label:SetPoint("LEFT", bar.line, "LEFT", size.icon + 8, 0)
+    return size
+end
+
+-- What the engine's slot was built for: a change rebuilds it.
+local function BuildKey(size)
+    return string.format("%d:%d:%d:%d", size.width, size.line, math.floor(size.text * 100 + 0.5),
+        math.floor(size.alpha * 100 + 0.5))
+end
+
+-- Builds the bar at its size settings: the bar's own regions and a new
+-- container (the old one lets its mob go and hides), bound again to the sheep
+-- that is up. Out of combat only; a change in combat waits for the end of
+-- combat. The secure holder's size and place are Dyre's Toolkit's.
+local function BuildBar()
+    if InCombatLockdown() then
+        sheep.buildDirty = true
+        return
+    end
+    sheep.buildDirty = false
+    local size = ApplyLook()
+    bar.builtKey = BuildKey(size)
+    if bar.container then
+        bar.container:SetUnit("none")
+        bar.container:Hide()
+    end
+    local container = CreateFrame("AuraContainer", nil, bar, CONTAINER_TEMPLATE)
+    container:SetPoint("TOPLEFT", bar, "TOPLEFT")
+    container:SetSize(1, 1)
+    container:AddAuraSlot("polymorph", AURA_FILTER, {
+        candidateFilters = {includeSpellIDs = sheep.ids},
+        initializeFrame = SlotInitializer(size),
+    })
+    bar.container = container
+    bar.boundUnit = nil
+    Bind(FindUnit(sheep.guid))
+    ApplyOpacity()
 end
 
 local function CreateBar()
     holder = CreateFrame("Button", "MageToolsForeverPolymorph", UIParent, "SecureActionButtonTemplate")
-    holder:SetSize(WIDTH, HEIGHT)
-    holder:SetMovable(true)
-    holder:SetClampedToScreen(true)
     holder:RegisterForClicks("AnyUp", "AnyDown")
     holder:SetAttribute("useOnKeyDown", false)
-    holder:RegisterForDrag("LeftButton")
-    holder:SetScript("OnDragStart", StartDrag)
-    holder:SetScript("OnDragStop", StopDrag)
-    MTF.RegisterMovable(holder, function(position) MTF.db.polymorph.position = position end)
     holder:SetScript("OnEnter", ShowTooltip)
     holder:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- The bar sits on the holder and takes no mouse, so clicks reach the holder.
+    -- Not its child: a secure parent would stop it showing and hiding in combat.
+    -- Centered on the holder, so it grows around its middle with it.
     bar = CreateFrame("Frame", "MageToolsForeverPolymorphBar", UIParent, "BackdropTemplate")
-    bar:SetSize(WIDTH, HEIGHT)
-    bar:SetPoint("TOPLEFT", holder, "TOPLEFT")
+    bar:SetPoint("CENTER", holder, "CENTER")
     bar:EnableMouse(false)
     bar:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10,
         insets = {left = 2, right = 2, top = 2, bottom = 2}})
     bar:SetBackdropColor(BROWN[1], BROWN[2], BROWN[3], BROWN[4])
     bar:SetBackdropBorderColor(IDLE_BORDER[1], IDLE_BORDER[2], IDLE_BORDER[3])
-    bar.name = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.name = bar:CreateFontString(nil, "OVERLAY", NAME_FONT)
     bar.name:SetPoint("TOPLEFT", PADDING, -4)
-    bar.name:SetWidth(WIDTH - PADDING * 2)
     bar.name:SetJustifyH("LEFT")
     -- Behind the engine's bar: a dim line with the icon and the spell's name.
-    local line = bar:CreateTexture(nil, "BACKGROUND")
-    line:SetPoint("TOPLEFT", bar, "TOPLEFT", PADDING, -HEADER)
-    line:SetSize(WIDTH - PADDING * 2, LINE)
-    line:SetColorTexture(LINE_BACKGROUND[1], LINE_BACKGROUND[2], LINE_BACKGROUND[3], LINE_BACKGROUND[4])
-    local placeholder = bar:CreateTexture(nil, "BACKGROUND", nil, 1)
-    placeholder:SetTexture(C_Spell.GetSpellTexture(POLYMORPH_IDS[1]))
-    placeholder:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    placeholder:SetDesaturated(true)
-    placeholder:SetAlpha(PLACEHOLDER_ALPHA)
-    placeholder:SetSize(ICON, ICON)
-    placeholder:SetPoint("LEFT", line, "LEFT", 1, 0)
-    local label = bar:CreateFontString(nil, "BORDER", "GameFontDisableSmall")
-    label:SetPoint("LEFT", line, "LEFT", ICON + 8, 0)
-    label:SetText(C_Spell.GetSpellName(POLYMORPH_IDS[1]) or "Polymorph")
-    local container = CreateFrame("AuraContainer", nil, bar, CONTAINER_TEMPLATE)
-    container:SetPoint("TOPLEFT", bar, "TOPLEFT")
-    container:SetSize(1, 1)
-    container:AddAuraSlot("polymorph", AURA_FILTER, {
-        candidateFilters = {includeSpellIDs = sheep.ids},
-        initializeFrame = InitializeSlot,
-    })
-    bar.container = container
+    bar.line = bar:CreateTexture(nil, "BACKGROUND")
+    bar.line:SetColorTexture(LINE_BACKGROUND[1], LINE_BACKGROUND[2], LINE_BACKGROUND[3], LINE_BACKGROUND[4])
+    bar.placeholder = bar:CreateTexture(nil, "BACKGROUND", nil, 1)
+    bar.placeholder:SetTexture(C_Spell.GetSpellTexture(POLYMORPH_IDS[1]))
+    bar.placeholder:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    bar.placeholder:SetDesaturated(true)
+    bar.placeholder:SetAlpha(PLACEHOLDER_ALPHA)
+    bar.placeholder:SetPoint("LEFT", bar.line, "LEFT", 1, 0)
+    bar.label = bar:CreateFontString(nil, "BORDER", LABEL_FONT)
+    bar.label:SetText(C_Spell.GetSpellName(POLYMORPH_IDS[1]) or "Polymorph")
     bar.boundUnit = nil
-    bar.mover = MTF.CreateMover(bar)
     MTF.polymorphBar = bar
 end
 
@@ -528,16 +590,17 @@ events:SetScript("OnEvent", function(_, event, unit, first, second, third)
         end
     elseif event == "SPELLS_CHANGED" then
         BuildSpellSet()
-        bar.container:SetAuraSlotCandidateFilters("polymorph", {includeSpellIDs = sheep.ids})
+        if bar.container then
+            bar.container:SetAuraSlotCandidateFilters("polymorph", {includeSpellIDs = sheep.ids})
+        end
         ApplyClick()
         MTF.ApplyPolymorphMacro()
     elseif event == "PLAYER_REGEN_ENABLED" then
         if sheep.macroDirty then
             MTF.ApplyPolymorphMacro()
         end
-        if sheep.placeDirty then
-            sheep.placeDirty = false
-            Place()
+        if sheep.buildDirty then
+            BuildBar()
         end
         if sheep.clickDirty then
             ApplyClick()
@@ -559,16 +622,70 @@ function MTF.RefreshPolymorph()
     MTF.ApplyPolymorphMacro()
 end
 
-function MTF.ResetPolymorphPosition()
-    MTF.db.polymorph.position = nil
-    if not sheep.available then
-        return
+-- A setting change: the look follows at once, and one rebuild runs after the
+-- slider rests (out of combat, or when combat ends).
+local function ScheduleBuild()
+    local token = {}
+    sheep.buildToken = token
+    C_Timer.After(BUILD_DELAY, function()
+        if sheep.buildToken == token then
+            BuildBar()
+        end
+    end)
+end
+
+-- The holder is a Dyre's Toolkit widget: the toolkit places, drags, snaps,
+-- outlines, saves, and sizes it (its frame size from the bar's settings,
+-- through measure), with Bar size as its scale and the sliders on the
+-- Polymorph page. Existing saves carry over: the bar line's height is saved
+-- as "height", which the toolkit reserves for a frame height, so the setting
+-- is named barHeight. Its mouse is MTF's: clicks only with a sheep to click
+-- or while unlocked (ApplyClick).
+local function CreateWidget()
+    local specs = {}
+    for _, spec in ipairs(MTF.POLYMORPH_SIZE_SPECS) do
+        specs[spec.key] = spec
     end
-    if InCombatLockdown() then
-        sheep.placeDirty = true
-        return
+    local function Range(spec, label)
+        return {min = spec.min, max = spec.max, step = spec.step, default = spec.default, label = label,
+            percent = spec.percent}
     end
-    Place()
+    local size = Sizes()
+    MTF.polymorphWidget = MTF.toolkit.CreateWidget({
+        addon = "MageToolsForever", key = "polymorph", title = "Polymorph", frame = holder,
+        store = MTF.db.polymorph, width = size.width, height = size.height, point = DEFAULT_POINT,
+        mouse = "client", keys = {barHeight = "height"},
+        sizes = {
+            scale = {min = MTF.SCALE_MIN, max = MTF.SCALE_MAX, step = MTF.SCALE_STEP, default = MTF.DEFAULT_SCALE},
+            width = Range(specs.width, "Bar width"),
+            barHeight = Range(specs.height, "Bar height"),
+            textScale = Range(specs.textScale, "Text size"),
+            opacity = {min = MTF.POLYMORPH_OPACITY_MIN, max = MTF.POLYMORPH_OPACITY_MAX,
+                step = MTF.POLYMORPH_OPACITY_STEP, default = MTF.DEFAULT_POLYMORPH_OPACITY},
+        },
+        sizeOrder = {"scale", "width", "barHeight", "textScale"},
+        -- Reset size (John-approved): the bar's own sizes; Bar size and Opacity stay.
+        resetSizes = {"width", "barHeight", "textScale"},
+        measure = function()
+            local current = Sizes()
+            return current.width, current.height
+        end,
+        onLayout = function(_, _, _, scale)
+            bar:SetScale(scale)
+            local current = ApplyLook()
+            if not bar.container then
+                BuildBar()
+            elseif BuildKey(current) ~= bar.builtKey then
+                ScheduleBuild()
+            end
+        end,
+        onOpacity = function()
+            ApplyOpacity()
+            if bar.container and BuildKey(Sizes()) ~= bar.builtKey then
+                ScheduleBuild()
+            end
+        end,
+    })
 end
 
 function MTF.InitializePolymorph()
@@ -578,7 +695,7 @@ function MTF.InitializePolymorph()
     end
     BuildSpellSet()
     CreateBar()
-    Place()
+    CreateWidget()
     sheep.available = true
     for _, event in ipairs({"PLAYER_REGEN_ENABLED", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
         "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "SPELLS_CHANGED", "UNIT_HEALTH"}) do

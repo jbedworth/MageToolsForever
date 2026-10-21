@@ -77,7 +77,7 @@ local BUTTON_GAP = 6
 local PADDING = 6
 local GOLD = {1, 0.82, 0}
 local BROWN = {0.28, 0.16, 0.07, 0.85}
-local DEFAULT_POINT = {"CENTER", "CENTER", 260, -140}
+local DEFAULT_POINT = {point = "CENTER", relativePoint = "CENTER", x = 260, y = -140}
 -- Secure buttons run PostClick for both the press and the release.
 local REPEAT_MESSAGE_SECONDS = 0.3
 -- Seconds a requested trade waits for the trade window to open.
@@ -518,7 +518,6 @@ local function UpdateVisibility()
         conjure.pending = true
         return
     end
-    buttons.bar:SetScale(MTF.db.conjure.scale / 100)
     if MTF.db.conjure.enabled then
         buttons.bar:Show()
     else
@@ -530,8 +529,6 @@ function MTF.RefreshConjure()
     if not buttons.bar then
         return
     end
-    -- A plain child of the bar, so it can show and hide also in combat.
-    buttons.bar.mover:SetShown(not MTF.db.conjure.locked)
     ApplyActions()
     UpdateVisibility()
 end
@@ -1023,24 +1020,6 @@ end
 
 -- The bar ------------------------------------------------------------------------
 
-local function PlaceBar(bar)
-    local position = MTF.db.conjure.position
-    bar:ClearAllPoints()
-    if position then
-        bar:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
-    else
-        bar:SetPoint(DEFAULT_POINT[1], UIParent, DEFAULT_POINT[2], DEFAULT_POINT[3], DEFAULT_POINT[4])
-    end
-end
-
--- Dragging and snapping: Layout.lua.
-local function StartDrag()
-    MTF.BeginDrag(buttons.bar)
-end
-
-local function StopDrag()
-    MTF.EndDrag(buttons.bar)
-end
 
 local function CreateConjureButton(bar, name, kind)
     local button = CreateFrame("Button", name, bar, "SecureActionButtonTemplate")
@@ -1075,22 +1054,7 @@ local function CreateConjureButton(bar, name, kind)
     button:SetScript("PostClick", PostClick)
     button:SetScript("OnEnter", ShowTooltip)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    button:RegisterForDrag("LeftButton")
-    button:SetScript("OnDragStart", StartDrag)
-    button:SetScript("OnDragStop", StopDrag)
     return button
-end
-
-function MTF.ResetConjurePosition()
-    MTF.db.conjure.position = nil
-    if not buttons.bar then
-        return
-    end
-    if InCombatLockdown() then
-        conjure.resetPending = true
-        return
-    end
-    PlaceBar(buttons.bar)
 end
 
 -- /mtf conjure: what you carry and the share stack size.
@@ -1137,10 +1101,6 @@ events:SetScript("OnEvent", function(_, event, ...)
         end
         return
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if conjure.resetPending then
-            conjure.resetPending = false
-            PlaceBar(buttons.bar)
-        end
         if conjure.pending then
             MTF.RefreshConjure()
         end
@@ -1171,35 +1131,28 @@ function MTF.InitializeConjure()
         MTF.Report("Conjure macros stay off: this client lacks " .. macros.missing .. ".")
     end
     local bar = CreateFrame("Frame", "MageToolsForeverConjure", UIParent, "BackdropTemplate")
-    bar:SetSize(PADDING * 2 + BUTTON_SIZE * #BUTTON_ORDER + BUTTON_GAP * (#BUTTON_ORDER - 1), PADDING * 2 + BUTTON_SIZE)
     bar:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
         insets = {left = 3, right = 3, top = 3, bottom = 3}})
     bar:SetBackdropColor(BROWN[1], BROWN[2], BROWN[3], BROWN[4])
     bar:SetBackdropBorderColor(GOLD[1], GOLD[2], GOLD[3])
-    bar:SetMovable(true)
-    bar:SetClampedToScreen(true)
-    bar:EnableMouse(true)
-    bar:RegisterForDrag("LeftButton")
-    bar:SetScript("OnDragStart", StartDrag)
-    bar:SetScript("OnDragStop", StopDrag)
-    -- While unlocked: a bright outline and a hint, as the shield display has.
-    bar.mover = CreateFrame("Frame", nil, bar, "BackdropTemplate")
-    bar.mover:SetPoint("TOPLEFT", -4, 4)
-    bar.mover:SetPoint("BOTTOMRIGHT", 4, -4)
-    bar.mover:SetBackdrop({edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14})
-    bar.mover:SetBackdropBorderColor(1, 0.82, 0)
-    bar.mover.hint = bar.mover:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    bar.mover.hint:SetPoint("BOTTOM", bar.mover, "TOP", 0, 2)
-    bar.mover.hint:SetText("Drag to move · /mtf lock when done")
-    bar.mover:Hide()
-    MTF.RegisterMovable(bar, function(position) MTF.db.conjure.position = position end)
     buttons.bar = bar
     buttons.water = CreateConjureButton(bar, "MageToolsForeverWater", "water")
     buttons.food = CreateConjureButton(bar, "MageToolsForeverFood", "food")
     buttons.both = CreateConjureButton(bar, "MageToolsForeverFoodAndWater", "both")
     buttons.gem = CreateConjureButton(bar, "MageToolsForeverManaGem", "gem")
-    PlaceBar(bar)
+    -- A visible bar of buttons, so it takes clicks also while locked; it holds
+    -- secure buttons, so the toolkit changes it only out of combat.
+    MTF.conjureWidget = MTF.toolkit.CreateWidget({
+        addon = "MageToolsForever", key = "conjure", title = "Conjure", frame = bar, store = MTF.db.conjure,
+        width = PADDING * 2 + BUTTON_SIZE * #BUTTON_ORDER + BUTTON_GAP * (#BUTTON_ORDER - 1),
+        height = PADDING * 2 + BUTTON_SIZE, point = DEFAULT_POINT, mouse = "always",
+        sizes = {scale = {min = MTF.SCALE_MIN, max = MTF.SCALE_MAX, step = MTF.SCALE_STEP, default = MTF.DEFAULT_SCALE}},
+    })
+    -- The buttons cover most of the bar: a drag that starts on one moves it.
+    for _, kind in ipairs(BUTTON_ORDER) do
+        MTF.conjureWidget:AddDragHandle(buttons[kind])
+    end
     -- Level requirements need item data, which arrives later on first use.
     if type(C_Item.RequestLoadItemDataByID) == "function" then
         for _, kind in ipairs(KIND_ORDER) do

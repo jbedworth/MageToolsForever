@@ -37,7 +37,6 @@ MageToolsForever/
     MageToolsForever.toc
     Commands.lua
     Core.lua
-    Layout.lua
     Conjure.lua
     Portals.lua
     Polymorph.lua
@@ -70,7 +69,7 @@ Validate the actual archive, not only the staging folder:
 
 1. Check CRC/integrity, non-empty files, and the exact file list.
 2. Reject absolute paths, traversal paths, symlinks, and extra root folders.
-3. Verify the TOC name, Interface `16001`, and Commands/Core/Layout/Conjure/Portals/Polymorph/Reminders/Shield/Chimes/
+3. Verify the TOC name, Interface `16001`, and Commands/Core/Conjure/Portals/Polymorph/Reminders/Shield/Chimes/
    Options load order. Every listed runtime file must exist inside the archive.
 4. Verify the packaged version matches the selected tag, with one leading `v`
    removed. Verify the packaged MIT copyright/permission notice is intact.
@@ -112,7 +111,7 @@ WowUp 2.24.0 reads `release.json` first and maps its `forever` flavor to Forever
 installs, falling back to the ZIP-name suffix. The publisher refuses to upload
 unless `release.json` exactly names the verified ZIP.
 
-Only the twelve package files are inside the installable ZIP. Checksums, manifest,
+Only the package files listed above are inside the installable ZIP. Checksums, manifest,
 and notes stay outside it. Identical inputs and toolchain produce deterministic
 ZIP bytes; this is not a cross-toolchain compression guarantee. The builder does
 not itself run Lua syntax checks or establish client compatibility.

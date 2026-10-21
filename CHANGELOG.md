@@ -4,6 +4,21 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.1.0
+
+### Features
+
+- The Polymorph bar has new settings on the Polymorph settings page: **Bar width**, **Bar height**, **Text size**, and **Opacity**, each with a gold mark at its default, and a **Reset size** button. The defaults keep the bar as it was, and **Bar size (%)** still scales it on top. Opacity fades the whole bar at once, also in combat; a size change made in combat applies when combat ends.
+- **Bar size (%)** on the Conjure, Portals, and Polymorph pages has a gold mark at 100%.
+
+### Fixes
+
+- The conjure, portal, and Polymorph bars and the buff reminders now grow and shrink around their middle and stay where you put them. Before, a bigger **Bar size** moved a bar right and up, and a smaller one moved it left and down. The portal bar also stays centered when you learn a new teleport or portal.
+
+### Other changes
+
+- Mage Tools Forever now needs **Dyre's Toolkit 2.0** (the CurseForge app installs it). The toolkit moves, snaps, and sizes every MTF frame, the same way for all of Dyre's AddOns. Your frames keep their places and sizes. Without Dyre's Toolkit 2.0, MTF stays off and says once in chat what to install.
+
 ## 1.0.0
 
 The first full release for WoW: Forever, no longer marked beta: it was play tested on the Forever beta client 1.60.1, build 70450. CurseForge now offers it as a release, so the app updates it and installs what it needs for every player.

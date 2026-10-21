@@ -15,7 +15,7 @@
 
 ```sh
 .tools/luarocks-3.13.0-win32/win32/lua5.1/bin/lua5.1.exe tests/run.lua
-.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Layout.lua Conjure.lua Portals.lua Polymorph.lua Reminders.lua Shield.lua Chimes.lua Options.lua tests/run.lua
+.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Conjure.lua Portals.lua Polymorph.lua Reminders.lua Shield.lua Chimes.lua Options.lua tests/run.lua
 .tools/python-3.13.7/python.exe -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -165,6 +165,25 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       drags and resizes with the mouse wheel, and `/mtf reset` restores them;
       a drop near another icon snaps 20 apart and aligned, also with
       different sizes; Shift-drag moves the snapped group, a plain drag one icon.
+- [ ] Polymorph bar look (1.1.0): the bar looks as in 1.0.0 at the defaults;
+      the Polymorph page has Bar width, Bar height, Text size, and Opacity,
+      each with a gold mark at its default, and Reset size. Out of combat,
+      each slider changes the bar at once (the icon follows the height, the
+      mob name and the timer texts follow the text size), the bar stays
+      centered where it was, and a sheep up stays on the bar and its click.
+      Opacity fades the whole bar, its timer bar and texts too, never twice.
+      In combat: Opacity fades the frame at once and the timer bar follows
+      when combat ends; a size change waits for the end of combat, with no
+      "blocked" popup and no BugGrabber entry. Reset size restores the width,
+      the height, and the text size, and leaves Bar size (%) and Opacity. Drag Text size and Bar
+      width back and forth many times: the texts stay in proportion and
+      never grow (1.1.0 test build: the label grew huge). Drag Bar size
+      (%), Bar width, and Bar height up and down: the bar grows and shrinks
+      around its middle and does not move (the test build moved it right and
+      up as it grew). The same for Bar size (%) on the Conjure and Portals
+      pages, and for the portal bar when you learn a new teleport or portal.
+      Each Bar size (%) slider has a gold mark at 100. Unlocked, the bar
+      drags and snaps with its new size. Settings survive `/reload`.
 - [ ] "! Polymorph" on a bar: hovering a mob and pressing it focuses and
       sheeps it, with the moon; the bar keeps its timer while you fight
       another mob; a bar click sheeps the focus again.
@@ -180,33 +199,31 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       Power Word: Shield in the icon row.
 - [ ] Announce page: switches and texts save, Enter keeps, Escape undoes,
       Defaults restores, the page scrolls, and each whisper uses its text.
-- [ ] Unlocked: the grid covers the screen under every frame, red lines
-      cross at the center, clicks pass through it, it rebuilds after a UI
-      scale change, and its switch hides it.
-- [ ] With Dyre's Toolkit enabled: MTF is listed under Dyre's Toolkit in the
-      AddOn list; no "Install Dyre's Toolkit" line at login; MTF's page is
-      under Options > AddOns > Dyre's AddOns, with Conjure, Shield, Portals,
-      Polymorph, Buff Reminders, Cooldown Chimes, and Announce under it;
-      `/mtf` opens it (and says out of combat in combat). `/mtf unlock` and
-      `/dyre unlock` outline MTF's frames and the other Dyre's AddOns' with
-      one "Dyre:" line and no "MTF:" line; the toolkit's grid shows and MTF
-      draws none; MTF's pages have no unlock or grid switch, and the
-      toolkit's "Unlock frames" switch unlocks MTF's frames too. A dropped MTF bar snaps
-      beside another Dyre's AddOn's frame; with "Snap to the grid" on, a bar
-      dropped alone centers on a grid point; Shift-drag moves a snapped group;
-      positions and reminder sizes survive `/reload`. `/mtf lock` and the
-      toolkit's minimap button lock every AddOn. The shield display (its
-      full sample) drags, snaps beside an MTF bar, joins a Shift-drag group,
-      and keeps its place after `/reload`.
-- [ ] With Dyre's Toolkit disabled: MTF says once at login to install it
-      from CurseForge; its page is top level again, with its "Unlock frames
-      to move them" and grid switches, and its own grid and lock work as
-      before (the shield display drags freely and saves its place),
-      and positions saved with the toolkit stay.
-- [ ] Without Dyre's Toolkit: "Unlock frames to move them" and `/mtf unlock` outline the conjure bar,
-      the portal bar, and the shield display (with a full sample); all drag; unticking or
-      `/mtf lock` locks both, and the switch and commands stay in step;
-      `/mtf reset` puts them back.
+- [ ] Dyre's Toolkit 2.0 widgets (MTF 1.1.0): MTF is listed under Dyre's
+      Toolkit in the AddOn list; MTF's page is under Options > AddOns >
+      Dyre's AddOns, with Conjure, Shield, Portals, Polymorph, Buff
+      Reminders, Cooldown Chimes, and Announce under it; `/mtf` opens it
+      (and says out of combat in combat). Every frame is where it was before
+      the update, at the same size (conjure, portal, and Polymorph bars,
+      every buff reminder, the shield display). `/mtf unlock`, `/dyre
+      unlock`, the minimap button, and the toolkit's "Unlock frames" switch
+      outline MTF's frames and the other Dyre's AddOns' with one "Dyre:"
+      line and no "MTF:" line, each outline with its name in the hint; the
+      toolkit's grid shows. The conjure and portal bars drag from any of
+      their buttons; their buttons still click while locked. The Polymorph
+      bar drags while unlocked and lets clicks through while locked with no
+      sheep. A buff reminder resizes with the mouse wheel from its middle. A
+      dropped MTF bar snaps beside another Dyre's AddOn's frame; with "Snap
+      to the grid" on, a bar dropped alone centers on a grid point;
+      Shift-drag moves a snapped group. In combat, unlock and drag: secure
+      frames wait for the end of combat, with no "blocked" popup and no
+      BugGrabber entry. `/mtf reset` puts every MTF frame back (after
+      combat if needed). Positions and sizes survive `/reload`. The shield
+      display (its full sample) drags, snaps beside an MTF bar, joins a
+      Shift-drag group, and keeps its place after `/reload`.
+- [ ] With Dyre's Toolkit 1.x (or disabled with MTF forced on): MTF says once
+      at login that it needs Dyre's Toolkit 2.0 from CurseForge, and stays
+      off with no errors.
 - [ ] Mana Shield alone: the inner crescent shows, drains with its time left,
       and disappears when it breaks or ends; the outer crescent stays hidden.
 - [ ] A ward, then Mana Shield: the outer crescent keeps the ward's color and

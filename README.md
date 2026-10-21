@@ -12,11 +12,12 @@ CurseForge app installs it with Mage Tools Forever; otherwise get it from
 CurseForge or [GitHub](https://github.com/jbedworth/DyresSounds). Without it,
 MTF works but plays no sounds, and says so once in chat.
 
-**Dyre's Toolkit** is the home of all of Dyre's AddOns: one layout mode for
-every Dyre's AddOn's frames, a grid, and one settings page. The CurseForge app
-installs it with Mage Tools Forever. With it, MTF's settings are under
-**Options → AddOns → Dyre's AddOns → Mage Tools Forever**. Without it, MTF
-works as before and says so once in chat.
+**Needs Dyre's Toolkit 2.0.** Dyre's Toolkit is the home of all of Dyre's
+AddOns: one layout mode for every Dyre's AddOn's frames, a grid, and one
+settings page. The CurseForge app installs it with Mage Tools Forever. MTF's
+settings are under **Options → AddOns → Dyre's AddOns → Mage Tools Forever**.
+Without Dyre's Toolkit 2.0 or later, MTF stays off and says once in chat what
+to install.
 
 ## Conjure
 
@@ -115,6 +116,13 @@ target, and if the Polymorph breaks early, the bar empties so you see it.
   switch takes the `/tm` line out of "! Polymorph" and the bar's click (or
   puts it back). If you mark with your own `/tm` macro, use `!` the same way
   (`!5`), or turn MTF's marker off.
+- Make the bar your own on the Polymorph settings page: **Bar width**
+  (120-400, default 200), **Bar height** (10-40, default 16; the icon
+  follows), **Text size** (50-200%), and **Opacity** (10-100%). A gold mark
+  shows each default, and **Reset size** puts the width, height, and text
+  size back. **Bar size (%)** scales the whole bar on top. Opacity fades
+  the bar at once, also in combat; a size change in combat applies when
+  combat ends.
 
 ## Buff reminders
 
@@ -208,28 +216,19 @@ combat. Cold Snap cancels the Frost chimes, since it makes them ready at once.
 
 ## Moving frames
 
-All MTF frames move together. Tick **Unlock frames to move them** on the
-main MTF settings page, or type `/mtf unlock`: every MTF frame (the
-conjure, portal, and Polymorph bars, the buff reminders, and the shield
-display) gets a gold outline, and you can drag them; scroll over a buff
+Dyre's Toolkit moves every MTF frame (the conjure, portal, and Polymorph
+bars, the buff reminders, and the shield display), together with the frames
+of your other Dyre's AddOns. Type `/mtf unlock` or `/dyre unlock`, tick
+**Unlock frames** on the Dyre's AddOns settings page, or click the minimap
+button: every frame gets a gold outline, and you can drag it; drag the
+conjure and portal bars from any of their buttons, and scroll over a buff
 reminder to resize it. Frames are magnetic: drop one near another and it
-snaps beside it, 20 pixels apart and lined up. Hold **Shift** while dragging
-to move a whole snapped group together. Untick it, or
-type `/mtf lock`, to lock them again. `/mtf reset` puts them back in their
-default places and sizes. Everything starts locked.
-
-While unlocked, a faint grid covers the screen, with red lines through its
-center, so you can line frames up. Turn off **Show a grid while unlocked** on
-the main settings page if you'd rather not see it.
-
-With **Dyre's Toolkit** installed, the frames of every Dyre's AddOn unlock
-and lock together: `/mtf unlock`, `/mtf lock`, `/dyre unlock`, `/dyre lock`,
-the minimap button, and the **Unlock frames** switch on the Dyre's AddOns
-settings page all do the same. MTF's own unlock and grid switches are then
-left out, since the toolkit's page has them. MTF's frames snap to the
-frames of your other Dyre's AddOns too, and the toolkit draws the grid; use
-its settings (`/dyre`) for the grid and "Snap to the grid". The shield
-display snaps with them too.
+snaps beside it. Hold **Shift** while dragging to move a whole snapped group
+together. `/mtf lock` (or `/dyre lock`) locks them again, and `/mtf reset`
+puts MTF's frames back in their default places and sizes. Everything starts
+locked. The grid and "Snap to the grid" are on the Dyre's AddOns page
+(`/dyre`). Every frame grows and shrinks around its middle, and the size
+sliders on each page have a gold mark at their default.
 
 ## Commands
 

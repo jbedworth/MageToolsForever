@@ -80,8 +80,17 @@ local function RefreshReminders()
     MTF.RefreshReminders()
 end
 
+-- A widget's size sliders (Dyre's Toolkit: each with a gold mark at its
+-- default, then "Reset size"), with the label players know.
+local function AddWidgetSizes(page, layout, widget, tooltips, resetTooltip)
+    if widget then
+        MTF.toolkit.AddWidgetSettings(page, layout, widget,
+            {labels = {scale = "Bar size (%)", width = "Bar width"}, tooltips = tooltips, resetTooltip = resetTooltip})
+    end
+end
+
 local function AddConjurePage(parent)
-    local page = Settings.RegisterVerticalLayoutSubcategory(parent, CONJURE_TITLE)
+    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, CONJURE_TITLE)
     Flag(page, "MTF_CONJURE_MACROS", "Keep conjure macros", "conjure", "macros", true,
         "Keep \"! Water\", \"! Food\", and \"! Mana Gem\" in your character macros for your action bars: "
             .. "left-click eats, drinks, or uses; right-click conjures. Each appears once you know its spell. "
@@ -93,32 +102,20 @@ local function AddConjurePage(parent)
         function(value)
             MTF.db.conjure.shareSize = MTF.SanitizeShareSize(value)
         end)
-    local scale = Proxy(page, "MTF_CONJURE_SCALE", Settings.VarType.Number, "Bar size (%)", MTF.DEFAULT_SCALE,
-        function() return MTF.db.conjure.scale end,
-        function(value)
-            MTF.db.conjure.scale = MTF.SanitizeScale(value)
-            RefreshConjure()
-        end)
-    Settings.CreateSlider(page, scale, SliderOptions(MTF.SCALE_MIN, MTF.SCALE_MAX, MTF.SCALE_STEP),
-        "How big the conjure bar is, in percent. A change in combat applies when combat ends.")
     Settings.CreateSlider(page, share, SliderOptions(MTF.SHARE_SIZE_MIN, MTF.SHARE_SIZE_MAX, 1),
         "How much food or water one left-click trade gives your target. If you carry less, they get all of it.")
+    AddWidgetSizes(page, layout, MTF.conjureWidget,
+        {scale = "How big the conjure bar is, in percent. A change in combat applies when combat ends."})
 end
 
 local function AddPortalsPage(parent)
-    local page = Settings.RegisterVerticalLayoutSubcategory(parent, PORTALS_TITLE)
-    local scale = Proxy(page, "MTF_PORTALS_SCALE", Settings.VarType.Number, "Bar size (%)", MTF.DEFAULT_SCALE,
-        function() return MTF.db.portals.scale end,
-        function(value)
-            MTF.db.portals.scale = MTF.SanitizeScale(value)
-            RefreshPortals()
-        end)
-    Settings.CreateSlider(page, scale, SliderOptions(MTF.SCALE_MIN, MTF.SCALE_MAX, MTF.SCALE_STEP),
-        "How big the portal bar is, in percent. A change in combat applies when combat ends.")
+    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, PORTALS_TITLE)
+    AddWidgetSizes(page, layout, MTF.portalWidget,
+        {scale = "How big the portal bar is, in percent. A change in combat applies when combat ends."})
 end
 
 local function AddPolymorphPage(parent)
-    local page = Settings.RegisterVerticalLayoutSubcategory(parent, POLYMORPH_TITLE)
+    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, POLYMORPH_TITLE)
     Flag(page, "MTF_POLYMORPH_MACRO", "Keep the Polymorph macro", "polymorph", "macro", true,
         "Keep \"! Polymorph\" in your character macros for your action bars, once you know Polymorph: it focuses "
             .. "the hostile mob under your mouse (or your target, out of combat) and sheeps your focus, which the "
@@ -128,14 +125,15 @@ local function AddPolymorphPage(parent)
             .. "combat. A Polymorph from the plain spell button gets no moon: the game does not let AddOns set "
             .. "markers. In a raid the game lets only the leader and assistants mark.",
         function() MTF.RefreshPolymorph() end)
-    local scale = Proxy(page, "MTF_POLYMORPH_SCALE", Settings.VarType.Number, "Bar size (%)", MTF.DEFAULT_SCALE,
-        function() return MTF.db.polymorph.scale end,
-        function(value)
-            MTF.db.polymorph.scale = MTF.SanitizeScale(value)
-            RefreshPolymorph()
-        end)
-    Settings.CreateSlider(page, scale, SliderOptions(MTF.SCALE_MIN, MTF.SCALE_MAX, MTF.SCALE_STEP),
-        "How big the Polymorph bar is, in percent. A change in combat applies when combat ends.")
+    AddWidgetSizes(page, layout, MTF.polymorphWidget, {
+        scale = "How big the Polymorph bar is, in percent, on top of its width, height, and text size. A change "
+            .. "in combat applies when combat ends.",
+        width = "The Polymorph bar's width. A change in combat applies when combat ends.",
+        barHeight = "The height of the bar line; the icon follows. A change in combat applies when combat ends.",
+        textScale = "The size of the mob's name and the bar's texts. A change in combat applies when combat ends.",
+        opacity = "How solid the whole Polymorph bar is. It fades at once, also in combat; its timer bar follows "
+            .. "when combat ends.",
+    }, "Back to the bar's own width, height, and text size. Bar size (%) and Opacity stay as they are.")
 end
 
 local REMINDERS_ELSEWHERE = " Dyre's Buff Reminders shows your buff reminders now, so these icons stay hidden. Type /dbr to change them."
@@ -494,28 +492,6 @@ function MTF.InitializeOptions()
     Grey(Flag(category, "MTF_CHIMES_ENABLED", "Cooldown chimes", "chimes", "enabled", true,
         "A sound just before Blink, Frost Nova, and your other chosen spells are ready again."
             .. ChimesNote(MTF.SoundLibrary())), MTF.ChimesStandAside())
-    -- With Dyre's Toolkit, its "Dyre's AddOns" page has the one unlock switch
-    -- and the grid for every Dyre's AddOn (author-approved: no redundant
-    -- switches here); /mtf unlock and /mtf lock still work.
-    if not MTF.toolkit then
-        local unlocked = Proxy(category, "MTF_UNLOCKED", Settings.VarType.Boolean, "Unlock frames to move them",
-            false,
-            function() return not MTF.db.locked end,
-            function(value) MTF.SetFramesLocked(value ~= true) end)
-        Settings.CreateCheckbox(category, unlocked,
-            "Outline every MTF frame (the conjure, portal, and Polymorph bars, the buff reminders, and the "
-                .. "shield display) so you can drag them, and scroll a buff reminder to resize it; untick to lock "
-                .. "them again. /mtf unlock and /mtf lock do the same, and /mtf reset moves them back to their "
-                .. "default places.")
-        local grid = Proxy(category, "MTF_GRID", Settings.VarType.Boolean, "Show a grid while unlocked", true,
-            function() return MTF.db.grid end,
-            function(value)
-                MTF.db.grid = value == true
-                MTF.RefreshGrid()
-            end)
-        Settings.CreateCheckbox(category, grid, "While frames are unlocked, draw a faint grid over the screen with "
-            .. "the center lines in red, so you can line frames up.")
-    end
     AddConjurePage(category)
     AddShieldPage(category)
     AddPortalsPage(category)

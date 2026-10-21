@@ -253,9 +253,7 @@ function MTF.RefreshReminders()
     for _, reminder in ipairs(MTF.REMINDERS) do
         local icon = reminders.icons[reminder.key]
         local saved = settings.icons[reminder.key]
-        icon:SetScale(saved.scale / 100)
         icon.texture:SetTexture(BestTexture(reminder))
-        icon.mover:SetShown(unlocked)
         icon:EnableMouseWheel(unlocked)
         local wanted = settings.enabled and settings.spells[reminder.key] and not aside
         icon.missing = nil
@@ -280,44 +278,26 @@ local function DefaultPoint(index)
     return {point = "CENTER", relativePoint = "CENTER", x = offset, y = DEFAULT_Y}
 end
 
-local function Place(icon, index)
-    local position = MTF.db.reminders.icons[icon.key].position or DefaultPoint(index)
-    icon:ClearAllPoints()
-    icon:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
-end
-
-local function PlaceAll()
-    for index, reminder in ipairs(MTF.REMINDERS) do
-        Place(reminders.icons[reminder.key], index)
-    end
-end
-
-function MTF.ResetRemindersPosition()
+-- /mtf reset: every icon back to its own size (the toolkit puts each back in
+-- its place, after combat when needed).
+function MTF.ResetRemindersSize()
     for _, reminder in ipairs(MTF.REMINDERS) do
-        local saved = MTF.db.reminders.icons[reminder.key]
-        saved.position, saved.scale = nil, MTF.DEFAULT_REMINDER_SCALE
+        local icon = reminders.icons[reminder.key]
+        if icon then
+            icon:ResetSize()
+        end
     end
-    if not reminders.ready then
-        return
-    end
-    if InCombatLockdown() then
-        reminders.placeDirty = true
-        return
-    end
-    PlaceAll()
-    MTF.RefreshReminders()
 end
 
--- Dragging and snapping: Layout.lua. The mouse wheel resizes in 10% steps,
--- keeping the icon's center.
+-- Each icon is a Dyre's Toolkit widget: the toolkit places, drags, snaps,
+-- sizes from the center, and saves it. While unlocked the mouse wheel sizes
+-- it in 10% steps.
 local function Resize(icon, delta)
     if MTF.db.locked or InCombatLockdown() then
         return
     end
-    local saved = MTF.db.reminders.icons[icon.key]
     local step = delta > 0 and MTF.REMINDER_SCALE_STEP or -MTF.REMINDER_SCALE_STEP
-    saved.scale = MTF.SanitizeReminderScale(saved.scale + step)
-    MTF.ScaleKeepingCenter(icon, saved.scale / 100)
+    icon:SetSetting("scale", icon:GetSetting("scale") + step)
 end
 
 local function ShowTooltip(icon)
@@ -339,18 +319,12 @@ local function ShowTooltip(icon)
     GameTooltip:Show()
 end
 
-local function CreateIcon(reminder)
+local function CreateIcon(reminder, index)
     local icon = CreateFrame("Button", "MageToolsForeverReminder_" .. reminder.key, holder,
         "SecureActionButtonTemplate")
     icon.key, icon.label = reminder.key, reminder.label
-    icon:SetSize(ICON_SIZE, ICON_SIZE)
-    icon:SetMovable(true)
-    icon:SetClampedToScreen(true)
     icon:RegisterForClicks("AnyUp", "AnyDown")
     icon:SetAttribute("useOnKeyDown", false)
-    icon:RegisterForDrag("LeftButton")
-    icon:SetScript("OnDragStart", MTF.BeginDrag)
-    icon:SetScript("OnDragStop", MTF.EndDrag)
     icon:SetScript("OnMouseWheel", Resize)
     icon:SetScript("OnEnter", ShowTooltip)
     icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -375,10 +349,17 @@ local function CreateIcon(reminder)
     fade:SetToAlpha(PULSE_LOW_ALPHA)
     fade:SetDuration(PULSE_SECONDS)
     icon.pulse = pulse
-    icon.mover = MTF.CreateMover(icon)
-    icon.mover.hint:SetText("")
-    MTF.RegisterMovable(icon, function(position) MTF.db.reminders.icons[reminder.key].position = position end)
     icon:Hide()
+    -- Clicks cast the missing buff, so it takes them also while locked; secure,
+    -- so the toolkit changes it only out of combat.
+    MTF.toolkit.CreateWidget({
+        addon = "MageToolsForever", key = "reminder_" .. reminder.key, title = reminder.label, frame = icon,
+        store = MTF.db.reminders.icons[reminder.key], width = ICON_SIZE, height = ICON_SIZE,
+        point = DefaultPoint(index), mouse = "always",
+        hint = reminder.label .. " · drag to move · scroll to resize · /dyre lock when done",
+        sizes = {scale = {min = MTF.REMINDER_SCALE_MIN, max = MTF.REMINDER_SCALE_MAX, step = MTF.REMINDER_SCALE_STEP,
+            default = MTF.DEFAULT_REMINDER_SCALE}},
+    })
     return icon
 end
 
@@ -404,10 +385,6 @@ events:SetScript("OnEvent", function(_, event, _, _, spellID)
             reminders.driverPending = false
             RegisterStateDriver(holder, "visibility", COMBAT_DRIVER)
         end
-        if reminders.placeDirty then
-            reminders.placeDirty = false
-            PlaceAll()
-        end
     end
     MTF.RefreshReminders()
 end)
@@ -427,10 +404,9 @@ function MTF.InitializeReminders()
     holder = CreateFrame("Frame", "MageToolsForeverReminders", UIParent)
     holder:SetAllPoints(UIParent)
     holder:EnableMouse(false)
-    for _, reminder in ipairs(MTF.REMINDERS) do
-        reminders.icons[reminder.key] = CreateIcon(reminder)
+    for index, reminder in ipairs(MTF.REMINDERS) do
+        reminders.icons[reminder.key] = CreateIcon(reminder, index)
     end
-    PlaceAll()
     reminders.ready = true
     for _, event in ipairs({"UNIT_AURA", "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED",
         "PLAYER_REGEN_ENABLED", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST", "BAG_UPDATE_DELAYED"}) do

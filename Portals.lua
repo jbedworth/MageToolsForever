@@ -34,7 +34,7 @@ local BUTTON_GAP = 6
 local PADDING = 6
 local GOLD = {1, 0.82, 0}
 local BROWN = {0.28, 0.16, 0.07, 0.85}
-local DEFAULT_POINT = {"CENTER", "CENTER", 260, -190}
+local DEFAULT_POINT = {point = "CENTER", relativePoint = "CENTER", x = 260, y = -190}
 local MAX_BUTTONS = #TELEPORTS + #PORTALS
 
 local portals = {pending = false, buttons = {}, names = {}, teleports = {}, lastAnnounce = nil}
@@ -92,9 +92,9 @@ local function ApplySpells()
             button:Hide()
         end
     end
+    -- One button per spell you know: the toolkit resizes the bar from its center.
     local count = math.max(1, #known)
-    bar:SetSize(PADDING * 2 + BUTTON_SIZE * count + BUTTON_GAP * (count - 1), PADDING * 2 + BUTTON_SIZE)
-    bar:SetScale(MTF.db.portals.scale / 100)
+    bar:SetContentSize(PADDING * 2 + BUTTON_SIZE * count + BUTTON_GAP * (count - 1), PADDING * 2 + BUTTON_SIZE)
     -- Shown while unlocked even with nothing known, so it can be placed.
     if MTF.db.portals.enabled and (#known > 0 or not MTF.db.locked) then
         bar:Show()
@@ -116,41 +116,10 @@ function MTF.RefreshPortals()
     if not bar then
         return
     end
-    bar.mover:SetShown(not MTF.db.locked)
     ApplySpells()
     UpdateCounts()
 end
 
-local function PlaceBar()
-    local position = MTF.db.portals.position
-    bar:ClearAllPoints()
-    if position then
-        bar:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
-    else
-        bar:SetPoint(DEFAULT_POINT[1], UIParent, DEFAULT_POINT[2], DEFAULT_POINT[3], DEFAULT_POINT[4])
-    end
-end
-
-function MTF.ResetPortalsPosition()
-    MTF.db.portals.position = nil
-    if not bar then
-        return
-    end
-    if InCombatLockdown() then
-        portals.resetPending = true
-        return
-    end
-    PlaceBar()
-end
-
--- Dragging and snapping: Layout.lua.
-local function StartDrag()
-    MTF.BeginDrag(bar)
-end
-
-local function StopDrag()
-    MTF.EndDrag(bar)
-end
 
 local function CreateButton(index)
     local button = CreateFrame("Button", "MageToolsForeverPortal" .. index, bar, "SecureActionButtonTemplate")
@@ -171,9 +140,6 @@ local function CreateButton(index)
     button.count:SetPoint("BOTTOMRIGHT", -2, 2)
     button:SetScript("OnEnter", ShowTooltip)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    button:RegisterForDrag("LeftButton")
-    button:SetScript("OnDragStart", StartDrag)
-    button:SetScript("OnDragStop", StopDrag)
     button:Hide()
     return button
 end
@@ -257,10 +223,6 @@ events:SetScript("OnEvent", function(_, event, ...)
     elseif event == "BAG_UPDATE_DELAYED" then
         UpdateCounts()
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if portals.resetPending then
-            portals.resetPending = false
-            PlaceBar()
-        end
         if portals.pending then
             MTF.RefreshPortals()
         end
@@ -276,17 +238,21 @@ function MTF.InitializePortals()
         insets = {left = 3, right = 3, top = 3, bottom = 3}})
     bar:SetBackdropColor(BROWN[1], BROWN[2], BROWN[3], BROWN[4])
     bar:SetBackdropBorderColor(GOLD[1], GOLD[2], GOLD[3])
-    bar:SetMovable(true)
-    bar:SetClampedToScreen(true)
-    bar:EnableMouse(true)
-    bar:RegisterForDrag("LeftButton")
-    bar:SetScript("OnDragStart", StartDrag)
-    bar:SetScript("OnDragStop", StopDrag)
-    bar.mover = MTF.CreateMover(bar)
-    MTF.RegisterMovable(bar, function(position) MTF.db.portals.position = position end)
     MTF.portalBar = bar
     for index = 1, MAX_BUTTONS do
         portals.buttons[index] = CreateButton(index)
+    end
+    -- A visible bar of buttons, so it takes clicks also while locked; it holds
+    -- secure buttons, so the toolkit changes it only out of combat.
+    MTF.portalWidget = MTF.toolkit.CreateWidget({
+        addon = "MageToolsForever", key = "portals", title = "Portals", frame = bar, store = MTF.db.portals,
+        width = PADDING * 2 + BUTTON_SIZE, height = PADDING * 2 + BUTTON_SIZE, point = DEFAULT_POINT,
+        mouse = "always",
+        sizes = {scale = {min = MTF.SCALE_MIN, max = MTF.SCALE_MAX, step = MTF.SCALE_STEP, default = MTF.DEFAULT_SCALE}},
+    })
+    -- The buttons cover most of the bar: a drag that starts on one moves it.
+    for _, button in ipairs(portals.buttons) do
+        MTF.portalWidget:AddDragHandle(button)
     end
     for _, group in ipairs({TELEPORTS, PORTALS}) do
         local names = group == PORTALS and portals.names or portals.teleports
@@ -297,7 +263,6 @@ function MTF.InitializePortals()
             end
         end
     end
-    PlaceBar()
     for _, event in ipairs({"BAG_UPDATE_DELAYED", "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED",
         "PLAYER_ENTERING_WORLD", "PLAYER_LEVEL_UP"}) do
         events:RegisterEvent(event)
