@@ -1892,7 +1892,7 @@ test("several AddOns shipping the shield display show only one ring", function()
     contains(said[1], "shown by MageToolsForever")
     state.clear()
     state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v9 (running), ShieldForever v1 (running)")
+    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v11 (running), ShieldForever v1 (running)")
     contains(table.concat(state.messages, "|"), "minimumAbsorb=75")
     local text = table.concat(state.messages, "|")
     contains(text, "the absorb total shows above your character")
@@ -1929,7 +1929,7 @@ test("with Dyre's Shields Up loaded, MTF draws no shield and greys out its shiel
     equal(#mage().categories.Shield.headings, 0, "no heading without Dyre's Shields Up")
 end)
 test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 10}}})
+    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 12}}})
     equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
     local function shieldGreyed(want)
         local seen = 0
@@ -1980,10 +1980,14 @@ end)
 test("Mana Shield drains with time in the inner crescent; absorb shields stay in the outer one", function()
     local state = mage()
     local ring = state.mtf.ShieldDisplay.frame
-    local mana = ring.iconButtons.manashield
+    -- v11: the timed crescents are slots of their own container in the ring.
+    local mana
+    for _, slot in ipairs(ring.crescents.slots) do
+        if slot.key == "manashield" then mana = slot.button end
+    end
     equal(mana.mouse, false, "never blocks clicks on the world")
     local bar = mana.display.bar
-    equal(bar, ring.timedBars.manashield)
+    equal(ring.crescents.parent, ring, "in the ring, so it grows with the outer crescent")
     equal(mana.display.barOptions.direction, 1, "drains with the time left")
     contains(bar.statusBarTexture, "ShieldArcInner")
     equal(bar.points[1][5], -21.25, "the bar spans the crescent itself, so it empties as the buff ends")
@@ -3052,6 +3056,16 @@ local function same(actual, expected, what)
     end
 end
 
+test("Shield.lua is byte-identical with Dyre's Shields Up's copy when it is there", function()
+    -- The shared component: DSU owns it, and every host ships the same bytes.
+    local dsu = io.open("../DyresShieldsUp/Shield.lua", "rb")
+    if dsu then
+        local own = assert(io.open("Shield.lua", "rb"))
+        equal(own:read("*a") == dsu:read("*a"), true, "Shield.lua differs from DSU's: copy it again")
+        own:close()
+        dsu:close()
+    end
+end)
 test("the toolkit copy the tests load matches ../DyresToolkit when it is there", function()
     -- CI has only this repository, so the tests load a copy; on a developer's
     -- machine it must be the toolkit's own files, byte for byte.

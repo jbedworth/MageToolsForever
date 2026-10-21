@@ -224,6 +224,12 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] With Dyre's Toolkit 1.x (or disabled with MTF forced on): MTF says once
       at login that it needs Dyre's Toolkit 2.0 from CurseForge, and stays
       off with no errors.
+- [ ] Shield display v11 (MTF 1.1.1; with Dyre's Shields Up disabled, since
+      MTF stands aside while it is loaded): Size on the Shield page grows
+      and shrinks the crescents around their middle, and the display does
+      not move; the number and the icon row keep their size. Mana Shield's
+      inner crescent grows with the outer one and drains as before. The
+      place and size survive `/reload`.
 - [ ] Mana Shield alone: the inner crescent shows, drains with its time left,
       and disappears when it breaks or ends; the outer crescent stays hidden.
 - [ ] A ward, then Mana Shield: the outer crescent keeps the ward's color and

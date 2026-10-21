@@ -172,6 +172,25 @@ frameworks without agreement.
   `Initialize` moves the ring through the host's layout (Dyre's Toolkit);
   `save` stores `{point, relativePoint, x, y}` in the shield settings.
   Without it the ring moves freely and saves its own point.
+- Version 10 (DSU 1.1.0; MTF 1.1.1 copies it): a widget host may pass
+  `layout = {adopt(frame), resetPosition(frame)}` and own the ring's layout.
+  MTF still passes v9's `{register, beginDrag, endDrag}` (adopting the ring
+  as a toolkit widget is optional, later). For such a host, a size change
+  keeps the ring's center and saves `{CENTER, BOTTOMLEFT, x, y}`, only when
+  it is placed and the scale really changed (found in client: a bare
+  `SetScale` moved the ring right and up as it grew). Shield.lua never names
+  Dyre's Toolkit.
+- Version 11 (with v10; author-approved: large crescents with a large
+  number were disconcerting): `shield.scale` sizes the crescents only. The
+  number and the icon row have their own sizes, `textScale` and `iconScale`
+  (50-150%, sanitized by the display); MTF has no sliders for them, so they
+  stay at 100%. The engine's slots are never resized: icons and timed
+  crescents are separate slots in two AuraContainers (`frame.icons`,
+  `frame.crescents`), each set up only in its initializeFrame.
+- MTF's copy is byte-identical with DSU's (Shield.lua sha256 for v11:
+  0d09d196498024d8c6725914f2b47af4185071aa4fbfea70d2dae35aed68fa13); a test
+  compares it with ../DyresShieldsUp/Shield.lua when that folder is there.
+  Never edit it here: changes go through DSU and the coordinator.
 - The icon row holds the player's own class's shields (`class` on each
   entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
   Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
@@ -536,9 +555,8 @@ frameworks without agreement.
 - Every MTF frame resizes from its center: the toolkit's widgets do it
   (`DyresToolkit.ResizeFromCenter`). Found in client: a frame placed by an
   offset from a screen corner moved right and up as it grew, because the
-  offset scales with the frame. The shield display (shared Shield.lua) still
-  scales by its corner offset; a fix goes through the coordinator to DSU,
-  MTF, and WTF together.
+  offset scales with the frame. The shield display (shared Shield.lua, not
+  a widget) scales from its center itself since v10 (MTF 1.1.1).
 
 ## Project structure
 
