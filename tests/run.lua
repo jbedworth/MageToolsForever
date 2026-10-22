@@ -973,7 +973,8 @@ local function fixture(options)
                 return require(n)
             end
         end
-        env.DyresToolkitDB = options.toolkitDB
+        -- Toolkit 2.2.1 snaps to the grid by default; these tests drop frames without it.
+        env.DyresToolkitDB = options.toolkitDB or {snapToGrid = false}
     end
     state.mtf = {}
     for _, path in ipairs(options.files or RUNTIME_FILES) do
@@ -3388,9 +3389,9 @@ test("the conjure and portal bars resize from their centers, and their Bar size 
     for _, name in ipairs({"Conjure", "Portals"}) do
         local mark
         for _, initializer in ipairs(state.categories[name].initializers) do
-            if initializer.setting.name == "Bar size (%)" then mark = initializer.dyreDefault end
+            if initializer.setting.name == "Bar size" then mark = initializer.dyreDefault end
         end
-        equal(mark and mark.default, 100, name .. ": Bar size (%) has its mark at 100")
+        equal(mark and mark.default, 100, name .. ": Bar size has its mark at 100")
     end
 end)
 test("a Polymorph bar size changed in combat waits; the secure holder never resizes in combat", function()
@@ -3469,14 +3470,22 @@ test("the Polymorph page has the sizes and opacity with gold default marks, and 
     for _, initializer in ipairs(page.initializers) do
         if initializer.dyreDefault then labels[#labels + 1] = initializer.setting.name end
     end
-    equal(table.concat(labels, ","), "Bar size (%),Bar width,Bar height,Text size,Opacity", "in this order")
-    equal(marks.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE.default, 100, "Bar size (%) has its mark too")
+    equal(table.concat(labels, ","), "Bar size,Bar width,Bar height,Text size,Opacity", "in this order")
+    equal(marks.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE.default, 100, "Bar size has its mark too")
+    -- The values show the % sign, so no label repeats it.
+    for _, page in pairs(state.categories) do
+        for _, initializer in ipairs(page.initializers) do
+            local name = initializer.setting and initializer.setting.name or ""
+            equal(name:find("(%)", 1, true), nil, name .. " has no (%)")
+        end
+    end
+    equal(state.settings.MTF_SHIELD_SCALE.name, "Display size")
     local reset
     for _, item in ipairs(page.headings) do
         if item.button then reset = item end
     end
     equal(reset.buttonText, "Reset size")
-    equal(reset.tooltip, "Back to the bar's own width, height, and text size. Bar size (%) and Opacity stay as they are.")
+    equal(reset.tooltip, "Back to the bar's own width, height, and text size. Bar size and Opacity stay as they are.")
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(320)
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_BARHEIGHT:SetValue(30)
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE:SetValue(80)
@@ -3492,9 +3501,9 @@ test("the Polymorph page has the sizes and opacity with gold default marks, and 
     equal(settings.height, 16)
     equal(settings.textScale, 100)
     equal(settings.opacity, 50, "opacity stays")
-    equal(settings.scale, 120, "Bar size (%) stays (John-approved)")
+    equal(settings.scale, 120, "Bar size stays (John-approved)")
     equal(state.env.MageToolsForeverPolymorph.width, 200)
-    equal(state.env.MageToolsForeverPolymorph:GetScale(), 1.2, "Bar size (%) still scales on top")
+    equal(state.env.MageToolsForeverPolymorph:GetScale(), 1.2, "Bar size still scales on top")
 end)
 test("damaged Polymorph bar sizes and opacity are repaired on load", function()
     local state = mage({db = {polymorph = {width = "wide", height = 99, textScale = 33, opacity = -5}}})

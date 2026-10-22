@@ -22,7 +22,7 @@ local DyresToolkit = ns.toolkit
 
 local DEFAULT_KEYS = {position = "position", scale = "scale", width = "width", height = "height",
     opacity = "opacity"}
-local LABELS = {scale = "Size (%)", width = "Width", height = "Height", opacity = "Opacity"}
+local LABELS = {scale = "Size", width = "Width", height = "Height", opacity = "Opacity"}
 local PERCENT = {scale = true, opacity = true}
 local DEFAULT_SCALE = {min = 50, max = 150, step = 5, default = 100}
 local DEFAULT_OPACITY = {min = 10, max = 100, step = 5, default = 100}
@@ -176,8 +176,20 @@ local function Setup(widget)
     widget.dyre.needsSetup = nil
     local scale, width, height = Wanted(widget)
     widget:SetScale(scale)
-    widget:SetSize(width, height)
-    Place(widget)
+    -- A widget that grows from an edge was saved at its size then; its
+    -- size now can differ (content not in yet), so it goes back at the saved
+    -- size and resizes keeping that edge, or it would drift on each reload.
+    local position = Value(widget, "position")
+    if type(position) == "table" and type(position.anchor) == "string" and type(position.width) == "number"
+            and type(position.height) == "number" then
+        widget:SetSize(position.width, position.height)
+        Place(widget)
+        widget.dyre.lastAnchor = position.anchor
+        DyresToolkit.ResizeFromCenter(widget, nil, width, height, position.anchor)
+    else
+        widget:SetSize(width, height)
+        Place(widget)
+    end
     if widget.dyre.mouseMode ~= "client" then
         widget:EnableMouse(MouseWanted(widget))
     end
@@ -240,11 +252,15 @@ local WidgetMethods = {}
 
 -- A size that comes from the content (a bar holding as many buttons as
 -- spells you know), not from a setting. Applied from the center.
--- anchor: "LEFT" or "RIGHT" keeps that edge fixed (a bar growing left to
--- right, or right to left); "CENTER" (the default) keeps the center.
+-- anchor: "LEFT", "RIGHT", "TOP", "BOTTOM", or a corner ("TOPLEFT") keeps
+-- that edge or corner fixed (a bar growing left to right, a box collapsing
+-- toward its top); "CENTER" (the default) keeps the center.
 function WidgetMethods.SetContentSize(widget, width, height, anchor)
     widget.dyre.contentWidth, widget.dyre.contentHeight = width, height
     widget.dyre.growAnchor = anchor
+    if anchor and anchor ~= "CENTER" then
+        widget.dyre.lastAnchor = anchor
+    end
     Apply(widget)
 end
 
@@ -352,6 +368,11 @@ function DyresToolkit.CreateWidget(spec)
     widget:SetScript("OnDragStart", DyresToolkit.BeginDrag)
     widget:SetScript("OnDragStop", DyresToolkit.EndDrag)
     DyresToolkit.RegisterMovable(widget, function(position)
+        -- The size and grow edge too, so Setup can restore the place exactly.
+        if widget.dyre.lastAnchor then
+            position.anchor = widget.dyre.lastAnchor
+            position.width, position.height = widget:GetWidth(), widget:GetHeight()
+        end
         widget.dyre.store[widget.dyre.keys.position] = position
     end)
     widget.dyre.mover = CreateMover(widget)
@@ -428,6 +449,9 @@ function ns.AddDefaultTick(initializer, range)
         tick:Show()
     end
 end
+
+-- For an AddOn's own sliders (2.2.0): range = {min, max, default}.
+DyresToolkit.AddDefaultTick = ns.AddDefaultTick
 
 local function SliderOptions(name, range)
     local options = Settings.CreateSliderOptions(range.min, range.max, range.step)

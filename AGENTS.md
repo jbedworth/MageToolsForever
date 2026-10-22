@@ -293,7 +293,7 @@ frameworks without agreement.
   frames), the grid, Shift and Ctrl, the gold outline and hint, resizing
   from the center, waiting out combat for protected widgets, repairing the
   saved numbers, and the size sliders with gold marks and "Reset size"
-  (`AddWidgetSettings`, labels "Bar size (%)" and "Bar width"; the
+  (`AddWidgetSettings`, labels "Bar size" and "Bar width"; no label repeats "(%)", since the values show the % sign (John, 1.1.2); the
   Polymorph bar's "Reset size" restores width, bar height, and text size
   only, `spec.resetSizes`, John-approved; Bar size and Opacity stay). MTF never calls SetScale, SetSize, SetPoint,
   StartMoving, or EnableMouse on a widget, except EnableMouse on the
@@ -420,7 +420,7 @@ frameworks without agreement.
   (Core's `POLYMORPH_SIZE_SPECS`), and Opacity (10-100%, step 5, default
   100), each slider with a gold default mark (Dyre's Toolkit's widget
   settings, see above), and "Reset size". The defaults draw the old bar
-  exactly (name line 18, height 40). "Bar size (%)" is the widget's scale on
+  exactly (name line 18, height 40). "Bar size" is the widget's scale on
   top. The toolkit sizes the secure holder from the center (out of combat);
   its `onLayout` scales and lays out the visible bar (`ApplyLook`) and
   rebuilds the engine slot once, 0.2 s after a slider rests (`BuildBar`: a

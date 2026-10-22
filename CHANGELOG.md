@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.1.2
+
+### Other changes
+
+- Size sliders are labeled without '(%)': their values already show the % sign.
+
 ## 1.1.1
 
 ### Fixes

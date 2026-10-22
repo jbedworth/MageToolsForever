@@ -175,14 +175,15 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       In combat: Opacity fades the frame at once and the timer bar follows
       when combat ends; a size change waits for the end of combat, with no
       "blocked" popup and no BugGrabber entry. Reset size restores the width,
-      the height, and the text size, and leaves Bar size (%) and Opacity. Drag Text size and Bar
+      the height, and the text size, and leaves Bar size and Opacity. Drag Text size and Bar
       width back and forth many times: the texts stay in proportion and
-      never grow (1.1.0 test build: the label grew huge). Drag Bar size
-      (%), Bar width, and Bar height up and down: the bar grows and shrinks
+      never grow (1.1.0 test build: the label grew huge). Drag Bar size,
+      Bar width, and Bar height up and down: the bar grows and shrinks
       around its middle and does not move (the test build moved it right and
-      up as it grew). The same for Bar size (%) on the Conjure and Portals
+      up as it grew). The same for Bar size on the Conjure and Portals
       pages, and for the portal bar when you learn a new teleport or portal.
-      Each Bar size (%) slider has a gold mark at 100. Unlocked, the bar
+      Each Bar size slider has a gold mark at 100. No size slider's name
+      has "(%)": its value shows the % sign. Unlocked, the bar
       drags and snaps with its new size. Settings survive `/reload`.
 - [ ] "! Polymorph" on a bar: hovering a mob and pressing it focuses and
       sheeps it, with the moon; the bar keeps its timer while you fight

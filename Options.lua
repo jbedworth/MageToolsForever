@@ -85,7 +85,7 @@ end
 local function AddWidgetSizes(page, layout, widget, tooltips, resetTooltip)
     if widget then
         MTF.toolkit.AddWidgetSettings(page, layout, widget,
-            {labels = {scale = "Bar size (%)", width = "Bar width"}, tooltips = tooltips, resetTooltip = resetTooltip})
+            {labels = {scale = "Bar size", width = "Bar width"}, tooltips = tooltips, resetTooltip = resetTooltip})
     end
 end
 
@@ -133,7 +133,7 @@ local function AddPolymorphPage(parent)
         textScale = "The size of the mob's name and the bar's texts. A change in combat applies when combat ends.",
         opacity = "How solid the whole Polymorph bar is. It fades at once, also in combat; its timer bar follows "
             .. "when combat ends.",
-    }, "Back to the bar's own width, height, and text size. Bar size (%) and Opacity stay as they are.")
+    }, "Back to the bar's own width, height, and text size. Bar size and Opacity stay as they are.")
 end
 
 local REMINDERS_ELSEWHERE = " Dyre's Buff Reminders shows your buff reminders now, so these icons stay hidden. Type /dbr to change them."
@@ -248,7 +248,7 @@ local function AddShieldPage(parent)
     if type(dropdown.SetParentInitializer) == "function" then
         dropdown:SetParentInitializer(soundSwitch, function() return MTF.db.shield.breakSound end)
     end
-    local scale = Proxy(page, "MTF_SHIELD_SCALE", Settings.VarType.Number, "Display size (%)", display.DEFAULT_SCALE,
+    local scale = Proxy(page, "MTF_SHIELD_SCALE", Settings.VarType.Number, "Display size", display.DEFAULT_SCALE,
         function() return MTF.db.shield.scale end,
         function(value)
             MTF.db.shield.scale = display.SanitizeScale(value)

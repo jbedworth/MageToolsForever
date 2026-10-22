@@ -20,7 +20,7 @@ local SNAP_TOLERANCE = 1.5
 local GRID_LINE = {1, 1, 1, 0.12}
 local GRID_CENTER = {1, 0.15, 0.15, 0.6}
 
-local layout = {saves = {}, order = {}, dragging = {}, pending = {}}
+local layout = {saves = {}, order = {}, dragging = {}, pending = {}, free = {}}
 
 function DyresToolkit.RegisterMovable(frame, save)
     if type(frame) ~= "table" or type(save) ~= "function" then
@@ -33,10 +33,26 @@ function DyresToolkit.RegisterMovable(frame, save)
     return true
 end
 
+-- A frame's center in its own units. A frame placed by the toolkit (CENTER
+-- on UIParent's bottom left) is read from its anchor: GetCenter makes the
+-- client lay out pending frames now, inside our call, and a Blizzard frame
+-- that changes size then (the objective tracker) runs its update tainted
+-- (found in client, 2026-10-21: GetAuraDataByIndex blocked, "tainted by
+-- DyresToolkit"). Anything else, such as a frame just dragged, uses GetCenter.
+local function Center(frame)
+    if frame:GetNumPoints() == 1 and type(frame.GetPoint) == "function" then
+        local point, relative, relativePoint, x, y = frame:GetPoint(1)
+        if point == "CENTER" and relative == UIParent and relativePoint == "BOTTOMLEFT" then
+            return x, y
+        end
+    end
+    return frame:GetCenter()
+end
+
 -- A frame's center and half size in UIParent units.
 local function Box(frame)
     local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
-    local x, y = frame:GetCenter()
+    local x, y = Center(frame)
     return x * ratio, y * ratio, frame:GetWidth() * ratio / 2, frame:GetHeight() * ratio / 2
 end
 
@@ -174,9 +190,10 @@ end
 -- frame is only re-anchored. Pass width and height together, or neither.
 local SIZE_EPSILON = 0.01
 
--- anchor (2.1.0): "LEFT" or "RIGHT" keeps that edge where it is instead of
--- the center (a bar that grows left to right, or right to left); the saved
--- place is still the center.
+-- anchor (2.1.0): "LEFT", "RIGHT", "TOP", "BOTTOM", or a corner such as
+-- "TOPLEFT" keeps that edge (or both edges) where it is instead of the
+-- center: a bar that grows left to right, a box that collapses toward its
+-- top. The saved place is still the center.
 function DyresToolkit.ResizeFromCenter(frame, scale, width, height, anchor)
     if scale and math.abs(frame:GetScale() - scale) < SIZE_EPSILON then
         scale = nil
@@ -188,10 +205,10 @@ function DyresToolkit.ResizeFromCenter(frame, scale, width, height, anchor)
     if not scale and not (width and height) then
         return
     end
-    local placed = frame:GetNumPoints() > 0 and frame:GetCenter() ~= nil
-    local x, y, halfWidth
+    local placed = frame:GetNumPoints() > 0 and Center(frame) ~= nil
+    local x, y, halfWidth, halfHeight
     if placed then
-        x, y, halfWidth = Box(frame)
+        x, y, halfWidth, halfHeight = Box(frame)
     end
     if scale then
         frame:SetScale(scale)
@@ -202,9 +219,19 @@ function DyresToolkit.ResizeFromCenter(frame, scale, width, height, anchor)
     if not placed then
         return
     end
-    if anchor == "LEFT" or anchor == "RIGHT" then
-        local newHalf = frame:GetWidth() * frame:GetEffectiveScale() / UIParent:GetEffectiveScale() / 2
-        x = anchor == "LEFT" and x - halfWidth + newHalf or x + halfWidth - newHalf
+    if type(anchor) == "string" then
+        local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+        local newHalfWidth, newHalfHeight = frame:GetWidth() * ratio / 2, frame:GetHeight() * ratio / 2
+        if anchor:find("LEFT") then
+            x = x - halfWidth + newHalfWidth
+        elseif anchor:find("RIGHT") then
+            x = x + halfWidth - newHalfWidth
+        end
+        if anchor:find("TOP") then
+            y = y + halfHeight - newHalfHeight
+        elseif anchor:find("BOTTOM") then
+            y = y - halfHeight + newHalfHeight
+        end
     end
     if layout.saves[frame] then
         MoveTo(frame, x, y)
@@ -220,20 +247,34 @@ function DyresToolkit.ScaleKeepingCenter(frame, scale)
     DyresToolkit.ResizeFromCenter(frame, scale)
 end
 
+local function ControlDown()
+    return type(IsControlKeyDown) == "function" and IsControlKeyDown() == true
+end
+
+-- While frames are locked, a drag started with Ctrl held moves that one
+-- frame anyway (author-approved 2026-10-21, family-wide, as Questie's
+-- tracker): no group, and the drop is free (no neighbors, no grid). It
+-- can start only on a part that takes the mouse while locked (a button, a
+-- box's header); the rest of a locked widget lets clicks through.
 function DyresToolkit.BeginDrag(frame)
-    if ns.db.locked or InCombatLockdown() or not layout.saves[frame] then
+    if InCombatLockdown() or not layout.saves[frame] then
+        return
+    end
+    local lockedDrag = ns.db.locked
+    if lockedDrag and not ControlDown() then
         return
     end
     local group = {frame}
+    layout.free[frame] = lockedDrag or nil
     -- Shift: the snapped group follows, anchored to the dragged frame.
-    if IsShiftKeyDown() then
+    if not lockedDrag and IsShiftKeyDown() then
         group = SnappedGroup(frame)
         local scale = frame:GetEffectiveScale()
-        local leadX, leadY = frame:GetCenter()
+        local leadX, leadY = Center(frame)
         for index = 2, #group do
             local follower = group[index]
             local followerScale = follower:GetEffectiveScale()
-            local x, y = follower:GetCenter()
+            local x, y = Center(follower)
             follower:ClearAllPoints()
             follower:SetPoint("CENTER", frame, "CENTER", (x * followerScale - leadX * scale) / followerScale,
                 (y * followerScale - leadY * scale) / followerScale)
@@ -284,7 +325,7 @@ pendingEvents:SetScript("OnEvent", function(self)
     layout.pending = {}
     for _, drop in ipairs(pending) do
         drop.frame:StopMovingOrSizing()
-        FinishDrop(drop.frame, drop.group)
+        FinishDrop(drop.frame, drop.group, drop.free)
     end
 end)
 
@@ -294,17 +335,20 @@ function DyresToolkit.EndDrag(frame)
         return
     end
     layout.dragging[frame] = nil
+    local wasLocked = layout.free[frame] == true
+    local free = wasLocked or ControlDown()
+    layout.free[frame] = nil
     if InCombatLockdown() then
         local protected = type(frame.IsProtected) == "function" and frame:IsProtected()
         if not protected then
             frame:StopMovingOrSizing()
         end
-        layout.pending[#layout.pending + 1] = {frame = frame, group = group}
+        layout.pending[#layout.pending + 1] = {frame = frame, group = group, free = wasLocked}
         pendingEvents:RegisterEvent("PLAYER_REGEN_ENABLED")
         return
     end
     frame:StopMovingOrSizing()
-    FinishDrop(frame, group, type(IsControlKeyDown) == "function" and IsControlKeyDown() == true)
+    FinishDrop(frame, group, free)
 end
 
 -- The grid: lines ns.db.gridSize apart from the screen's center, and the two

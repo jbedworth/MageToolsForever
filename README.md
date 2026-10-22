@@ -120,7 +120,7 @@ target, and if the Polymorph breaks early, the bar empties so you see it.
   (120-400, default 200), **Bar height** (10-40, default 16; the icon
   follows), **Text size** (50-200%), and **Opacity** (10-100%). A gold mark
   shows each default, and **Reset size** puts the width, height, and text
-  size back. **Bar size (%)** scales the whole bar on top. Opacity fades
+  size back. **Bar size** scales the whole bar on top. Opacity fades
   the bar at once, also in combat; a size change in combat applies when
   combat ends.
 
