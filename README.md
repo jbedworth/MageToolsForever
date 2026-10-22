@@ -95,26 +95,31 @@ page.
 ## Polymorph bar
 
 A bar with your Polymorph's time left and the sheeped mob's name, in the same
-style as Warlock Tools Forever's DoT bars. It follows the mob when you change
-target, and if the Polymorph breaks early, the bar empties so you see it.
+style as Warlock Tools Forever's DoT bars. It shows your **focus** while you
+have it sheeped, so it keeps the timer when you change target, and if the
+Polymorph breaks early, the bar empties so you see it. Sheep with the
+**"! Polymorph"** macro: it focuses the mob, marks it with the moon, and
+sheeps it.
 
 - As you start casting in a group, MTF tells your party or raid: "Sheeping
   Defias Pillager; you spank it, you tank it."
-- The moon marker: for the moon, use the **"! Polymorph"** macro or click
-  the bar. They mark the mob as you press them, also in combat, and a second
-  press never toggles the moon off. A Polymorph from the plain spell button
-  gets no moon: the game does not let AddOns set markers. (In a raid, only
-  the leader and assistants can mark.)
+- The moon marker: **"! Polymorph"** marks your focus as you press it, also
+  in combat, and a second press never toggles the moon off. A click on the
+  bar and the plain spell button do not mark: the game does not let AddOns
+  set markers. (In a raid, only the leader and assistants can mark.)
+- A Polymorph at a mob that is not your focus (the plain spell button on
+  your target, for example) shows no bar.
 - With no sheep to click, the bar lets your clicks through to the world.
 - **"! Polymorph"** in your character macros (once you know Polymorph) focuses
   the hostile mob under your mouse (or your target, out of combat) and sheeps
   your focus. The bar follows your focus, so it keeps the timer while you fight
-  something else.
-- **Click the bar** to sheep your focus again; with no focus, MTF targets the
-  mob by name, casts the same Polymorph, and goes back to your target. The game lets the
-  click change only out of combat, so after sheeping a different mob in
-  combat, the click catches up when combat ends. With several mobs of the same
-  name, it picks the nearest.
+  something else. The game counts a neutral critter (a Chicken) as
+  attackable, so with the mouse on a critter it focuses and marks the
+  critter.
+- **Click the bar** to sheep your focus again, with the same Polymorph you
+  cast. The click does not mark or change your target. The game lets the
+  click change only out of combat, so after you sheep with another Polymorph
+  spell (Pig, Turtle) in combat, the click catches up when combat ends.
 - The marker switch and **Bar size** are on the Polymorph settings page. The
   switch takes the `/tm` line out of "! Polymorph" and the bar's click (or
   puts it back). If you mark with your own `/tm` macro, use `!` the same way

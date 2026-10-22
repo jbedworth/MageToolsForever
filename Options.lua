@@ -115,9 +115,10 @@ local function AddPolymorphPage(parent)
             .. "the hostile mob under your mouse (or your target, out of combat) and sheeps your focus, which the "
             .. "bar's click recasts on. Turning this off deletes it.", function() MTF.ApplyPolymorphMacro() end)
     Flag(page, "MTF_POLYMORPH_MARK", "Mark the sheep with the moon", "polymorph", "mark", true,
-        "\"! Polymorph\" and a click on the bar put the moon raid marker on the mob as you press them, also in "
-            .. "combat. A Polymorph from the plain spell button gets no moon: the game does not let AddOns set "
-            .. "markers. In a raid the game lets only the leader and assistants mark.",
+        "\"! Polymorph\" puts the moon raid marker on your focus as you press it, also in combat; pressing it "
+            .. "again keeps the moon. A click on the bar and the plain spell button do not mark: the game does not "
+            .. "let AddOns set markers, so use \"! Polymorph\". In a raid the game lets only the leader and "
+            .. "assistants mark.",
         function() MTF.RefreshPolymorph() end)
     AddWidgetSizes(page, layout, MTF.polymorphWidget, {
         scale = "How big the Polymorph bar is, in percent, on top of its width, height, and text size. A change "
@@ -306,7 +307,8 @@ function MTF.InitializeOptions()
         "A bar with a button for each teleport and portal you know, and the runes you carry for them.",
         RefreshPortals)
     Flag(category, "MTF_POLYMORPH_ENABLED", "Polymorph bar", "polymorph", "enabled", true,
-        "A bar with your Polymorph's time left and the sheeped mob's name; click it to sheep the mob again.",
+        "A bar with the time left on your focus's Polymorph and the mob's name; click it to sheep your focus "
+            .. "again. Sheep with \"! Polymorph\": it focuses and marks the mob.",
         RefreshPolymorph)
     AddConjurePage(category)
     AddPortalsPage(category)

@@ -4,6 +4,14 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.2.1
+
+### Fixes
+
+- The Polymorph bar now shows only your focus, the mob "! Polymorph" focuses, marks, and sheeps. It no longer follows a mob by its name, so a mob with the same name, or a critter under your mouse, can no longer take the bar's place. When your focus changes to another mob, or you clear it, the bar goes. A Polymorph at a mob that is not your focus shows no bar.
+- A click on the bar now only sheeps your focus again: it no longer marks, targets a mob by name, or changes your target.
+- Without a new enough Dyre's Toolkit, MTF now says that it needs version 2.3 or later (it said 2.0).
+
 ## 1.2.0
 
 ### Other changes

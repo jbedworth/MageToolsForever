@@ -94,25 +94,29 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       the macro, the bar click, and the plain spell button. No "blocked from
       an action" popup, no ADDON_ACTION_FORBIDDEN, and no taint line names
       MageToolsForever.
-- [ ] The moon: "! Polymorph" puts it on as you press it, in and out of
-      combat, and pressing it again keeps it; a bar click marks the mob it
-      sheeps; the plain Polymorph spell button gives no moon, and the bar
-      still shows the sheep. `/mtf debug_polymorph` says
-      `moon=from the macro and the click`.
+- [ ] The moon: "! Polymorph" puts it on your focus as you press it, in
+      and out of combat, and pressing it again keeps it. A bar click and the
+      plain Polymorph spell button give no moon. BugGrabber shows no
+      ADDON_ACTION_FORBIDDEN. `/mtf debug_polymorph` says
+      `moon=from the macro`.
+- [ ] The bar is your focus only (1.2.1): sheep with "! Polymorph", tab to
+      another mob: the bar keeps the timer. Focus another mob or clear your
+      focus: the bar goes. Cast the plain spell at your target with no focus:
+      no bar (`debug_polymorph` says `focus=false`). With the mouse on a
+      Chicken and "! Polymorph": the Chicken is focused and marked (known
+      gap), and no other mob takes the bar.
 - [ ] "Mark the sheep with the moon" off: after combat (or at once out of
-      combat) "! Polymorph" and the bar's click have no `/tm` line, and no
-      moon goes on; on again puts the line back.
+      combat) "! Polymorph" has no `/tm` line, and no moon goes on; on again
+      puts the line back. The bar's click never has a `/tm` line.
 - [ ] Locked, with no sheep up: left- and right-click the empty spot where
       the Polymorph bar sits; the clicks reach the world (target a mob or
       turn the camera behind it). With a sheep up, the bar's click sheeps
       it again; after it ends out of combat, clicks pass through again.
 - [ ] Polymorph: in a party, the group message as the cast starts; the moon
-      from the macro or the bar click (also solo; in a raid as assistant); the bar
-      shows the name and drains, follows the mob when you tab away, empties
-      when it breaks, and goes when the mob dies. Click the bar after the
-      Polymorph breaks (out of combat sheep): it re-sheeps that mob and
-      returns to your target; with the mob gone, nothing is cast and your
-      target stays. `/mtf debug_polymorph` lists the IDs (check Forever's).
+      from the macro (also solo; in a raid as assistant); the bar shows the
+      name and drains, stays when you tab away, empties when it breaks, and
+      goes when the mob dies. Click the bar after the Polymorph breaks: it
+      re-sheeps your focus; your target does not change. `/mtf debug_polymorph` lists the IDs (check Forever's).
 - [ ] Polymorph bar look (1.1.0): the bar looks as in 1.0.0 at the defaults;
       the Polymorph page has Bar width, Bar height, Text size, and Opacity,
       each with a gold mark at its default, and Reset size. Out of combat,

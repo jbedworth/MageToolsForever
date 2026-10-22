@@ -533,7 +533,16 @@ local function fixture(options)
         local data = state.units[unit]
         if data then return data.name, data.surname end
     end
-    env.UnitGUID = function(unit) return state.units[unit] and state.units[unit].guid end
+    -- state.secretGUIDs[token]: that token's GUID is secret, as in some combat cases.
+    state.secretGUIDs = {}
+    env.UnitGUID = function(unit)
+        if state.units[unit] and state.secretGUIDs[unit] then
+            local value = secret()
+            state.secrets[value] = true
+            return value
+        end
+        return state.units[unit] and state.units[unit].guid
+    end
     env.UnitCanAttack = function(_, unit) return state.units[unit] ~= nil and not state.units[unit].friend end
     env.UnitIsUnit = function(a, b) return state.units[a] == state.units[b] end
     -- In client, combat makes index access raise an error for AddOn code.
@@ -1874,8 +1883,10 @@ end)
 
 local POLYMORPH = 118
 
+-- The mob is your target and your focus, as "! Polymorph" sets it out of combat.
 local function sheepTarget(state, name, guid)
     state.units.target = {name = name or "Defias Pillager", guid = guid or "mob-1", level = 20}
+    state.units.focus = state.units.target
 end
 
 local function castPolymorph(state, spellID)
@@ -1905,7 +1916,7 @@ test("Polymorph tells the group as the cast starts, never when alone", function(
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-5", POLYMORPH)
     equal(#state.sent, 1, "its switch turns it off")
 end)
-test("a landed Polymorph shows the bar on its unit", function()
+test("a landed Polymorph at your focus shows the bar on your focus", function()
     local state = mage({known = {[POLYMORPH] = true}})
     local bar = state.env.MageToolsForeverPolymorphBar
     equal(bar.shown, false, "nothing sheeped")
@@ -1913,36 +1924,71 @@ test("a landed Polymorph shows the bar on its unit", function()
     castPolymorph(state)
     equal(bar.shown, true)
     equal(bar.name.text, "Defias Pillager")
-    equal(bar.container.unit, "target")
+    equal(bar.container.unit, "focus")
     equal(bar.container.slots[1].ids[POLYMORPH], true)
     equal(bar.container.slots[1].filter, "HARMFUL|PLAYER")
-    castPolymorph(state)
-    -- Tabbing away: the bar follows the mob's nameplate.
-    state.units.nameplate3 = state.units.target
+    -- Tabbing away keeps it: the bar is on your focus.
     state.units.target = {name = "Defias Bandit", guid = "mob-2", level = 20}
     state.emit("PLAYER_TARGET_CHANGED")
-    equal(bar.container.unit, "nameplate3")
-    state.units.nameplate3.dead = true
-    state.emit("UNIT_HEALTH", "nameplate3")
+    equal(bar.container.unit, "focus")
+    equal(bar.shown, true)
+    state.units.focus.dead = true
+    state.emit("UNIT_HEALTH", "focus")
     equal(bar.shown, false, "gone when the mob dies")
 end)
-test("a Polymorph cast on the mob under the mouse is tracked", function()
+test("only a Polymorph at your focus drives the bar", function()
+    -- A plain Polymorph at your target, with no focus or another focus: no bar.
     local state = mage({known = {[POLYMORPH] = true}})
-    state.units.mouseover = {name = "Defias Pillager", guid = "mob-7", level = 20}
-    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-m", POLYMORPH)
-    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-m", POLYMORPH)
-    local bar = state.env.MageToolsForeverPolymorphBar
-    equal(bar.shown, true, "tracked")
-    equal(bar.name.text, "Defias Pillager")
-    equal(bar.container.unit, "none", "the bar never binds to mouseover")
-    state.units.nameplate5 = state.units.mouseover
-    state.units.mouseover = nil
-    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate5")
-    equal(bar.container.unit, "nameplate5", "it finds the mob on its nameplate")
+    state.units.target = {name = "Defias Pillager", guid = "mob-1", level = 20}
+    castPolymorph(state)
+    equal(state.env.MageToolsForeverPolymorphBar.shown, false, "no focus")
+    equal(state.env.MageToolsForeverPolymorph.attributes.type1, nil, "no click either")
+    state.units.focus = {name = "Chicken", guid = "critter-1", level = 1}
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-2", POLYMORPH)
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-2", POLYMORPH)
+    equal(state.env.MageToolsForeverPolymorphBar.shown, false, "another focus")
+    -- At the mob under the mouse: no bar.
+    local mouse = mage({known = {[POLYMORPH] = true}})
+    mouse.units.mouseover = {name = "Defias Pillager", guid = "mob-7", level = 20}
+    mouse.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-m", POLYMORPH)
+    mouse.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-m", POLYMORPH)
+    equal(mouse.env.MageToolsForeverPolymorphBar.shown, false)
+    -- A same-named focus whose GUID is secret is not proven: no bar.
+    local secret = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(secret)
+    secret.secretGUIDs.focus = true
+    castPolymorph(secret)
+    equal(secret.env.MageToolsForeverPolymorphBar.shown, false)
+    secret.clear()
+    secret.slash("debug_polymorph")
+    contains(table.concat(secret.messages, "|"), "focus=false")
 end)
-test("MTF never calls SetRaidTarget: the moon comes only from /tm in the macro and the click", function()
-    -- In client (0.3.3, BugGrabber): ADDON_ACTION_FORBIDDEN for MTF's SetRaidTarget,
-    -- also out of combat. The mock forbids it the same way.
+test("the bar forgets the sheep when your focus becomes another mob or none", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local bar = state.env.MageToolsForeverPolymorphBar
+    sheepTarget(state)
+    castPolymorph(state)
+    state.units.focus = {name = "Defias Bandit", guid = "mob-2", level = 20}
+    state.emit("PLAYER_FOCUS_CHANGED")
+    equal(bar.shown, false, "another mob")
+    equal(bar.container.unit, "none")
+    local none = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(none)
+    castPolymorph(none)
+    none.units.focus = nil
+    none.emit("PLAYER_FOCUS_CHANGED")
+    equal(none.env.MageToolsForeverPolymorphBar.shown, false, "no focus")
+    -- Focusing the same mob again keeps it.
+    local same = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(same)
+    castPolymorph(same)
+    same.emit("PLAYER_FOCUS_CHANGED")
+    equal(same.env.MageToolsForeverPolymorphBar.shown, true)
+end)
+test("MTF never calls SetRaidTarget: the moon comes only from /tm in \"! Polymorph\"", function()
+    -- In client (0.3.3, and 1.2.1 test builds also from a C_Timer callback on
+    -- "target"): ADDON_ACTION_FORBIDDEN for MTF's SetRaidTarget. The mock
+    -- forbids it the same way, and no runtime file calls it.
     for _, setup in ipairs({
         function() end,
         function(state) state.combat = true end,
@@ -1950,19 +1996,25 @@ test("MTF never calls SetRaidTarget: the moon comes only from /tm in the macro a
     }) do
         local state = mage({known = {[POLYMORPH] = true}})
         sheepTarget(state)
-        state.units.focus = state.units.target
         state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-c", POLYMORPH)
         setup(state)
         state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-c", POLYMORPH)
+        advance(state, 1)
         equal(state.markCount, nil, "SetRaidTarget never called")
         equal(state.env.MageToolsForeverPolymorphBar.shown, true, "the bar shows the sheep")
         state.combat = false
         state.emit("PLAYER_REGEN_ENABLED")
         contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead,exists] !5")
-        contains(state.env.MageToolsForeverPolymorph.attributes.macrotext1, "/tm [@target,harm,nodead,exists] !5")
+        equal(state.env.MageToolsForeverPolymorph.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "the click never marks")
         state.clear()
         state.slash("debug_polymorph")
-        contains(table.concat(state.messages, "|"), "moon=from the macro and the click")
+        contains(table.concat(state.messages, "|"), "moon=from the macro")
+    end
+    for _, file in ipairs({"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}) do
+        local handle = assert(io.open(file, "r"))
+        local text = handle:read("*a")
+        handle:close()
+        equal(text:find("SetRaidTarget%s*%("), nil, file .. " calls SetRaidTarget")
     end
 end)
 test("an older \"! Polymorph\" without the moon is rewritten out of combat", function()
@@ -2012,25 +2064,23 @@ test("the invisible Polymorph click area lets clicks through unless it has a she
     state.emit("PLAYER_REGEN_ENABLED")
     equal(holder.mouse, false, "clicks pass through after combat")
 end)
-test("the mark switch takes the /tm lines out of the macro and the click; the bar's switch hides it", function()
+test("the mark switch takes the /tm line out of the macro; the bar's switch hides it", function()
     local state = mage({known = {[POLYMORPH] = true}})
     local holder = state.env.MageToolsForeverPolymorph
     sheepTarget(state)
     castPolymorph(state)
-    contains(holder.attributes.macrotext1, "/tm ")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "the click never marks")
     state.combat = true
     state.settings.MTF_POLYMORPH_MARK:SetValue(false)
     contains(macroBody(state, "! Polymorph"), "/tm ", "in combat the macro waits")
-    contains(holder.attributes.macrotext1, "/tm ", "and so does the click")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
     equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
         .. "[nocombat,harm,nodead]\n/use [@focus,exists,harm,nodead] Polymorph", "no /tm line")
-    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
-        .. "\n/cleartarget\n/targetexact Defias Pillager\n/use [@target,harm,nodead] Polymorph\n/targetlasttarget")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph")
     state.settings.MTF_POLYMORPH_MARK:SetValue(true)
     contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead,exists] !5", "back at once out of combat")
-    contains(holder.attributes.macrotext1, "/tm [@target,harm,nodead,exists] !5")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "the click never marks")
     equal(state.markCount, nil)
     equal(state.env.MageToolsForeverPolymorphBar.shown, true)
     state.settings.MTF_POLYMORPH_ENABLED:SetValue(false)
@@ -2046,7 +2096,7 @@ test("the bar forgets the mob once the longest Polymorph is over", function()
     advance(state, 2)
     equal(state.env.MageToolsForeverPolymorphBar.shown, false)
 end)
-test("clicking the bar re-sheeps the mob by name and goes back to your target", function()
+test("clicking the bar re-sheeps your focus: no /tm, no targeting, no mouseover", function()
     local state = mage({known = {[POLYMORPH] = true}})
     local holder = state.env.MageToolsForeverPolymorph
     equal(holder.protected, true, "a secure button")
@@ -2054,22 +2104,18 @@ test("clicking the bar re-sheeps the mob by name and goes back to your target", 
     sheepTarget(state)
     castPolymorph(state)
     equal(holder.attributes.type1, "macro")
-    -- The click marks the mob it sheeps with /tm, which the game allows in combat.
-    equal(holder.attributes.macrotext1, "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
-        .. "\n/cleartarget\n/targetexact Defias Pillager\n/tm [@target,harm,nodead,exists] !5\n/use [@target,harm,nodead] Polymorph\n/targetlasttarget")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph")
     -- In combat the click cannot change; it follows after combat.
     state.combat = true
     sheepTarget(state, "Defias Bandit", "mob-2")
+    state.emit("PLAYER_FOCUS_CHANGED")
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Bandit", "cast-28272", 28272)
     state.cast(28272)
-    equal(state.env.MageToolsForeverPolymorphBar.name.text, "Defias Bandit  |cff999999(click: Defias Pillager)|r",
-        "the bar shows in combat, and says whom its click still sheeps")
-    contains(holder.attributes.macrotext1, "Defias Pillager")
+    equal(state.env.MageToolsForeverPolymorphBar.name.text, "Defias Bandit", "the bar shows in combat")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "still your focus")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
-    equal(holder.attributes.macrotext1, "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph: Pig\n/stopmacro [@focus,exists]"
-        .. "\n/cleartarget\n/targetexact Defias Bandit\n/tm [@target,harm,nodead,exists] !5\n/use [@target,harm,nodead] Polymorph: Pig\n/targetlasttarget",
-        "the same Polymorph you cast")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph: Pig", "the same Polymorph you cast")
 end)
 test("a Polymorph begun before combat sets the click before it lands in combat", function()
     local state = mage({known = {[POLYMORPH] = true}})
@@ -2078,9 +2124,7 @@ test("a Polymorph begun before combat sets the click before it lands in combat",
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-118", POLYMORPH)
     state.combat = true
     state.cast(POLYMORPH)
-    equal(holder.attributes.macrotext1, "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph\n/stopmacro [@focus,exists]"
-        .. "\n/cleartarget\n/targetexact Defias Pillager\n/tm [@target,harm,nodead,exists] !5\n/use [@target,harm,nodead] Polymorph\n/targetlasttarget",
-        "ready for the whole fight")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "ready for the whole fight")
     equal(state.env.MageToolsForeverPolymorphBar.shown, true)
 end)
 test("the click is there when the client knows Polymorph by its own spell ID", function()
@@ -2115,11 +2159,16 @@ test("a Polymorph that fails out of combat gives the click back to the sheep tha
     local holder = state.env.MageToolsForeverPolymorph
     sheepTarget(state)
     castPolymorph(state)
-    sheepTarget(state, "Defias Bandit", "mob-2")
-    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Bandit", "cast-fail", POLYMORPH)
-    contains(holder.attributes.macrotext1, "Defias Bandit", "set as the cast starts")
-    state.emit("UNIT_SPELLCAST_INTERRUPTED", "player", "cast-fail", POLYMORPH)
-    contains(holder.attributes.macrotext1, "Defias Pillager", "back to the sheep that is up")
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-fail", 28272)
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph: Pig", "set as the cast starts")
+    state.emit("UNIT_SPELLCAST_INTERRUPTED", "player", "cast-fail", 28272)
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "back to the sheep that is up")
+    -- With no sheep up, a failed cast clears the click.
+    local fresh = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(fresh)
+    fresh.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-fail", POLYMORPH)
+    fresh.emit("UNIT_SPELLCAST_FAILED", "player", "cast-fail", POLYMORPH)
+    equal(fresh.env.MageToolsForeverPolymorph.attributes.type1, nil)
 end)
 test("\"! Polymorph\" focuses the mob and sheeps your focus, once you know Polymorph", function()
     local state = mage()
@@ -2204,9 +2253,9 @@ test("without Dyre's Toolkit 2.0 MTF stays off and says once what to install", f
     for _, options in ipairs({{noToolkit = true}, {oldToolkit = true}}) do
         local state = mage(options)
         equal(state.mtf.available, false)
-        equal(countMessages(state, "needs Dyre's Toolkit 2.0"), 1, "said once")
+        equal(countMessages(state, "needs Dyre's Toolkit 2.3"), 1, "said once")
         for _, message in ipairs(state.messages) do
-            if message:find("Dyre's Toolkit 2.0", 1, true) then
+            if message:find("Dyre's Toolkit 2.3", 1, true) then
                 contains(message, "MTF: ")
                 contains(message, "CurseForge")
                 equal(message:lower():find("github", 1, true), nil, "CurseForge only")
@@ -2382,18 +2431,18 @@ test("Polymorph bar sizes rebuild it out of combat, keeping the sheep and the cl
     castPolymorph(state)
     local click = holder.attributes.macrotext1
     local old = bar.container
-    equal(old.unit, "target")
+    equal(old.unit, "focus")
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(300)
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_BARHEIGHT:SetValue(24)
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_TEXTSCALE:SetValue(150)
     equal(bar.width, 300, "the look follows each step at once")
-    equal(old.unit, "target", "the rebuild waits until the slider rests")
+    equal(old.unit, "focus", "the rebuild waits until the slider rests")
     advance(state, 1)
     equal(old.unit, "none", "the old container lets its mob go")
     equal(old.shown, false)
     local container, button = polymorphSlot(state)
     equal(container ~= old, true, "a new container")
-    equal(container.unit, "target", "bound again to the sheep")
+    equal(container.unit, "focus", "bound again to the sheep")
     equal(holder.width, 300)
     equal(holder.height, 27 + 24 + 6, "name line 18 x 150%")
     equal(bar.width, 300)

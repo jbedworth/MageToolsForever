@@ -368,7 +368,7 @@ local TOOLKIT_FUNCTIONS = {
     "RegisterAddOn", "RegisterSettingsCategory", "IsLocked", "SetLocked", "OpenSettings", "CreateWidget",
     "AddWidgetSettings", "ResetWidgets", "AddSettingsLink",
 }
-local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit 2.0 or later: install or update it from "
+local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit 2.3 or later: install or update it from "
     .. "CurseForge. MTF stays off until then."
 
 -- Dyre's Toolkit with the contract and functions MTF uses, else nil.

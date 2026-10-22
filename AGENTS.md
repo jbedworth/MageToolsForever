@@ -253,31 +253,40 @@ feature set; do not add speculative features or frameworks without agreement.
   AuraContainer slot (`HARMFUL|PLAYER`, `includeSpellIDs` = Classic Polymorph,
   Pig, Turtle, and Cow IDs plus spellbook spells of those names) that the
   engine draws with `SetDurationBar` (RemainingTime), `SetSpellName`, and
-  `SetDurationText`; a dim line behind it shows a broken Polymorph. The mob
-  comes from your own cast events: `UNIT_SPELLCAST_SENT` names the target,
-  matched to a unit for its GUID; on `UNIT_SPELLCAST_SUCCEEDED` the bar binds
-  to the mob through your focus, then target, then its nameplate (never
-  mouseover, which follows the pointer), rebinding on target, focus, and
-  nameplate changes; a mob's nameplate token can change as it leaves plate
-  range and comes back, its GUID does not. It forgets the mob when it dies
-  (`UNIT_HEALTH` through any unit showing it, by GUID), after the longest
-  Polymorph (50 s) plus 5 s, or on the next Polymorph. A cast on the mob
-  under the mouse counts (mouseover checks the cast); the
-  bar binds once the mob is your focus, target, or a nameplate. MTF never reads the aura; a resist cannot be seen (the
-  combat log is closed), so a successful cast counts as landed.
+  `SetDurationText`; a dim line behind it shows a broken Polymorph. The bar
+  tracks your focus only (John, 1.2.1: "Let the macro set focus and mark the
+  sheeped mob. Have the sheep-tracker box depend on it being the 'focus' mob,
+  and just resheep it."). At `UNIT_SPELLCAST_SENT`, MTF locks the GUID only
+  when the cast is at your focus: the focus's name is the cast's, its GUID
+  is readable, and `UnitCanAttack` is readable and true (`LockFocusGUID`).
+  Never a match by name on another unit (1.2.1 in client: the moon went to a
+  far neutral Chicken and same-named mobs could be confused). On
+  `UNIT_SPELLCAST_SUCCEEDED` a locked cast binds the container to "focus".
+  It forgets the mob when it dies (`UNIT_HEALTH`, by GUID), when
+  PLAYER_FOCUS_CHANGED shows no focus or a readable GUID of another mob (a
+  secret focus GUID stays bound), after the longest Polymorph (50 s) plus
+  5 s, or on the next Polymorph at your focus. A cast at a mob that is not
+  your focus (the plain spell button on your target, mouseover) drives
+  nothing. MTF never reads the aura; a resist cannot be seen (the combat log
+  is closed), so a successful cast counts as landed.
 - On cast start (`UNIT_SPELLCAST_SENT`, author-approved), the group message
   "Sheeping %T; you spank it, you tank it" (the author's classic line, no
   credit), raid or party only, at most once per 3 s; switch and text on the
   Announce page.
-- The moon (index 5, author-approved) comes only from secure `/tm` (author:
-  "put the /tm [@focus,harm,nodead,exists] !5 back into the macro";
-  Blizzard's /tm runs untainted from the key press, pinned
-  SlashCommands.lua): "! Polymorph" and the bar's click mark at the press,
-  also in combat; "!" keeps a second press from toggling it off. The
-  "Mark the sheep with the moon" switch (on by default) decides whether the
-  macro and the click have their /tm lines; a change rebuilds both out of
-  combat. A plain spell-button Polymorph gets no moon. MTF never calls
-  `SetRaidTarget` (coordinator, 0.3.3): in John's client, with MTF's
+- The moon (index 5, author-approved) comes only from secure `/tm` in
+  "! Polymorph" (John, 1.2.1: "What does work, 100% of the time, is the
+  marking the sheep with the macro"; Blizzard's /tm runs untainted from the
+  key press, pinned SlashCommands.lua), also in combat; "!" keeps a second
+  press from toggling it off. The bar's click never marks (John: "leave
+  target marking out of the resheep-on-click"). The "Mark the sheep with the
+  moon" switch (on by default) decides only whether the macro has its /tm
+  line; a change rebuilds it out of combat. A plain spell-button Polymorph
+  gets no moon. MTF never calls `SetRaidTarget` (family rule): 1.2.1 test
+  builds called it from a C_Timer.After(0) callback, on "target" only and
+  proven by GUID, and John's BugGrabber still showed ADDON_ACTION_FORBIDDEN
+  for it (`/mtf debug_polymorph`: "ADDON_ACTION_FORBIDDEN for target from
+  the timer"), while TankHelper's marks work; the rule is unknown, and John
+  ended the experiment. Earlier (coordinator, 0.3.3): in John's client, with MTF's
   out-of-combat guard in place, BugGrabber showed "4x
   [ADDON_ACTION_FORBIDDEN] AddOn 'MageToolsForever' tried to call the
   protected function 'SetRaidTarget()'" (Polymorph.lua Mark <-
@@ -286,34 +295,31 @@ feature set; do not add speculative features or frameworks without agreement.
   players saw the "blocked from an action" popup. The exact rule is unknown
   (TankHelper's direct call on an unmarked TARGET from a C_Timer callback
   works for John); do not work around it. The mock forbids `SetRaidTarget`
-  always, and a test checks MTF never calls it.
+  always, and a test checks MTF never calls it and no runtime file contains
+  a `SetRaidTarget(` call.
 - "! Polymorph" (author-approved, after the author's own, `polymorph.macro`):
   once you know Polymorph, `#showtooltip`, `/focus [@mouseover,harm,nodead]
   [nocombat,harm,nodead]`, `/tm [@focus,harm,nodead,exists] !5` (author's
   line, exactly), `/use [@focus,exists,harm,nodead] Polymorph`. The "!" keeps a
   second press from toggling the moon off. A body change is written out of
   combat (`WriteMacro` edits a macro whose body differs), so older copies
-  update.
-  The bar finds the sheep through your focus, then target, then its nameplate.
-- Click to re-sheep (author-approved, "if we can"; on your focus first since
-  the author's focus workflow: `/use [@focus,exists,harm,nodead] <spell>`,
-  `/stopmacro [@focus,exists]`, then by name): the bar sits on a secure
-  button (`MageToolsForeverPolymorph`, the drag anchor); the visible bar is an
-  ordinary frame anchored to it, so it shows and hides in combat. The macro is
-  `/tm [@focus,harm,nodead,exists] !5` before the focus cast, then
-  `/cleartarget`, `/targetexact <mob>`, `/tm [@target,harm,nodead,exists] !5`,
-  `/use [@target,harm,nodead] <the Polymorph you cast>`, `/targetlasttarget`: a missing mob leaves no
-  target, so nothing else is sheeped. Attributes change only out of combat;
-  a Polymorph begun in combat on another mob updates the click when combat
-  ends, and until then the bar names the mob its click still sheeps. A cast
-  that fails out of combat gives the click back to the sheep that is up.
-  The holder (and the bar with it) is scaled only there too: in client, a
-  recast from the bar that landed in combat rescaled the secure holder, and
-  every click after failed. Tests make secure frames refuse SetScale,
-  SetPoint, ClearAllPoints, Show, Hide, and SetAttribute in combat, as the
-  client does. `/targetexact` picks the nearest mob of that name, so
-  same-named mobs can be confused. Verify `/targetlasttarget` after
-  `/cleartarget` in client.
+  update. The macro text is John's, exactly (1.2.1). Known gap: the
+  mouseover clause is true on an attackable neutral critter, so the mouse on
+  a Chicken focuses and marks it; macro conditions cannot exclude critters.
+- Click to re-sheep (author-approved; John, 1.2.1: "no /tm, no targeting, no
+  mouseover"): the bar sits on a secure button (`MageToolsForeverPolymorph`,
+  the drag anchor); the visible bar is an ordinary frame anchored to it, so
+  it shows and hides in combat. The macro is `/use [@focus,exists,harm,nodead]
+  <the Polymorph you cast>`, set while a sheep is up. Attributes change only
+  out of combat: the click is set as a cast at your focus starts (a pull's
+  Polymorph starts before combat); another Polymorph spell begun in combat
+  updates it when combat ends. A cast that fails out of combat gives the
+  click back to the sheep that is up, or clears it. The holder (and the bar
+  with it) is scaled only out of combat too: in client, a recast from the
+  bar that landed in combat rescaled the secure holder, and every click
+  after failed. Tests make secure frames refuse SetScale, SetPoint,
+  ClearAllPoints, Show, Hide, and SetAttribute in combat, as the client
+  does.
 
 ### Planned (pass 2, agreed)
 
