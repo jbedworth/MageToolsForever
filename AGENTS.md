@@ -303,9 +303,9 @@ feature set; do not add speculative features or frameworks without agreement.
   line, exactly), `/use [@focus,exists,harm,nodead] Polymorph`. The "!" keeps a
   second press from toggling the moon off. A body change is written out of
   combat (`WriteMacro` edits a macro whose body differs), so older copies
-  update. The macro text is John's, exactly (1.2.1). Known gap: the
-  mouseover clause is true on an attackable neutral critter, so the mouse on
-  a Chicken focuses and marks it; macro conditions cannot exclude critters.
+  update. The macro text is John's, exactly (1.2.1). Its mouseover clause
+  also focuses and marks an attackable critter: by design (John: "people are
+  aware that critters are attackable"); not called out to players.
 - Click to re-sheep (author-approved; John, 1.2.1: "no /tm, no targeting, no
   mouseover"): the bar sits on a secure button (`MageToolsForeverPolymorph`,
   the drag anchor); the visible bar is an ordinary frame anchored to it, so

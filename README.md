@@ -113,9 +113,7 @@ sheeps it.
 - **"! Polymorph"** in your character macros (once you know Polymorph) focuses
   the hostile mob under your mouse (or your target, out of combat) and sheeps
   your focus. The bar follows your focus, so it keeps the timer while you fight
-  something else. The game counts a neutral critter (a Chicken) as
-  attackable, so with the mouse on a critter it focuses and marks the
-  critter.
+  something else.
 - **Click the bar** to sheep your focus again, with the same Polymorph you
   cast. The click does not mark or change your target. The game lets the
   click change only out of combat, so after you sheep with another Polymorph

@@ -102,9 +102,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] The bar is your focus only (1.2.1): sheep with "! Polymorph", tab to
       another mob: the bar keeps the timer. Focus another mob or clear your
       focus: the bar goes. Cast the plain spell at your target with no focus:
-      no bar (`debug_polymorph` says `focus=false`). With the mouse on a
-      Chicken and "! Polymorph": the Chicken is focused and marked (known
-      gap), and no other mob takes the bar.
+      no bar (`debug_polymorph` says `focus=false`).
 - [ ] "Mark the sheep with the moon" off: after combat (or at once out of
       combat) "! Polymorph" has no `/tm` line, and no moon goes on; on again
       puts the line back. The bar's click never has a `/tm` line.
