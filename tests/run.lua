@@ -25,7 +25,7 @@ local function contains(actual, fragment, context)
 end
 
 local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua"}
-local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua", "Chimes.lua", "Options.lua"}
+local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}
 local SPELLS = {
     [5504] = "Conjure Water", [5505] = "Conjure Water", [5506] = "Conjure Water", [6127] = "Conjure Water",
     [587] = "Conjure Food", [597] = "Conjure Food", [990] = "Conjure Food", [6129] = "Conjure Food",
@@ -94,7 +94,10 @@ local function fixture(options)
         return state.toc[field] or ""
     end}
     env.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip)
-        return {button = true, name = name, buttonText = buttonText, onClick = onClick, tooltip = tooltip}
+        local object = {button = true, name = name, buttonText = buttonText, onClick = onClick, tooltip = tooltip,
+            modifyPredicates = {}}
+        function object:AddModifyPredicate(predicate) self.modifyPredicates[#self.modifyPredicates + 1] = predicate end
+        return object
     end
     env.CreateSettingsListSectionHeaderInitializer = function(name, tooltip)
         return {heading = name, tooltip = tooltip}
@@ -158,6 +161,17 @@ local function fixture(options)
         if name == "CustomAuraContainerTemplate" and not options.noAuraContainer then return {} end
     end}
     env.C_AddOns.IsAddOnLoaded = function(name) return state.loadedAddOns and state.loadedAddOns[name] end
+    -- As the client: reason "MISSING" when an AddOn is not installed, and
+    -- "DISABLED" when it is installed but turned off (options.disabledAddOns).
+    env.C_AddOns.GetAddOnInfo = function(name)
+        if state.loadedAddOns and state.loadedAddOns[name] then
+            return name, name, "", true, nil
+        end
+        if state.disabledAddOns and state.disabledAddOns[name] then
+            return name, name, "", false, "DISABLED"
+        end
+        return name, nil, nil, false, "MISSING"
+    end
     env.C_AddOns.LoadAddOn = function(name)
         state.loadedAddOns = state.loadedAddOns or {}
         state.loadedAddOns[name] = true
@@ -300,6 +314,7 @@ local function fixture(options)
     -- Speech plays only with state.voice. options.noSounds leaves it out, and
     -- options.oldSounds offers an older contract.
     state.loadedAddOns = options.loadedAddOns
+    state.disabledAddOns = options.disabledAddOns
     if not options.noSounds then
         local order = {
             {key = "fadingslow", label = "Dyre's Picks: Fading slow disappear", file = "FadingSlowDisappear.mp3"},
@@ -940,20 +955,6 @@ local function fixture(options)
     end
 
     for _, name in ipairs(options.remove or {}) do env[name] = nil end
-    -- Other AddOns shipping Shield.lua: {addon, version, before}; each gets its own namespace.
-    state.copies = {}
-    local function loadShieldCopy(spec)
-        local source = assert(io.open("Shield.lua")):read("*a")
-        source = source:gsub("local VERSION = %d+", "local VERSION = " .. spec.version)
-        local chunk = assert(loadstring(source, "=" .. spec.addon .. "/Shield.lua"))
-        setfenv(chunk, env)
-        local namespace = {}
-        chunk(spec.addon, namespace)
-        state.copies[spec.addon] = namespace
-    end
-    for _, spec in ipairs(options.shieldCopies or {}) do
-        if spec.before then loadShieldCopy(spec) end
-    end
     -- Dyre's Toolkit, its real files (a copy in tests/toolkit, checked against
     -- ../DyresToolkit when that folder is there): MTF requires it. Not the
     -- minimap, which needs the embedded libraries. options.noToolkit leaves it
@@ -983,12 +984,16 @@ local function fixture(options)
         setfenv(chunk, env)
         chunk("MageToolsForever", state.mtf)
     end
-    for _, spec in ipairs(options.shieldCopies or {}) do
-        if not spec.before then loadShieldCopy(spec) end
-    end
     env.MageToolsForeverDB = options.db
     state.env = env
     state.emit("ADDON_LOADED", "DyresToolkit")
+    state.openedCompanion = {}
+    for _, addon in ipairs(options.companions or {}) do
+        state.loadedAddOns = state.loadedAddOns or {}
+        state.loadedAddOns[addon] = true
+        env.DyresToolkit.RegisterAddOn({addon = addon, title = addon,
+            openSettings = function() state.openedCompanion[#state.openedCompanion + 1] = addon end})
+    end
     state.emit("ADDON_LOADED", "MageToolsForever")
     state.emit("PLAYER_LOGIN")
 
@@ -1051,7 +1056,10 @@ test("commands are one word; extra words and unknown commands show usage", funct
     equal(parse(""), "")
     equal(parse("  OPTIONS "), "options")
     equal(parse("conjure"), "conjure")
-    equal(parse("debug_chimes"), "debug_chimes")
+    equal(parse("debug_portals"), "debug_portals")
+    equal(parse("debug_shield"), nil, "the shield moved to Dyre's Shields Up")
+    equal(parse("debug_chimes"), nil)
+    equal(parse("debug_reminders"), nil)
     local command, usage = parse("conjure 10")
     equal(command, nil)
     contains(usage, "/mtf debug_conjure")
@@ -1105,12 +1113,6 @@ test("diagnostics still run when MTF is unavailable", function()
     state.clear()
     state.slash("debug_conjure")
     contains(state.messages[1], "debug_conjure water spell=5504 name=Conjure Water(Rank 1)")
-    state.clear()
-    state.slash("debug_shield")
-    contains(state.messages[1], "debug_shield UnitGetTotalAbsorbs=function")
-    state.clear()
-    state.slash("debug_chimes")
-    contains(state.messages[1], "debug_chimes blink name=Blink")
 end)
 test("a missing client API disables MTF with one message naming it", function()
     local state = fixture({remove = {"InitiateTrade"}})
@@ -1119,10 +1121,9 @@ test("a missing client API disables MTF with one message naming it", function()
     equal(state.categories["Mage Tools Forever"], nil, "no settings page")
 end)
 test("a mixed install of old and new files is reported at login", function()
-    local state = fixture({files = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua", "Shield.lua",
-        "Options.lua"}})
+    local state = fixture({files = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Options.lua"}})
     equal(state.mtf.available, false)
-    contains(state.last(), "missing InitializeChimes")
+    contains(state.last(), "Reinstall every Mage Tools Forever file")
 end)
 
 -- Saved settings ---------------------------------------------------------------
@@ -1134,34 +1135,13 @@ test("saved settings get defaults and are repaired on load", function()
     equal(db.locked, true, "every frame locked by default")
     equal(db.conjure.macros, true)
     equal(db.conjure.shareSize, 10)
-    equal(db.shield.enabled, true)
-    equal(db.shield.locked, true, "locked, so the ring never takes the mouse")
-    equal(db.shield.number, true)
-    equal(db.shield.breakSound, false)
-    equal(db.chimes.enabled, true)
-    equal(db.chimes.sounds.blink, "talent", "Talent ready for every spell")
-    equal(db.chimes.sounds.frostnova, "talent")
-    equal(db.chimes.sounds.evocation, "talent")
-    equal(db.chimes.lead, 0.5)
-    equal(db.chimes.spells.blink, true)
-    equal(db.chimes.spells.coldsnap, false)
-    local repaired = fixture({db = {conjure = {shareSize = 99, position = {point = 1}}, shield = "broken",
-        chimes = {sound = "talent", sounds = {blink = "kazoo", counterspell = "alarm", frostnova = "popclick",
-            iceblock = "effectmagical"}, lead = 0.7,
-            spells = {blink = false}, learned = {blink = 14.9, frostnova = 5000}}}})
+    equal(db.shield, nil, "no shield settings of MTF's own")
+    equal(db.chimes, nil)
+    equal(db.reminders, nil)
+    local repaired = fixture({db = {conjure = {shareSize = 99, position = {point = 1}}}})
     db = repaired.mtf.db
     equal(db.conjure.shareSize, 20)
     equal(db.conjure.position, nil)
-    equal(db.shield.enabled, true)
-    equal(db.chimes.sounds.blink, "talent", "an unknown sound gives way to the default")
-    equal(db.chimes.sounds.counterspell, "alarm", "a sound you chose stays")
-    equal(db.chimes.sounds.frostnova, "impactspopclick", "the old Pop click key carries over")
-    equal(db.chimes.sounds.iceblock, "magical", "an old effect key is mapped by Dyre's Sounds")
-    equal(db.chimes.sounds.evocation, "talent", "the one sound chosen before carries over")
-    equal(db.chimes.lead, 0.5)
-    equal(db.chimes.spells.blink, false)
-    equal(db.chimes.learned.blink, 14.9)
-    equal(db.chimes.learned.frostnova, nil, "an implausible cooldown is dropped")
     equal(fixture({db = {conjure = {shareSize = "lots"}}}).mtf.db.conjure.shareSize, 10)
 end)
 
@@ -1656,29 +1636,61 @@ test("/mtf conjure reports what you carry and the share size", function()
     equal(state.messages[2], "MTF: Food: none.")
     equal(state.messages[4], "MTF: Share stack size: 10.")
 end)
-test("the conjure bar and the shield display each have a size setting", function()
+test("the conjure bar has a size setting, applied out of combat", function()
     local state = mage()
-    local bar, ring = state.env.MageToolsForeverConjure, state.mtf.ShieldDisplay.frame
+    local bar = state.env.MageToolsForeverConjure
     equal(state.mtf.db.conjure.scale, 100)
-    equal(state.mtf.db.shield.scale, 100)
-    state.settings.MTF_SHIELD_SCALE:SetValue(60)
-    equal(ring.scale, 0.6)
     state.combat = true
     state.settings.DYRE_MAGETOOLSFOREVER_CONJURE_SCALE:SetValue(60)
     equal(bar.scale or 1, 1, "the bar holds secure buttons: not in combat")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
     equal(bar.scale, 0.6)
-    state.settings.MTF_SHIELD_SCALE:SetValue(999)
-    equal(state.mtf.db.shield.scale, 150, "at most 150%")
     state.settings.DYRE_MAGETOOLSFOREVER_CONJURE_SCALE:SetValue(62)
     equal(state.mtf.db.conjure.scale, 60, "in steps of 5")
-    local saved = mage({db = {conjure = {scale = "huge"}, shield = {scale = 10}}})
+    local saved = mage({db = {conjure = {scale = "huge"}}})
     equal(saved.mtf.db.conjure.scale, 100)
-    equal(saved.mtf.db.shield.scale, 50)
+end)
+test("MTF 1.1's shield, reminder, and chime settings stay exactly as they were", function()
+    -- Dyre's Shields Up and Dyre's Buff Reminders copy them once per character,
+    -- also when a player installs them later, so MTF never changes or drops them.
+    local function old()
+        return {
+            locked = true,
+            shield = {enabled = false, number = false, breakSound = true, breakSoundKey = "magical", scale = 80,
+                textScale = 120, iconScale = 90, locked = true,
+                position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 400, y = 300}},
+            reminders = {enabled = true, group = false, spells = {intellect = true, armor = false, dampen = true},
+                last = {armor = "Mage Armor"},
+                icons = {intellect = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 10, y = 20},
+                    scale = 150}}},
+            chimes = {enabled = true, lead = 1, spells = {blink = true, coldsnap = true},
+                sounds = {blink = "shortbellstrike"}, learned = {blink = 14}, sound = "kazoo", unknown = "kept"},
+        }
+    end
+    local state = mage({db = old()})
+    local expected = old()
+    local function same(actual, wanted, path)
+        equal(type(actual), type(wanted), path)
+        if type(wanted) == "table" then
+            for key, value in pairs(wanted) do same(actual[key], value, path .. "." .. key) end
+            for key in pairs(actual) do equal(wanted[key] ~= nil, true, path .. "." .. key .. " added") end
+        else
+            equal(actual, wanted, path)
+        end
+    end
+    for _, key in ipairs({"shield", "reminders", "chimes"}) do
+        same(state.mtf.db[key], expected[key], key)
+    end
+    state.slash("unlock")
+    state.slash("lock")
+    state.slash("reset")
+    for _, key in ipairs({"shield", "reminders", "chimes"}) do
+        same(state.mtf.db[key], expected[key], key .. " after unlock, lock, and reset")
+    end
 end)
 test("one lock for every frame; older saved per-frame locks give way to it", function()
-    local state = mage({db = {conjure = {locked = false}, shield = {locked = true}}})
+    local state = mage({db = {conjure = {locked = false}}})
     equal(state.mtf.db.locked, true)
     equal(state.settings.MTF_CONJURE_LOCKED, nil, "no per-frame switches")
     equal(state.settings.MTF_SHIELD_LOCKED, nil)
@@ -1698,563 +1710,12 @@ test("/mtf reset moves the conjure bar back, after combat if needed", function()
     equal(bar.points[1][1], "CENTER")
 end)
 
--- Shield display --------------------------------------------------------------------
-
-local ICE_BARRIER, MANA_SHIELD = 11426, 1463
-
-test("the shield ring shows your live absorb while a shield is up, hidden otherwise", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    equal(ring.shown, false)
-    equal(ring.mouse, false, "never blocks world clicks")
-    state.cast(ICE_BARRIER)
-    equal(ring.shown, true)
-    equal(ring.bar.value, state.absorb, "the secret absorb, passed on unread")
-    equal(ring.bar.maxValue, state.absorb, "measured against the shield's size as it landed")
-    equal(ring.text.text.abbreviated, state.absorb)
-    equal(ring.visible.alpha, state.absorb, "the ring's opacity is the absorb, so it drops at zero")
-    equal(ring.bar.barColor[3], 1, "Ice Barrier blue")
-    state.now = state.now + 61
-    state.runTimers()
-    equal(ring.shown, false, "hidden when the shield ends")
-end)
-test("out of combat a broken shield hides at once; in combat buffs are not read", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    state.cast(MANA_SHIELD)
-    state.combat = true
-    state.emit("UNIT_AURA", "player")
-    equal(ring.shown, true, "in combat MTF cannot see the buff")
-    state.combat = false
-    state.emit("UNIT_AURA", "player")
-    equal(ring.shown, false)
-end)
-test("Mana Shield after a ward leaves the outer crescent in the ward's color", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    state.cast(543)
-    equal(ring.bar.barColor[1], 1, "Fire Ward orange")
-    state.cast(MANA_SHIELD)
-    equal(ring.bar.barColor[1], 1, "still orange: Mana Shield has the inner crescent")
-    equal(ring.bar.barColor[3], 0.15)
-    local alone = mage()
-    alone.cast(MANA_SHIELD)
-    equal(alone.mtf.ShieldDisplay.frame.shown, true, "Mana Shield alone keeps the display up")
-end)
-test("a shield still up after a reload shows again", function()
-    local state = mage()
-    state.buffs = {["Ice Barrier"] = {name = "Ice Barrier", expirationTime = state.now + 40}}
-    state.emit("PLAYER_ENTERING_WORLD")
-    equal(state.mtf.ShieldDisplay.frame.shown, true)
-end)
-test("unlocked, the ring shows a sample and can be dragged", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    state.settings.DYRE_UNLOCKED:SetValue(true)
-    equal(ring.shown, true)
-    equal(ring.mouse, true)
-    equal(ring.bar.value, 1, "the sample shows full")
-    equal(ring.text.text, "drag me")
-    equal(ring.sample.shown, true, "a sample inner crescent and icons too")
-    contains(ring.sample.children[1].texture, "ShieldArcInner")
-    equal(ring.visible.alpha, 1, "the sample shows in full")
-    ring.scripts.OnDragStart(ring)
-    equal(ring.moving, true)
-    ring:SetPoint("LEFT", state.env.UIParent, "LEFT", 10, 0)
-    ring.scripts.OnDragStop(ring)
-    equal(state.mtf.db.shield.position.point, "CENTER", "dropped and saved through Dyre's Toolkit")
-    equal(state.mtf.db.shield.position.relativePoint, "BOTTOMLEFT")
-    state.settings.DYRE_UNLOCKED:SetValue(false)
-    equal(ring.sample.shown, false)
-    equal(ring.shown, false)
-    equal(ring.mouse, false)
-end)
-test("/mtf unlock and /mtf lock move the shield display and the conjure bar together", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    state.slash("unlock")
-    equal(state.mtf.db.shield.locked, false)
-    equal(state.env.MageToolsForeverConjure.dyre.mover.shown, true, "the bar is outlined too")
-    equal(state.settings.DYRE_UNLOCKED:GetValue(), true, "the toolkit's switch follows")
-    equal(ring.shown, true, "a sample to drag")
-    equal(ring.mouse, true)
-    equal(ring.mover.shown, true, "outlined, with a hint")
-    contains(ring.mover.hint.text, "/mtf lock when done")
-    contains(state.last(), "drag them where you want")
-    state.slash("lock")
-    equal(state.mtf.db.shield.locked, true)
-    equal(state.env.MageToolsForeverConjure.dyre.mover.shown, false)
-    equal(state.settings.DYRE_UNLOCKED:GetValue(), false)
-    equal(ring.shown, false)
-    equal(ring.mouse, false)
-    equal(ring.mover.shown, false)
-end)
-test("the absorb number can be hidden, and the break sound turned on", function()
-    local state = mage()
-    state.settings.MTF_SHIELD_NUMBER:SetValue(false)
-    state.cast(ICE_BARRIER)
-    equal(state.mtf.ShieldDisplay.frame.text.text, "")
-    equal(state.auraSoundCount, nil)
-    state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(true)
-    equal(state.auraSoundCount, 33, "every rank of the six shields a Mage can get")
-    equal(state.auraSounds[1].trigger, 2, "on removal")
-    equal(state.auraSounds[1].info.spellID, ICE_BARRIER)
-    equal(state.auraSounds[1].info.soundFileName,
-        "Interface\\AddOns\\DyresSounds\\Sounds\\FadingSlowDisappear.mp3", "Dyre's Sounds' file: MTF ships none")
-    equal(state.sounds[#state.sounds].key, "fadingslow", "turning it on plays it once")
-    state.settings.MTF_SHIELD_BREAK_SOUND_CHOICE:SetValue("cartoonvanish")
-    equal(state.sounds[#state.sounds].key, "cartoonvanish", "choosing plays it")
-    equal(state.mtf.db.shield.breakSoundKey, "cartoonvanish")
-    local live
-    for _, sound in pairs(state.auraSounds) do live = sound end
-    equal(live.info.soundFileName, "Interface\\AddOns\\DyresSounds\\Sounds\\CartoonVanish.mp3",
-        "registered again with the new sound")
-    state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(false)
-    local left = 0
-    for _ in pairs(state.auraSounds) do left = left + 1 end
-    equal(left, 0)
-end)
-test("the break sound keeps the player's choice, and without Dyre's Sounds MTF says once what to install", function()
-    equal(mage({db = {shield = {breakSoundKey = "cartoonvanish"}}}).mtf.db.shield.breakSoundKey, "cartoonvanish",
-        "a choice saved by 0.2 is a Dyre's Sounds key")
-    local state = mage({noSounds = true, db = {shield = {breakSoundKey = "magical"}}})
-    equal(state.mtf.db.shield.breakSoundKey, "magical", "a missing library never resets a choice")
-    local page = state.categories.Shield
-    local dropdown
-    for _, initializer in ipairs(page.initializers) do
-        if initializer.setting.variable == "MTF_SHIELD_BREAK_SOUND_CHOICE" then dropdown = initializer end
-    end
-    equal(#dropdown.choices(), 0, "nothing to choose from")
-    equal(dropdown.soundMenu, nil)
-    state.settings.MTF_SHIELD_BREAK_SOUND:SetValue(true)
-    equal(state.auraSoundCount, nil, "no sound to register")
-    state.settings.MTF_SHIELD_NUMBER:SetValue(false)
-    local count, said = 0, nil
-    for _, message in ipairs(state.messages) do
-        if message:find("Install Dyre's Sounds", 1, true) then count, said = count + 1, message end
-    end
-    equal(count, 1, "one line for all of MTF's sounds, the shield sound included")
-    contains(said, "the chimes and the shield sound")
-end)
-test("an absorb MTF cannot name, from another player or a trinket, shows for 30 seconds", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    state.emit("UNIT_ABSORB_AMOUNT_CHANGED", "player")
-    equal(ring.shown, true)
-    equal(ring.bar.barColor[2], 0.85, "the neutral color")
-    state.now = state.now + 31
-    state.runTimers()
-    equal(ring.shown, false)
-end)
-test("a tiny absorb stays hidden: a gate bar ending at the minimum clips the ring", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    state.emit("UNIT_ABSORB_AMOUNT_CHANGED", "player")
-    equal(ring.gate.value, state.absorb, "the secret absorb, passed on unread")
-    equal(ring.gate.minValue, 74, "one point wide, so the fill is empty or full")
-    equal(ring.gate.maxValue, 75, "5% of 1500 health beats 25 points")
-    equal(ring.gated.clips, true)
-    equal(ring.gated.points[2][2], ring.gate:GetStatusBarTexture(), "the clip ends where the gate's fill ends")
-    equal(ring.bar.parent, ring.gated)
-    equal(ring.gated.parent, ring.visible, "the opacity still follows the absorb")
-    state.slash("unlock")
-    equal(ring.gate.value, 1, "unlocked, the gate is open for the sample")
-end)
-test("a known shield going is not mistaken for another absorb", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    state.cast(ICE_BARRIER)
-    state.now = state.now + 10
-    state.emit("UNIT_AURA", "player")
-    equal(ring.shown, false, "broke early, seen out of combat")
-    state.emit("UNIT_ABSORB_AMOUNT_CHANGED", "player")
-    equal(ring.shown, false)
-end)
-test("a Priest's Power Word: Shield on you shows in its own color", function()
-    local state = mage()
-    state.env.C_Spell.GetSpellName = function(id)
-        if id == 17 then return "Power Word: Shield" end
-        return SPELLS[id]
-    end
-    state.buffs = {["Power Word: Shield"] = {name = "Power Word: Shield", expirationTime = state.now + 25}}
-    state.emit("UNIT_AURA", "player")
-    local ring = state.mtf.ShieldDisplay.frame
-    equal(ring.shown, true)
-    equal(ring.bar.barColor[3], 0.85, "Power Word: Shield white")
-end)
-test("several AddOns shipping the shield display show only one ring", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 1}}})
-    equal(state.mtf.ShieldDisplay.IsOwner(), true, "first registered wins a tie")
-    local other = state.copies.ShieldForever.ShieldDisplay
-    local said = {}
-    other.Initialize({settings = function() return other.Sanitize({}) end,
-        report = function(message) said[#said + 1] = message end})
-    equal(other.frame, nil, "the other copy draws nothing")
-    contains(said[1], "shown by MageToolsForever")
-    state.clear()
-    state.slash("debug_shield")
-    contains(table.concat(state.messages, "|"), "owner=MageToolsForever copies=MageToolsForever v11 (running), ShieldForever v1 (running)")
-    contains(table.concat(state.messages, "|"), "minimumAbsorb=75")
-    local text = table.concat(state.messages, "|")
-    contains(text, "the absorb total shows above your character")
-    equal(text:find("failed", 1, true), nil, "every debug step ran")
-end)
-test("with Dyre's Shields Up loaded, MTF draws no shield and greys out its shield settings", function()
-    local state = mage({loadedAddOns = {DyresShieldsUp = true}, db = {shield = {scale = 80, breakSound = true}}})
-    equal(state.mtf.ShieldDisplay.frame, nil, "no ring of its own: Dyre's Shields Up draws it")
-    equal(state.mtf.ShieldDisplay.IsOwner(), false, "not even a candidate")
-    state.cast(ICE_BARRIER)
-    state.slash("unlock")
-    state.slash("lock")
-    for _, message in ipairs(state.messages) do
-        equal(message:find("shown by", 1, true), nil, "no election message")
-    end
-    equal(state.mtf.db.shield.scale, 80, "its saved shield settings stay as they are")
-    equal(state.mtf.db.shield.breakSound, true)
-    local seen = 0
-    for _, page in pairs(state.categories) do
-        for _, initializer in ipairs(page.initializers) do
-            local variable = initializer.setting and initializer.setting.variable or ""
-            if variable:find("^MTF_SHIELD_") then
-                seen = seen + 1
-                equal(initializer.modifyPredicates[1](), false, variable .. " is greyed out")
-                contains(initializer.tooltip, "Dyre's Shields Up shows the shield display now")
-            end
-        end
-    end
-    equal(seen, 5, "the switch, number, sound, its choice, and the size")
-    equal(state.categories.Shield, nil, "the list name says who runs it")
-    local page = state.categories["Shield (Dyre's Shields Up)"]
-    equal(page.headings[1].heading, "Shields are now managed by Dyre's Shields Up")
-    contains(page.headings[1].tooltip, "/dsu")
-    equal(#mage().categories.Shield.headings, 0, "no heading without Dyre's Shields Up")
-end)
-test("a newer shield display in another AddOn takes over once its AddOn runs it", function()
-    local state = mage({shieldCopies = {{addon = "ShieldForever", version = 12}}})
-    equal(state.mtf.ShieldDisplay.frame ~= nil, true, "a copy whose AddOn never runs it does not count")
-    local function shieldGreyed(want)
-        local seen = 0
-        for _, page in pairs(state.categories) do
-            for _, initializer in ipairs(page.initializers) do
-                local variable = initializer.setting and initializer.setting.variable or ""
-                if variable:find("^MTF_SHIELD_") then
-                    seen = seen + 1
-                    equal(initializer.modifyPredicates[1](), not want, variable .. (want and " is greyed out" or " is not greyed"))
-                end
-            end
-        end
-        equal(seen, 5, "the switch, number, sound, its choice, and the size")
-    end
-    shieldGreyed(false)
-    local other = state.copies.ShieldForever.ShieldDisplay
-    other.Initialize({settings = function() return other.Sanitize({}) end, report = function() end})
-    equal(state.mtf.ShieldDisplay.IsOwner(), false)
-    shieldGreyed(true)
-    equal(state.mtf.ShieldDisplay.frame, nil, "MTF stood down")
-    local found = false
-    for _, message in ipairs(state.messages) do
-        if message:find("The shield display is shown by ShieldForever", 1, true) then found = true end
-    end
-    equal(found, true)
-    state.cast(ICE_BARRIER)
-    state.slash("reset")
-end)
-test("an icon per shield, shown by Blizzard's aura display, each in its own spot", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    local container = ring.icons
-    equal(container.unit, "player")
-    equal(#container.slots, 6, "one slot per shield a Mage can get, Blessing of Protection included")
-    equal(container.slots[1].key, "icebarrier")
-    equal(container.slots[1].filter, "HELPFUL")
-    equal(container.slots[1].ids[13033], true, "a set of every Ice Barrier rank, as the container requires")
-    equal(container.slots[1].ids[4], nil, "not a list")
-    -- The engine's shown state is secret, so each icon is placed once, in its spot.
-    local barrier, ward, frost = ring.iconButtons.icebarrier, ring.iconButtons.fireward, ring.iconButtons.frostward
-    equal(barrier.points[1][4], -61.5, "first of six spots (123 px wide), centered under the number")
-    equal(ward.points[1][4] - barrier.points[1][4], 42, "Mana Shield's spot between them")
-    equal(frost.points[1][4] - ward.points[1][4], 21)
-    equal(ring.iconButtons.powerwordshield.points[1][4] - frost.points[1][4], 21,
-        "Power Word: Shield in the last spot")
-    equal(ring.iconButtons.sacrifice, nil, "no Warlock shields on a Mage")
-end)
-test("Mana Shield drains with time in the inner crescent; absorb shields stay in the outer one", function()
-    local state = mage()
-    local ring = state.mtf.ShieldDisplay.frame
-    -- v11: the timed crescents are slots of their own container in the ring.
-    local mana
-    for _, slot in ipairs(ring.crescents.slots) do
-        if slot.key == "manashield" then mana = slot.button end
-    end
-    equal(mana.mouse, false, "never blocks clicks on the world")
-    local bar = mana.display.bar
-    equal(ring.crescents.parent, ring, "in the ring, so it grows with the outer crescent")
-    equal(mana.display.barOptions.direction, 1, "drains with the time left")
-    contains(bar.statusBarTexture, "ShieldArcInner")
-    equal(bar.points[1][5], -21.25, "the bar spans the crescent itself, so it empties as the buff ends")
-    equal(bar.points[2][5], 21.25)
-    equal(bar.points[1][2], ring, "centered on the ring")
-    equal(ring.bar.points[1][5], -6.25, "the outer bar too")
-    equal(ring.bar.points[1][2], ring, "the ring, not its taller clipping frame")
-    equal(bar.barColor[1], 0.68, "Mana Shield purple")
-    equal(ring.iconButtons.fireward.display.bar, nil, "an absorb shield is not timed")
-    equal(ring.bar.statusBarTexture:find("Inner"), nil, "the outer crescent is the absorb total")
-end)
-test("without the absorb API the shield display stays off with one message", function()
-    local state = mage({remove = {"UnitGetTotalAbsorbs"}})
-    equal(state.mtf.available, true)
-    equal(state.mtf.ShieldDisplay.frame, nil)
-    local found = false
-    for _, message in ipairs(state.messages) do
-        if message:find("The shield display stays off", 1, true) then found = true end
-    end
-    equal(found, true)
-end)
-
--- Cooldown chimes ----------------------------------------------------------------
-
-local BLINK, FROST_NOVA, COLD_SNAP = 1953, 122, 12472
+-- Timers -----------------------------------------------------------------------
 
 local function advance(state, seconds)
     state.now = state.now + seconds
     state.runTimers()
 end
-
-test("out of combat, MTF reads the real cooldown and chimes just before it ends", function()
-    local state = mage()
-    state.cooldowns[BLINK] = {start = state.now, duration = 15}
-    state.cast(BLINK)
-    advance(state, 0.1)
-    equal(state.mtf.db.chimes.learned.blink, 15)
-    advance(state, 14.2)
-    equal(#state.sounds, 0)
-    advance(state, 0.3)
-    equal(#state.sounds, 1, "half a second early")
-    equal(state.sounds[1].key, "talent", "Talent ready, played by Dyre's Sounds")
-    advance(state, 5)
-    equal(#state.sounds, 1, "once")
-end)
-test("a chime plays its own sound through Dyre's Sounds, also in combat", function()
-    local state = mage()
-    state.settings.MTF_CHIME_SOUND_BLINK:SetValue("effectmagical")
-    equal(state.mtf.db.chimes.sounds.blink, "magical", "saved in Dyre's Sounds' spelling")
-    equal(state.sounds[1].key, "magical", "previewed")
-    equal(state.sounds[1].speech, "Blink ready", "the speech text goes along")
-    state.combat = true
-    state.cast(BLINK)
-    advance(state, 15)
-    equal(#state.sounds, 2)
-    equal(state.sounds[2].key, "magical", "the chime plays it, also in combat")
-    equal(state.played, nil, "MTF plays no file of its own")
-end)
-test("one cast chimes once, even when the client reports it twice", function()
-    local state = mage()
-    state.cooldowns[FROST_NOVA] = {start = state.now, duration = 25}
-    state.cast(FROST_NOVA)
-    state.cast(865)
-    advance(state, 0.1)
-    advance(state, 30)
-    equal(#state.sounds, 1)
-    state.clear()
-    state.slash("debug_chimes")
-    local text = table.concat(state.messages, "|")
-    contains(text, "cast frostnova spell=122")
-    contains(text, "cast frostnova spell=865")
-    contains(text, "played frostnova")
-end)
-test("in combat the cooldown is secret, so MTF uses the length it learned", function()
-    local state = mage({db = {chimes = {learned = {blink = 13}}}})
-    state.combat = true
-    state.cooldowns[BLINK] = {start = state.now, duration = 15}
-    state.cast(BLINK)
-    advance(state, 12.4)
-    equal(#state.sounds, 0)
-    advance(state, 0.2)
-    equal(#state.sounds, 1)
-end)
-test("without a learned length, Classic's is used", function()
-    local state = mage()
-    state.combat = true
-    state.cast(FROST_NOVA)
-    advance(state, 24.4)
-    equal(#state.sounds, 0)
-    advance(state, 0.2)
-    equal(#state.sounds, 1)
-end)
-test("Cold Snap cancels Frost chimes; switches and the lead are honored", function()
-    local state = mage()
-    state.cast(FROST_NOVA)
-    state.cast(COLD_SNAP)
-    advance(state, 30)
-    equal(#state.sounds, 0, "Frost Nova is ready already; Cold Snap is off by default")
-    state.settings.MTF_CHIMES_LEAD:SetValue(0)
-    state.cast(BLINK)
-    advance(state, 14.9)
-    equal(#state.sounds, 0)
-    advance(state, 0.2)
-    equal(#state.sounds, 1)
-    state.settings.MTF_CHIME_BLINK:SetValue(false)
-    state.cast(BLINK)
-    advance(state, 20)
-    equal(#state.sounds, 1, "Blink switched off")
-    state.settings.MTF_CHIME_BLINK:SetValue(true)
-    state.settings.MTF_CHIMES_ENABLED:SetValue(false)
-    state.cast(BLINK)
-    advance(state, 20)
-    equal(#state.sounds, 1, "chimes off")
-    state.settings.MTF_CHIMES_ENABLED:SetValue(true)
-    state.cast(FIREBALL)
-    advance(state, 20)
-    equal(#state.sounds, 1, "other spells never chime")
-end)
-
-local function soundDropdown(state, key)
-    local soundSetting = state.settings["MTF_CHIME_SOUND_" .. key:upper()]
-    for _, initializer in ipairs(state.categories["Cooldown Chimes"].initializers) do
-        if initializer.setting == soundSetting then return initializer, soundSetting end
-    end
-end
-
-test("each chime's sound is chosen in Dyre's Sounds' menu under its switch", function()
-    local state = mage()
-    local dropdown = soundDropdown(state, "blink")
-    equal(dropdown.parentInitializer.setting, state.settings.MTF_CHIME_BLINK, "under Blink's switch")
-    equal(dropdown.soundMenu, "all", "Dyre's Sounds' nested menu, every kind of sound")
-    local labels = {}
-    for _, choice in ipairs(dropdown.choices()) do labels[#labels + 1] = choice.label end
-    equal(table.concat(labels, ","), "Dyre's Picks: Fading slow disappear,Dyre's Picks: Cartoon vanish,"
-        .. "Dyre's Picks: Magical disappear,Interface: Talent ready,Interface: Alarm clock,Short: Bell Strike,"
-        .. "Impacts: Pop Click,Imp: Spell chirp,Text to Speech", "the plain list is the library's")
-    contains(dropdown.tooltip, "Text to Speech says \"Blink ready\"")
-    state.settings.MTF_CHIME_SOUND_BLINK:SetValue("shortbellstrike")
-    equal(state.mtf.db.chimes.sounds.blink, "shortbellstrike")
-    equal(state.sounds[#state.sounds].key, "shortbellstrike", "choosing one plays it")
-    local count = #state.sounds
-    state.settings.MTF_CHIME_SOUND_BLINK:SetValue("kazoo")
-    equal(state.mtf.db.chimes.sounds.blink, "shortbellstrike", "a sound the library lacks is ignored")
-    equal(#state.sounds, count)
-    equal(state.mtf.db.chimes.sounds.frostnova, "talent", "Frost Nova keeps its own")
-end)
-test("Text to Speech says the spell, and without a voice the default plays", function()
-    local state = mage()
-    state.voice = true
-    state.settings.MTF_CHIME_SOUND_BLINK:SetValue("voice")
-    equal(state.sounds[1].key, "voice")
-    equal(state.sounds[1].speech, "Blink ready")
-    state.cast(BLINK)
-    advance(state, 15)
-    equal(state.sounds[2].key, "voice")
-    equal(state.sounds[2].speech, "Blink ready", "said when it is ready")
-    state.voice = false
-    state.cast(BLINK)
-    advance(state, 15)
-    equal(state.sounds[3].key, "talent", "no voice: the default sound instead")
-    state.settings.MTF_CHIME_SOUND_FROSTNOVA:SetValue("popclick")
-    equal(state.mtf.db.chimes.sounds.frostnova, "impactspopclick", "an old key, mapped")
-    state.clear()
-    state.slash("debug_chimes")
-    contains(state.messages[1], "debug_chimes blink name=Blink known=")
-    contains(state.messages[1], "sound=voice")
-    contains(table.concat(state.messages, "|"), "sounds=ok playedBy=MTF lead=0.5")
-end)
-test("without Dyre's Sounds chimes are timed, nothing plays, and MTF says so once", function()
-    local state = mage({noSounds = true, db = {chimes = {sounds = {blink = "effectmagical", frostnova = "nonsense"}}}})
-    local function count()
-        local found = 0
-        for _, message in ipairs(state.messages) do
-            if message:find("Install Dyre's Sounds to hear MTF's sounds", 1, true) then found = found + 1 end
-        end
-        return found
-    end
-    equal(count(), 1, "said at login")
-    local said
-    for _, message in ipairs(state.messages) do
-        if message:find("Install Dyre's Sounds", 1, true) then said = message end
-    end
-    contains(said, "MTF: ")
-    contains(said, "Get it from CurseForge.", "says where to get it")
-    equal(said:find("github", 1, true), nil, "CurseForge only, for now")
-    equal(state.mtf.db.chimes.sounds.blink, "effectmagical", "a saved choice is kept for when it is installed")
-    equal(state.mtf.db.chimes.sounds.frostnova, "nonsense", "nothing is reset without the library")
-    state.combat = true
-    state.cast(BLINK)
-    advance(state, 20)
-    equal(#state.sounds, 0)
-    equal(state.played, nil)
-    state.mtf.PreviewChime("blink")
-    equal(count(), 1, "once per session")
-    equal(state.settings.MTF_CHIME_SOUND_BLINK, nil, "no sound menus to fill")
-    contains(state.categories["Cooldown Chimes"].initializers[2].tooltip, "Install Dyre's Sounds")
-    state.clear()
-    state.slash("debug_chimes")
-    contains(table.concat(state.messages, "|"), "sounds=missing")
-end)
-test("with an older Dyre's Sounds MTF says to update it", function()
-    local state = mage({oldSounds = true})
-    local found
-    for _, message in ipairs(state.messages) do
-        if message:find("Update Dyre's Sounds", 1, true) then found = message end
-    end
-    contains(found, "too old")
-    state.cast(BLINK)
-    advance(state, 20)
-    equal(#state.sounds, 0)
-end)
-local function chimesStandAside(addon, title, slash)
-    local saved = {enabled = true, lead = 1, spells = {blink = true, coldsnap = true},
-        sounds = {blink = "shortbellstrike"}, learned = {blink = 14}}
-    local state = mage({loadedAddOns = {[addon] = true}, db = {chimes = saved}})
-    state.cast(BLINK)
-    advance(state, 20)
-    state.mtf.PreviewChime("blink")
-    equal(#state.sounds, 0, title .. " plays them")
-    local chimes = state.mtf.db.chimes
-    equal(chimes.lead, 1)
-    equal(chimes.spells.coldsnap, true)
-    equal(chimes.sounds.blink, "shortbellstrike")
-    equal(chimes.learned.blink, 14, "left for " .. title .. " to copy")
-    equal(state.categories["Cooldown Chimes"], nil, "the list name says who runs them")
-    local page = state.categories["Cooldown Chimes (" .. title .. ")"]
-    equal(page.headings[1].heading, "Cooldown chimes are now managed by " .. title)
-    contains(page.headings[1].tooltip, "Use " .. slash .. " to change them.")
-    contains(page.headings[1].tooltip, "if you remove " .. title .. ".")
-    for _, initializer in ipairs(page.initializers) do
-        equal(initializer.modifyPredicates[1](), false, initializer.setting.variable .. " is greyed out")
-    end
-    contains(page.initializers[1].tooltip, title .. " is installed and plays the chimes")
-    contains(page.initializers[1].tooltip, "(" .. slash .. ")")
-    contains(page.initializers[2].tooltip, title)
-    local found
-    for _, initializer in ipairs(state.categories["Mage Tools Forever"].initializers) do
-        if initializer.setting.variable == "MTF_CHIMES_ENABLED" then
-            found = initializer
-        end
-    end
-    contains(found.tooltip, title .. " is installed and plays the chimes")
-    equal(found.modifyPredicates[1](), false, "the main page's chimes switch is greyed out")
-    state.clear()
-    state.slash("debug_chimes")
-    contains(table.concat(state.messages, "|"), "playedBy=" .. addon)
-    local quiet = mage({noSounds = true, loadedAddOns = {[addon] = true}})
-    for _, message in ipairs(quiet.messages) do
-        equal(message:find("Install Dyre's Sounds", 1, true), nil, "no install message for chimes " .. title .. " plays")
-    end
-end
-test("with Dyre's Buff Reminders loaded MTF plays no chimes and keeps its settings", function()
-    chimesStandAside("DyresBuffReminders", "Dyre's Buff Reminders", "/dbr")
-end)
-test("with Dyre's Cooldown Chimes loaded MTF plays no chimes and keeps its settings", function()
-    chimesStandAside("DyresCooldownChimes", "Dyre's Cooldown Chimes", "/dcc")
-end)
-test("with both loaded Dyre's Buff Reminders is named for the chimes", function()
-    local state = mage({loadedAddOns = {DyresBuffReminders = true, DyresCooldownChimes = true}})
-    state.cast(BLINK)
-    advance(state, 20)
-    equal(#state.sounds, 0)
-    equal(state.mtf.ChimesOwner().addon, "DyresBuffReminders")
-    local page = state.categories["Cooldown Chimes (Dyre's Buff Reminders)"]
-    contains(page.headings[1].tooltip, "/dbr")
-end)
 
 -- Portals ---------------------------------------------------------------------------
 
@@ -2700,337 +2161,6 @@ test("unlocked, the Polymorph bar shows a sample to drag", function()
     contains(state.messages[1], "debug_polymorph available=true known=false")
 end)
 
--- Buff reminders --------------------------------------------------------------------
-
-local INTELLECT, FROST_ARMOR = 1459, 168
-
-local function reminderIcon(state, key)
-    return state.env["MageToolsForeverReminder_" .. key]
-end
-
-test("a reminder icon shows while you lack a buff you know, with a pulsing border", function()
-    local state = mage({known = {[INTELLECT] = true, [FROST_ARMOR] = true}})
-    local intellect, armor = reminderIcon(state, "intellect"), reminderIcon(state, "armor")
-    equal(intellect.shown, true)
-    equal(intellect.glow.animation.playing, true, "the border pulses")
-    equal(intellect.glow.animation.looping, "BOUNCE")
-    equal(armor.shown, true)
-    equal(reminderIcon(state, "dampen").shown, false, "off by default, and not known")
-    state.buffs = {["Arcane Intellect"] = {name = "Arcane Intellect"}, ["Ice Armor"] = {name = "Ice Armor"}}
-    state.emit("UNIT_AURA", "player")
-    equal(intellect.shown, false)
-    equal(intellect.glow.animation.playing, false)
-    equal(armor.shown, false, "any armor counts")
-    state.buffs = {["Arcane Brilliance"] = {name = "Arcane Brilliance"}}
-    state.emit("UNIT_AURA", "player")
-    equal(intellect.shown, false, "Arcane Brilliance counts")
-    equal(armor.shown, true)
-end)
-test("reminders hide in combat, never read auras then, and come back after", function()
-    local state = mage({known = {[INTELLECT] = true}})
-    local intellect, holder = reminderIcon(state, "intellect"), state.env.MageToolsForeverReminders
-    equal(intellect.shown, true)
-    equal(holder.shown, true)
-    equal(state.drivers[holder], "[combat] hide; show", "the game hides the secure icons for combat")
-    state.combat = true
-    state.applyDrivers()
-    equal(holder.shown, false)
-    state.buffs = {["Arcane Intellect"] = {name = "Arcane Intellect"}}
-    state.emit("UNIT_AURA", "player")
-    state.slash("unlock")
-    equal(intellect.shown, true, "no aura read and no secure change in combat")
-    state.combat = false
-    state.applyDrivers()
-    state.emit("PLAYER_REGEN_ENABLED")
-    equal(holder.shown, true)
-    equal(intellect.shown, true, "unlocked after combat: a sample to drag")
-    equal(intellect.attributes.type1, nil, "dragging never casts")
-end)
-test("Arcane Intellect counts group members who use mana", function()
-    local state = mage({known = {[INTELLECT] = true}})
-    state.buffs = {["Arcane Intellect"] = {name = "Arcane Intellect"}}
-    state.group = "party"
-    state.units.party1 = {name = "Healy", class = "PRIEST", player = true, friend = true}
-    state.units.party2 = {name = "Stabby", class = "ROGUE", player = true, friend = true}
-    state.units.party3 = {name = "Faraway", class = "DRUID", player = true, friend = true, far = true}
-    state.units.party4 = {name = "Shocky", class = "SHAMAN", player = true, friend = true}
-    state.emit("GROUP_ROSTER_UPDATE")
-    local intellect = reminderIcon(state, "intellect")
-    equal(intellect.shown, true)
-    equal(intellect.count.text, 2, "Healy and Shocky; not the rogue or someone out of sight")
-    equal(table.concat(intellect.missing, ","), "Healy,Shocky")
-    state.units.party1.buffs = {["Arcane Brilliance"] = {}}
-    state.units.party4.buffs = {["Arcane Intellect"] = {}}
-    state.emit("UNIT_AURA", "party1")
-    equal(intellect.shown, false)
-    state.units.party1.buffs = nil
-    state.settings.MTF_REMINDER_GROUP:SetValue(false)
-    equal(intellect.shown, false, "only you when the group option is off")
-end)
-test("clicking Arcane Intellect buffs you first, then each group member who lacks it", function()
-    local state = mage({known = {[INTELLECT] = true}})
-    local intellect = reminderIcon(state, "intellect")
-    equal(intellect.protected, true, "a secure button")
-    equal(intellect.attributes.type1, "spell")
-    equal(intellect.attributes.spell1, "Arcane Intellect")
-    equal(intellect.attributes.unit1, "player", "you first")
-    state.buffs = {["Arcane Intellect"] = {name = "Arcane Intellect"}}
-    state.group = "party"
-    state.units.party1 = {name = "Stabby", class = "ROGUE", player = true, friend = true}
-    state.units.party2 = {name = "Healy", class = "PRIEST", player = true, friend = true}
-    state.units.party3 = {name = "Shocky", class = "SHAMAN", player = true, friend = true}
-    state.env.C_Spell.IsSpellInRange = function(spell, unit) return unit ~= "party2" end
-    state.emit("GROUP_ROSTER_UPDATE")
-    equal(intellect.attributes.unit1, "party3", "the first in range; never the rogue")
-    state.units.party3.buffs = {["Arcane Intellect"] = {}}
-    state.emit("UNIT_AURA", "party3")
-    equal(intellect.attributes.unit1, "party2", "out of range but the only one left")
-    state.units.party2.buffs = {["Arcane Intellect"] = {}}
-    state.emit("UNIT_AURA", "party2")
-    equal(intellect.shown, false)
-    equal(intellect.attributes.type1, nil, "nothing to cast")
-end)
-test("with two or more missing, Arcane Brilliance if you know it and carry Arcane Powder", function()
-    local state = mage({known = {[INTELLECT] = true, [23028] = true}})
-    local intellect = reminderIcon(state, "intellect")
-    state.group = "party"
-    state.units.party1 = {name = "Healy", class = "PRIEST", player = true, friend = true}
-    state.emit("GROUP_ROSTER_UPDATE")
-    equal(intellect.attributes.spell1, "Arcane Intellect", "no Arcane Powder")
-    state.put(0, 1, 17020, 5)
-    state.emit("BAG_UPDATE_DELAYED")
-    equal(intellect.attributes.spell1, "Arcane Brilliance")
-    state.buffs = {["Arcane Intellect"] = {name = "Arcane Intellect"}}
-    state.emit("UNIT_AURA", "player")
-    equal(intellect.attributes.spell1, "Arcane Intellect", "one missing: the single buff")
-    equal(intellect.attributes.unit1, "party1")
-end)
-test("clicking Armor recasts the armor you used last, else your best", function()
-    local state = mage({known = {[FROST_ARMOR] = true, [7302] = true}})
-    local armor = reminderIcon(state, "armor")
-    equal(armor.attributes.spell1, "Ice Armor", "your best")
-    equal(armor.attributes.unit1, "player")
-    state.cast(FROST_ARMOR)
-    state.emit("UNIT_AURA", "player")
-    equal(armor.attributes.spell1, "Frost Armor", "the one you used")
-    equal(state.mtf.db.reminders.last.armor, "Frost Armor", "saved per character")
-end)
--- Positions of a reminder icon's center on screen.
-local function iconCenter(state, key)
-    local icon = state.env["MageToolsForeverReminder_" .. key]
-    local x, y = state.absCenter(icon)
-    return math.floor(x + 0.5), math.floor(y + 0.5)
-end
-
-local function drop(state, icon, x, y)
-    icon.scripts.OnDragStart(icon)
-    icon:ClearAllPoints()
-    icon:SetPoint("CENTER", nil, "BOTTOMLEFT", x / icon:GetEffectiveScale(), y / icon:GetEffectiveScale())
-    icon.scripts.OnDragStop(icon)
-end
-
--- Drags a frame by a handle (a child that takes the drag) and drops it at x, y.
-local function dropBy(state, frame, handle, x, y)
-    handle.scripts.OnDragStart(handle)
-    frame:ClearAllPoints()
-    frame:SetPoint("CENTER", nil, "BOTTOMLEFT", x / frame:GetEffectiveScale(), y / frame:GetEffectiveScale())
-    handle.scripts.OnDragStop(handle)
-end
-
-local function centerOf(state, frame)
-    local x, y = state.absCenter(frame)
-    return math.floor(x + 0.5), math.floor(y + 0.5)
-end
-
-test("every MTF frame snaps, not only the buff reminders; Shift-drag moves a snapped group", function()
-    local state = mage({known = {[3561] = true, [118] = true}})
-    state.slash("unlock")
-    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
-    local polymorph = state.env.MageToolsForeverPolymorph
-    dropBy(state, conjure, conjure, 300, 300)
-    local cx, cy = centerOf(state, conjure)
-    -- The portal bar, dropped near the conjure bar's right side, snaps 20 past it, tops aligned.
-    local px = cx + conjure.width / 2 + 20 + portals.width / 2
-    local py = cy + conjure.height / 2 - portals.height / 2
-    dropBy(state, portals, portals, px + 7, py - 5)
-    equal(select(1, centerOf(state, portals)), math.floor(px + 0.5))
-    equal(select(2, centerOf(state, portals)), math.floor(py + 0.5))
-    -- The Polymorph bar under the conjure bar, lefts aligned.
-    local mx = cx - conjure.width / 2 + polymorph.width / 2
-    local my = cy - conjure.height / 2 - 20 - polymorph.height / 2
-    dropBy(state, polymorph, polymorph, mx + 4, my + 6)
-    equal(select(1, centerOf(state, polymorph)), math.floor(mx + 0.5))
-    equal(select(2, centerOf(state, polymorph)), math.floor(my + 0.5))
-    equal(state.mtf.db.polymorph.position.relativePoint, "BOTTOMLEFT", "saved")
-    -- Shift-drag the conjure bar: the portal and Polymorph bars come along.
-    local portalX = select(1, centerOf(state, portals)) - cx
-    state.shift = true
-    dropBy(state, conjure, conjure, 600, 600)
-    local nx, ny = centerOf(state, conjure)
-    equal(select(1, centerOf(state, portals)) - nx, portalX, "the group kept its spacing")
-    equal(select(2, centerOf(state, polymorph)), ny - (cy - math.floor(my + 0.5)))
-end)
-
-test("a Shift-dragged group that snaps to another frame keeps its spacing", function()
-    local state = mage({known = {[3561] = true, [118] = true}})
-    state.slash("unlock")
-    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
-    local icon = reminderIcon(state, "intellect")
-    dropBy(state, conjure, conjure, 300, 300)
-    local cx, cy = centerOf(state, conjure)
-    dropBy(state, portals, portals, cx + conjure.width / 2 + 20 + portals.width / 2, cy)
-    local gapX = select(1, centerOf(state, portals)) - cx
-    -- Drop the group a little off the spot under the buff reminder, so it snaps.
-    local ix, iy = state.absCenter(icon)
-    local iconHalf = icon.height * icon:GetEffectiveScale() / 2
-    local barHalfH = conjure.height * conjure:GetEffectiveScale() / 2
-    local spotX, spotY = ix, iy - iconHalf - 20 - barHalfH
-    state.shift = true
-    dropBy(state, conjure, conjure, spotX + 6, spotY - 5)
-    local nx, ny = centerOf(state, conjure)
-    equal(nx, math.floor(spotX + 0.5), "the group snapped")
-    equal(ny, math.floor(spotY + 0.5))
-    equal(select(1, centerOf(state, portals)) - nx, gapX, "the portal bar kept its place beside it")
-end)
-test("a drop after combat began waits, then snaps and saves the group when combat ends", function()
-    local state = mage({known = {[3561] = true}})
-    state.slash("unlock")
-    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
-    dropBy(state, conjure, conjure, 300, 300)
-    local cx, cy = centerOf(state, conjure)
-    dropBy(state, portals, portals, cx + conjure.width / 2 + 20 + portals.width / 2, cy)
-    local gapX = select(1, centerOf(state, portals)) - cx
-    local saved = state.mtf.db.portals.position
-    state.shift = true
-    conjure.scripts.OnDragStart(conjure)
-    conjure:ClearAllPoints()
-    conjure:SetPoint("CENTER", nil, "BOTTOMLEFT", 500 / conjure:GetEffectiveScale(), 500 / conjure:GetEffectiveScale())
-    state.combat = true
-    conjure.scripts.OnDragStop(conjure)
-    equal(state.mtf.db.portals.position, saved, "nothing saved in combat")
-    state.combat = false
-    state.emit("PLAYER_REGEN_ENABLED")
-    equal(state.mtf.db.portals.position.relativePoint, "BOTTOMLEFT", "saved once combat ends")
-    equal(select(1, centerOf(state, portals)) - select(1, centerOf(state, conjure)), gapX, "the group kept together")
-    equal(conjure.moving, false, "stopped moving")
-end)
-test("reminder icons start in a row 20 apart, and a drop near another snaps beside it", function()
-    local state = mage()
-    state.slash("unlock")
-    local intellect, armor, dampen = reminderIcon(state, "intellect"), reminderIcon(state, "armor"),
-        reminderIcon(state, "dampen")
-    state.mtf.db.reminders.spells.dampen = true
-    state.mtf.RefreshReminders()
-    local ix, iy = iconCenter(state, "intellect")
-    local ax = iconCenter(state, "armor")
-    equal(ax - ix, 60, "40 wide, 20 apart")
-    -- Dropped a little off to the right of Armor: snaps 20 past it, in line.
-    drop(state, intellect, ax + 64, iy + 9)
-    local nx, ny = iconCenter(state, "intellect")
-    equal(nx, ax + 60)
-    equal(ny, iy, "aligned")
-    -- Dropped far from everything: stays where it lands.
-    drop(state, dampen, 100, 100)
-    equal(select(1, iconCenter(state, "dampen")), 100)
-    -- Below a bigger icon: the gap is between their edges.
-    for _ = 1, 5 do armor.scripts.OnMouseWheel(armor, 1) end
-    equal(state.mtf.db.reminders.icons.armor.scale, 150)
-    local bx, by = iconCenter(state, "armor")
-    drop(state, dampen, bx + 3, by - 70)
-    local dx, dy = iconCenter(state, "dampen")
-    equal(dx, bx)
-    equal(dy, by - (30 + 20 + 20), "half of 60, the gap, half of 40")
-end)
-test("Shift-dragging an icon moves every icon snapped to it", function()
-    local state = mage()
-    state.mtf.db.reminders.spells.dampen = true
-    state.slash("unlock")
-    local intellect, armor, dampen = reminderIcon(state, "intellect"), reminderIcon(state, "armor"),
-        reminderIcon(state, "dampen")
-    local ix, iy = iconCenter(state, "intellect")
-    local ax, ay = iconCenter(state, "armor")
-    local dx, dy = iconCenter(state, "dampen")
-    state.shift = true
-    drop(state, intellect, ix - 300, iy - 100)
-    equal(select(1, iconCenter(state, "armor")), ax - 300, "the row moves together")
-    equal(select(2, iconCenter(state, "dampen")), dy - 100)
-    equal(state.mtf.db.reminders.icons.dampen.position.relativePoint, "BOTTOMLEFT", "each saved on its own")
-    -- Without Shift, one icon leaves the group.
-    state.shift = false
-    drop(state, intellect, 900, 700)
-    equal(select(1, iconCenter(state, "armor")), ax - 300, "the others stay")
-    -- A gap that is not the snap gap is not snapped.
-    state.shift = true
-    drop(state, armor, ax, ay)
-    equal(select(1, iconCenter(state, "intellect")), 900)
-end)
-test("resizing an icon keeps its center", function()
-    local state = mage()
-    state.slash("unlock")
-    local intellect = reminderIcon(state, "intellect")
-    local x, y = iconCenter(state, "intellect")
-    intellect.scripts.OnMouseWheel(intellect, 1)
-    local nx, ny = iconCenter(state, "intellect")
-    equal(nx, x)
-    equal(ny, y)
-end)
-test("with Dyre's Buff Reminders loaded, MTF's reminders stay hidden and keep their settings", function()
-    local state = mage({known = {[INTELLECT] = true, [FROST_ARMOR] = true},
-        loadedAddOns = {DyresBuffReminders = true}})
-    equal(reminderIcon(state, "intellect").shown, false, "no second icon beside Dyre's Buff Reminders'")
-    equal(reminderIcon(state, "armor").shown, false)
-    state.slash("unlock")
-    equal(reminderIcon(state, "intellect").shown, false, "not even to drag")
-    equal(state.mtf.db.reminders.spells.intellect, true, "the saved switch is untouched")
-    local greyed = 0
-    local page = state.categories["Buff Reminders (Dyre's Buff Reminders)"]
-    equal(page.headings[1].heading, "Buff reminders are now managed by Dyre's Buff Reminders")
-    contains(page.headings[1].tooltip, "/dbr")
-    for _, name in ipairs({"Buff Reminders (Dyre's Buff Reminders)", "Mage Tools Forever"}) do
-        for _, initializer in ipairs(state.categories[name].initializers) do
-            local variable = initializer.setting and initializer.setting.variable or ""
-            if variable:find("^MTF_REMINDER") then
-                equal(initializer.modifyPredicates[1](), false, variable .. " is greyed out")
-                contains(initializer.tooltip, "Dyre's Buff Reminders")
-                greyed = greyed + 1
-            end
-        end
-    end
-    equal(greyed, #state.mtf.REMINDERS + 2, "every reminder switch, the group switch, and the main switch")
-    local plain = mage()
-    for _, initializer in ipairs(plain.categories["Buff Reminders"].initializers) do
-        equal(#initializer.modifyPredicates, 0, "not greyed without Dyre's Buff Reminders")
-    end
-end)
-test("unlocked, each reminder shows to drag and resizes with the mouse wheel", function()
-    local state = mage()
-    state.buffs = {["Arcane Intellect"] = {name = "Arcane Intellect"}}
-    state.slash("unlock")
-    local intellect = reminderIcon(state, "intellect")
-    equal(intellect.shown, true, "shown to place, even unknown or buffed")
-    equal(intellect.wheel, true)
-    intellect.scripts.OnMouseWheel(intellect, 1)
-    intellect.scripts.OnMouseWheel(intellect, 1)
-    equal(state.mtf.db.reminders.icons.intellect.scale, 120)
-    equal(intellect.scale, 1.2)
-    equal(reminderIcon(state, "armor").scale, 1, "each icon on its own")
-    intellect.scripts.OnDragStart(intellect)
-    intellect:SetPoint("TOP", nil, "TOP", 5, -50)
-    intellect.scripts.OnDragStop(intellect)
-    equal(state.mtf.db.reminders.icons.intellect.position.relativePoint, "BOTTOMLEFT")
-    equal(math.floor(state.mtf.db.reminders.icons.intellect.position.x * 1.2 + 0.5), 506, "where it was dropped: 5 past center at 120%")
-    state.slash("lock")
-    equal(intellect.shown, false)
-    intellect.scripts.OnMouseWheel(intellect, 1)
-    equal(state.mtf.db.reminders.icons.intellect.scale, 120, "locked icons do not resize")
-    state.slash("reset")
-    equal(state.mtf.db.reminders.icons.intellect.scale, 100)
-    equal(state.mtf.db.reminders.icons.intellect.position, nil)
-    state.clear()
-    state.slash("debug_reminders")
-    contains(state.messages[1], "debug_reminders intellect on=true known=false")
-end)
-
 -- Dyre's Toolkit widgets (2.0) -------------------------------------------------------
 
 local function countMessages(state, fragment)
@@ -3057,16 +2187,6 @@ local function same(actual, expected, what)
     end
 end
 
-test("Shield.lua is byte-identical with Dyre's Shields Up's copy when it is there", function()
-    -- The shared component: DSU owns it, and every host ships the same bytes.
-    local dsu = io.open("../DyresShieldsUp/Shield.lua", "rb")
-    if dsu then
-        local own = assert(io.open("Shield.lua", "rb"))
-        equal(own:read("*a") == dsu:read("*a"), true, "Shield.lua differs from DSU's: copy it again")
-        own:close()
-        dsu:close()
-    end
-end)
 test("the toolkit copy the tests load matches ../DyresToolkit when it is there", function()
     -- CI has only this repository, so the tests load a copy; on a developer's
     -- machine it must be the toolkit's own files, byte for byte.
@@ -3103,9 +2223,6 @@ test("every movable MTF frame is a Dyre's Toolkit widget with the right mouse", 
         conjure = {env.MageToolsForeverConjure, "always"},
         portals = {env.MageToolsForeverPortals, "always"},
         polymorph = {env.MageToolsForeverPolymorph, "client"},
-        reminder_intellect = {env.MageToolsForeverReminder_intellect, "always"},
-        reminder_armor = {env.MageToolsForeverReminder_armor, "always"},
-        reminder_dampen = {env.MageToolsForeverReminder_dampen, "always"},
     }
     local count = 0
     for key, entry in pairs(want) do
@@ -3130,16 +2247,12 @@ test("existing saved places and sizes load unchanged", function()
         portals = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 300, y = 200}, scale = 120},
         polymorph = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 250, y = 500}, scale = 110,
             width = 300, height = 24, textScale = 150, opacity = 60},
-        reminders = {icons = {intellect = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 480,
-            y = 600}, scale = 150}}},
     }
     local copy = {
         conjure = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 600, y = 250}, scale = 80},
         portals = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 300, y = 200}, scale = 120},
         polymorph = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 250, y = 500}, scale = 110,
             width = 300, height = 24, textScale = 150, opacity = 60},
-        reminders = {icons = {intellect = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 480,
-            y = 600}, scale = 150}}},
     }
     local state = mage({known = {[POLYMORPH] = true, [TELEPORT_STORMWIND] = true}, db = saved})
     same(state.mtf.db, copy, "db")
@@ -3154,7 +2267,6 @@ test("existing saved places and sizes load unchanged", function()
     at(env.MageToolsForeverConjure, copy.conjure, "conjure")
     at(env.MageToolsForeverPortals, copy.portals, "portals")
     at(env.MageToolsForeverPolymorph, copy.polymorph, "polymorph")
-    at(env.MageToolsForeverReminder_intellect, copy.reminders.icons.intellect, "intellect")
     equal(env.MageToolsForeverPolymorph.width, 300)
     equal(env.MageToolsForeverPolymorph.height, 27 + 24 + 6, "the frame height from the bar's settings")
     equal(env.MageToolsForeverPolymorphBar.alpha, 0.6)
@@ -3179,8 +2291,6 @@ test("MTF never places, sizes, drags, or sets the mouse of a widget itself, but 
     state.settings.DYRE_MAGETOOLSFOREVER_PORTALS_SCALE:SetValue(80)
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_WIDTH:SetValue(260)
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_SCALE:SetValue(120)
-    local intellect = reminderIcon(state, "intellect")
-    intellect.scripts.OnMouseWheel(intellect, 1)
     state.known[TELEPORT_IRONFORGE] = true
     state.emit("SPELLS_CHANGED")
     advance(state, 1)
@@ -3230,7 +2340,6 @@ test("a drag that starts on a conjure or portal button drags its bar", function(
     equal(portals.moving, true)
     button.scripts.OnDragStop(button)
     equal(water.scripts.PostClick ~= nil, true, "the buttons still click")
-    contains(reminderIcon(state, "intellect").dyre.mover.hint.text, "scroll to resize")
 end)
 
 -- Polymorph bar look (1.1.0) --------------------------------------------------------
@@ -3479,7 +2588,6 @@ test("the Polymorph page has the sizes and opacity with gold default marks, and 
             equal(name:find("(%)", 1, true), nil, name .. " has no (%)")
         end
     end
-    equal(state.settings.MTF_SHIELD_SCALE.name, "Display size")
     local reset
     for _, item in ipairs(page.headings) do
         if item.button then reset = item end
@@ -3567,9 +2675,7 @@ test("the settings have a main page and a page per module", function()
     equal(main.initializers[1].setting.variable, "MTF_CONJURE_ENABLED")
     equal(main.initializers[2].setting.variable, "MTF_PORTALS_ENABLED")
     equal(main.initializers[3].setting.variable, "MTF_POLYMORPH_ENABLED")
-    equal(main.initializers[4].setting.variable, "MTF_REMINDERS_ENABLED")
-    equal(main.initializers[5].setting.variable, "MTF_SHIELD_ENABLED")
-    equal(main.initializers[6].setting.variable, "MTF_CHIMES_ENABLED")
+    equal(main.initializers[4], nil, "no switches for what moved to Dyre's Shields Up and Dyre's Buff Reminders")
     equal(state.categories.Polymorph.parent, main)
     equal(state.categories["Buff Reminders"].parent, main)
     equal(state.categories.Portals.parent, main)
@@ -3580,6 +2686,76 @@ test("the settings have a main page and a page per module", function()
     equal(state.categories["Cooldown Chimes"].parent, main)
     state.settings.MTF_CONJURE_ENABLED:SetValue(false)
     equal(state.env.MageToolsForeverConjure.shown, false)
+end)
+test("the Shield, Buff Reminders, and Cooldown Chimes pages link to Dyre's Shields Up and Dyre's Buff Reminders", function()
+    local function link(state, title)
+        local page = state.categories[title]
+        equal(#page.initializers, 0, title .. ": no settings of MTF's own")
+        local found
+        for _, item in ipairs(page.headings) do
+            if item.button then found = item end
+        end
+        return found
+    end
+    local state = mage({companions = {"DyresShieldsUp", "DyresBuffReminders"}})
+    local shield = link(state, "Shield")
+    equal(shield.buttonText, "Open Shield settings")
+    contains(shield.tooltip, "Dyre's Shields Up draws the shield display")
+    equal(shield.modifyPredicates[1](), true, "usable: Dyre's Shields Up has joined the toolkit")
+    shield.onClick()
+    equal(state.openedCompanion[1], "DyresShieldsUp", "opens Dyre's Shields Up's own page")
+    local reminders = link(state, "Buff Reminders")
+    equal(reminders.buttonText, "Open Buff Reminders settings")
+    contains(reminders.tooltip, "Dampen or Amplify Magic")
+    reminders.onClick()
+    equal(state.openedCompanion[2], "DyresBuffReminders")
+    local chimes = link(state, "Cooldown Chimes")
+    contains(chimes.tooltip, "Blink, Frost Nova")
+    chimes.onClick()
+    equal(state.openedCompanion[3], "DyresBuffReminders")
+    state.combat = true
+    shield.onClick()
+    equal(#state.openedCompanion, 3, "never in combat")
+    contains(state.last(), "out of combat")
+    -- Without them: greyed, and a click says what to install.
+    local alone = mage()
+    local missing = link(alone, "Shield")
+    equal(missing.modifyPredicates[1](), false, "greyed out")
+    equal(missing.tooltip, "Install Dyre's Shields Up from CurseForge for the shield display.")
+    alone.clear()
+    missing.onClick()
+    contains(alone.last(), "Install Dyre's Shields Up from CurseForge for the shield display.")
+    equal(link(alone, "Cooldown Chimes").tooltip,
+        "Install Dyre's Buff Reminders from CurseForge for buff reminders and cooldown chimes.")
+end)
+test("without Dyre's Shields Up or Dyre's Buff Reminders MTF says once what to install or enable", function()
+    local function lines(state, fragment)
+        local found = {}
+        for _, message in ipairs(state.messages) do
+            if message:find(fragment, 1, true) then found[#found + 1] = message end
+        end
+        return found
+    end
+    local state = mage()
+    equal(state.mtf.available, true, "MTF works without them")
+    local shield = lines(state, "Dyre's Shields Up")
+    equal(#shield, 1, "said once")
+    equal(shield[1], "MTF: Install Dyre's Shields Up from CurseForge for the shield display.")
+    local reminders = lines(state, "Dyre's Buff Reminders")
+    equal(#reminders, 1)
+    equal(reminders[1], "MTF: Install Dyre's Buff Reminders from CurseForge for buff reminders and cooldown chimes.")
+    for _, message in ipairs(state.messages) do
+        equal(message:lower():find("github", 1, true), nil, "CurseForge only")
+    end
+    local disabled = mage({disabledAddOns = {DyresShieldsUp = true}})
+    equal(lines(disabled, "Dyre's Shields Up")[1], "MTF: Enable Dyre's Shields Up in the AddOn list for the shield display.")
+    local both = mage({companions = {"DyresShieldsUp", "DyresBuffReminders"}})
+    equal(#lines(both, "Dyre's Shields Up"), 0, "nothing to say with both loaded")
+    equal(#lines(both, "Dyre's Buff Reminders"), 0)
+    state.clear()
+    state.slash("unlock")
+    state.slash("lock")
+    equal(#lines(state, "Install"), 0, "only at login")
 end)
 test("without the Settings API MTF runs and /mtf explains", function()
     local state = fixture({noSettings = true})

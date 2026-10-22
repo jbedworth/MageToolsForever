@@ -20,14 +20,12 @@ from pathlib import Path
 
 
 ADDON = "MageToolsForever"
-RUNTIME_FILES = ("Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Reminders.lua",
-                 "Shield.lua", "Chimes.lua", "Options.lua")
+RUNTIME_FILES = ("Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua")
 TEXT_FILES = (ADDON + ".toc",) + RUNTIME_FILES + ("LICENSE",)
-# Runtime textures shipped in the package: the shield display's crescents,
-# built by scripts/build_arc.py. The builder requires uncompressed 32-bit,
-# square, power-of-two TGAs.
-# Sounds come from the library AddOn Dyre's Sounds; MTF ships none.
-MEDIA_FILES = ("Textures/ShieldArc.tga", "Textures/ShieldArcInner.tga", "Textures/ShieldArcInnermost.tga")
+# Runtime media shipped in the package (the builder requires uncompressed
+# 32-bit, square, power-of-two TGAs): none since 1.2.0, when the shield
+# display moved to Dyre's Shields Up, which ships its crescents.
+MEDIA_FILES = ()
 PACKAGE_FILES = TEXT_FILES + MEDIA_FILES
 TGA_HEADER_SIZE = 18
 TGA_TRUECOLOR = 2

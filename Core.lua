@@ -62,17 +62,10 @@ local REQUIRED_NAMESPACE = {
     "AddInputHandler", "RunOnNextInput",
     "InitializePortals", "RefreshPortals", "ReportPortalsDebug",
     "InitializePolymorph", "RefreshPolymorph", "ReportPolymorphDebug",
-    "InitializeReminders", "RefreshReminders", "ResetRemindersSize", "ReportRemindersDebug",
-    "SanitizeReminderScale",
-    "InitializeChimes", "PreviewChime", "ReportChimesDebug",
     "InitializeOptions", "OpenSettings",
 }
 
 local function CheckInstalledFiles()
-    if type(MTF.ShieldDisplay) ~= "table" or type(MTF.ShieldDisplay.Initialize) ~= "function" then
-        return false, "AddOn files are from different versions (missing Shield.lua). Reinstall every "
-            .. "Mage Tools Forever file, then restart the client."
-    end
     for _, name in ipairs(REQUIRED_NAMESPACE) do
         if type(MTF[name]) ~= "function" then
             return false, "AddOn files are from different versions (missing " .. name
@@ -99,8 +92,7 @@ MTF.SHARE_SIZE_MIN = 1
 MTF.SHARE_SIZE_MAX = 20
 MTF.DEFAULT_SHARE_SIZE = 10
 
--- Frame sizes in percent (author-approved): the conjure bar's here, the shield
--- display's in its own component.
+-- Frame sizes in percent (author-approved).
 MTF.SCALE_MIN = 50
 MTF.SCALE_MAX = 150
 MTF.SCALE_STEP = 5
@@ -166,129 +158,44 @@ function MTF.FormatShareWhisper(text, count, item, target)
     return MTF.FormatAnnouncement(text, {C = count, I = item, T = target or "friend"})
 end
 
--- Seconds before a cooldown ends that its chime plays, as MageAlert does
--- (14.5 for Blink's 15), so you can act the moment it is ready.
-MTF.CHIME_LEAD_MIN = 0
-MTF.CHIME_LEAD_MAX = 3
-MTF.CHIME_LEAD_STEP = 0.5
-MTF.DEFAULT_CHIME_LEAD = 0.5
-
--- Spells that can chime when ready again: Classic IDs, matched by name so every
--- rank counts. cooldown is the Classic length in seconds, used until MTF reads
--- the real one out of combat. Mana Shield has no cooldown in Classic; it chimes
--- only if the client reports one. frost marks the spells Cold Snap resets.
--- Every spell starts on Talent ready (author-approved: a good sound for a
--- spell becoming available); players change any of them.
-MTF.CHIME_SPELLS = {
-    {key = "blink", spell = 1953, label = "Blink", cooldown = 15, on = true},
-    {key = "frostnova", spell = 122, label = "Frost Nova", cooldown = 25, on = true, frost = true},
-    {key = "counterspell", spell = 2139, label = "Counterspell", cooldown = 24, on = true},
-    {key = "iceblock", spell = 11958, label = "Ice Block", cooldown = 300, on = true, frost = true},
-    {key = "icebarrier", spell = 11426, label = "Ice Barrier", cooldown = 30, on = true, frost = true},
-    {key = "manashield", spell = 1463, label = "Mana Shield", on = true},
-    {key = "evocation", spell = 12051, label = "Evocation", cooldown = 480, on = true},
-    {key = "coldsnap", spell = 12472, label = "Cold Snap", cooldown = 600, on = false},
-    {key = "fireward", spell = 543, label = "Fire Ward", cooldown = 30, on = false},
-    {key = "frostward", spell = 6143, label = "Frost Ward", cooldown = 30, on = false, frost = true},
-    {key = "coneofcold", spell = 120, label = "Cone of Cold", cooldown = 10, on = false, frost = true},
-    {key = "fireblast", spell = 2136, label = "Fire Blast", cooldown = 8, on = false},
-    {key = "presenceofmind", spell = 12043, label = "Presence of Mind", cooldown = 180, on = false},
-    {key = "arcanepower", spell = 12042, label = "Arcane Power", cooldown = 180, on = false},
-    {key = "combustion", spell = 11129, label = "Combustion", cooldown = 180, on = false},
-}
--- A cooldown MTF read in client, kept only when plausible.
-local LEARNED_MIN = 1.5
-local LEARNED_MAX = 1200
-
--- Chime sounds come from the library AddOn Dyre's Sounds (author-approved:
--- only it ships sound files, so players keep one copy), listed as OptionalDeps
--- so MTF loads and times chimes without it. A chime's sound is a Dyre's Sounds
--- key; MTF's older keys ("effect...", "popclick") are its aliases.
-MTF.DEFAULT_CHIME_SOUND = "talent"
-local SOUNDS_CONTRACT = 1
-local SOUNDS_FUNCTIONS = {"List", "Groups", "Label", "Resolve", "Play", "Choices", "SetupMenu"}
-local SOUNDS_WHERE = " Get it from CurseForge."
-local SOUNDS_MESSAGES = {
-    missing = "Install Dyre's Sounds to hear MTF's sounds (the chimes and the shield sound)." .. SOUNDS_WHERE,
-    old = "Update Dyre's Sounds to hear MTF's sounds: this version is too old for MTF." .. SOUNDS_WHERE,
+-- Dyre's Shields Up draws the shield display and Dyre's Buff Reminders shows
+-- the buff reminders and plays the cooldown chimes, for every class (author,
+-- 1.2.0: MTF depends on them, so players get them on their other classes too;
+-- CurseForge installs them with MTF). The TOC lists them as OptionalDeps, so
+-- MTF loads without them and says once per session what to install or enable.
+MTF.COMPANIONS = {
+    {addon = "DyresShieldsUp", title = "Dyre's Shields Up", what = "the shield display"},
+    {addon = "DyresBuffReminders", title = "Dyre's Buff Reminders", what = "buff reminders and cooldown chimes"},
 }
 
--- Dyre's Sounds with the contract and functions MTF uses, else nil and why
--- ("missing" or "old").
-function MTF.SoundLibrary()
-    local library = rawget(_G, "DyresSounds")
-    if type(library) ~= "table" or type(library.RequireContract) ~= "function" then
-        return nil, "missing"
-    end
-    library = library.RequireContract(SOUNDS_CONTRACT)
-    if type(library) ~= "table" then
-        return nil, "old"
-    end
-    for _, name in ipairs(SOUNDS_FUNCTIONS) do
-        if type(library[name]) ~= "function" then
-            return nil, "old"
-        end
-    end
-    return library, "ok"
-end
-
--- Says once per session what to install when the chime sounds are missing.
-function MTF.ReportMissingSounds()
-    local library, state = MTF.SoundLibrary()
-    if library or MTF.soundsReported then
-        return
-    end
-    MTF.soundsReported = true
-    MTF.Report(SOUNDS_MESSAGES[state])
-end
-
--- The stand-alone Dyre's AddOns that play the chimes for every class
--- (author-approved: MTF stands aside for them and keeps its own chime
--- settings, which they copy on their first run). Dyre's Buff Reminders has
--- them from 0.2.0-beta; Dyre's Cooldown Chimes, never released, merged into it.
-MTF.CHIME_OWNERS = {
-    {addon = "DyresBuffReminders", title = "Dyre's Buff Reminders", slash = "/dbr"},
-    {addon = "DyresCooldownChimes", title = "Dyre's Cooldown Chimes", slash = "/dcc"},
-}
-
--- The first loaded AddOn of MTF.CHIME_OWNERS, else nil.
-function MTF.ChimesOwner()
-    if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
-        return nil
-    end
-    for _, owner in ipairs(MTF.CHIME_OWNERS) do
-        local loaded = C_AddOns.IsAddOnLoaded(owner.addon)
-        if loaded == true then
-            return owner
-        end
-    end
-    return nil
-end
-
-function MTF.ChimesStandAside()
-    return MTF.ChimesOwner() ~= nil
-end
-
--- Dyre's Buff Reminders shows buff reminders for every class (author-approved
--- two-step move): while it is loaded, MTF's own reminder icons stay hidden and
--- MTF's saved reminder settings stay as they are.
--- The stand-alone Dyre's AddOn wins when it is installed (author-approved rule
--- for every shared feature): while Dyre's Shields Up is loaded, MTF starts no
--- shield display of its own and its shield settings stay as they are.
-function MTF.ShieldStandAside()
+function MTF.CompanionLoaded(addon)
     if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
         return false
     end
-    local loaded = C_AddOns.IsAddOnLoaded("DyresShieldsUp")
-    return loaded == true
+    return C_AddOns.IsAddOnLoaded(addon) == true
 end
 
-function MTF.RemindersStandAside()
-    if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
-        return false
+-- What to tell a player who lacks a companion: install it, or enable it when
+-- the AddOn list has it (GetAddOnInfo's reason is "MISSING" when it is not
+-- installed). Only CurseForge is named as the place to get it.
+function MTF.CompanionMessage(companion)
+    local reason
+    if type(C_AddOns) == "table" and type(C_AddOns.GetAddOnInfo) == "function" then
+        local _, _, _, _, why = C_AddOns.GetAddOnInfo(companion.addon)
+        reason = why
     end
-    local loaded = C_AddOns.IsAddOnLoaded("DyresBuffReminders")
-    return loaded == true
+    if reason ~= nil and reason ~= "MISSING" then
+        return "Enable " .. companion.title .. " in the AddOn list for " .. companion.what .. "."
+    end
+    return "Install " .. companion.title .. " from CurseForge for " .. companion.what .. "."
+end
+
+local function ReportMissingCompanions()
+    for _, companion in ipairs(MTF.COMPANIONS) do
+        if not MTF.CompanionLoaded(companion.addon) then
+            MTF.Report(MTF.CompanionMessage(companion))
+        end
+    end
 end
 
 local function IsWholeNumber(value)
@@ -328,14 +235,6 @@ function MTF.SanitizePolymorphOpacity(value)
         MTF.POLYMORPH_OPACITY_STEP, MTF.DEFAULT_POLYMORPH_OPACITY)
 end
 
-function MTF.SanitizeChimeLead(value)
-    if type(value) ~= "number" or value ~= value then
-        return MTF.DEFAULT_CHIME_LEAD
-    end
-    local stepped = math.floor(value / MTF.CHIME_LEAD_STEP + 0.5) * MTF.CHIME_LEAD_STEP
-    return math.max(MTF.CHIME_LEAD_MIN, math.min(MTF.CHIME_LEAD_MAX, stepped))
-end
-
 local function SanitizePosition(position)
     if type(position) ~= "table" or type(position.point) ~= "string"
         or type(position.relativePoint) ~= "string"
@@ -344,20 +243,6 @@ local function SanitizePosition(position)
     end
     return {point = position.point, relativePoint = position.relativePoint,
         x = position.x, y = position.y}
-end
-
--- A saved sound key in Dyre's Sounds' spelling, or nil when it knows no such
--- sound. Without the library a saved key is kept as it is, so a missing
--- library never resets a choice.
-local function SavedSound(key)
-    if type(key) ~= "string" then
-        return nil
-    end
-    local library = MTF.SoundLibrary()
-    if not library then
-        return key
-    end
-    return library.Resolve(key)
 end
 
 function MTF.SanitizeDB(db)
@@ -390,26 +275,6 @@ function MTF.SanitizeDB(db)
     for _, spec in ipairs(MTF.POLYMORPH_SIZE_SPECS) do
         db.polymorph[spec.key] = MTF.SanitizePolymorphSize(spec, polymorph[spec.key])
     end
-    local reminders = type(db.reminders) == "table" and db.reminders or {}
-    local reminderSpells = type(reminders.spells) == "table" and reminders.spells or {}
-    local reminderIcons = type(reminders.icons) == "table" and reminders.icons or {}
-    local reminderLast = type(reminders.last) == "table" and reminders.last or {}
-    db.reminders = {enabled = reminders.enabled ~= false, group = reminders.group ~= false, spells = {}, icons = {},
-        last = {}}
-    for _, reminder in ipairs(MTF.REMINDERS or {}) do
-        local spell = reminderSpells[reminder.key]
-        if type(spell) == "boolean" then
-            db.reminders.spells[reminder.key] = spell
-        else
-            db.reminders.spells[reminder.key] = reminder.on
-        end
-        local icon = type(reminderIcons[reminder.key]) == "table" and reminderIcons[reminder.key] or {}
-        if type(reminderLast[reminder.key]) == "string" then
-            db.reminders.last[reminder.key] = reminderLast[reminder.key]
-        end
-        db.reminders.icons[reminder.key] = {position = SanitizePosition(icon.position),
-            scale = MTF.SanitizeReminderScale(icon.scale)}
-    end
     local announce = type(db.announce) == "table" and db.announce or {}
     -- Trade whispers once had one switch on the Conjure page.
     local formerWhisper = conjure.whisper
@@ -426,41 +291,12 @@ function MTF.SanitizeDB(db)
     for key, default in pairs(MTF.ANNOUNCE_DEFAULTS) do
         db.announce[key] = MTF.SanitizeAnnouncement(announce[key], default)
     end
-    -- The shield display is a self-contained component; it owns its defaults.
-    if MTF.ShieldDisplay then
-        db.shield = MTF.ShieldDisplay.Sanitize(db.shield)
-    end
     -- The lock is Dyre's Toolkit's (one for every Dyre's AddOn); MTF keeps a
-    -- copy for its modules, and the shield component reads its own.
+    -- copy for its modules.
     db.locked = db.locked ~= false
-    if type(db.shield) == "table" then
-        db.shield.locked = db.locked
-    end
-    local chimes = type(db.chimes) == "table" and db.chimes or {}
-    local spells = type(chimes.spells) == "table" and chimes.spells or {}
-    local learned = type(chimes.learned) == "table" and chimes.learned or {}
-    local sounds = type(chimes.sounds) == "table" and chimes.sounds or {}
-    -- The one sound every chime used before each had its own.
-    local formerSound = SavedSound(chimes.sound)
-    db.chimes = {
-        enabled = chimes.enabled ~= false,
-        lead = MTF.SanitizeChimeLead(chimes.lead),
-        spells = {},
-        sounds = {},
-        learned = {},
-    }
-    for _, chime in ipairs(MTF.CHIME_SPELLS) do
-        if type(spells[chime.key]) == "boolean" then
-            db.chimes.spells[chime.key] = spells[chime.key]
-        else
-            db.chimes.spells[chime.key] = chime.on
-        end
-        db.chimes.sounds[chime.key] = SavedSound(sounds[chime.key]) or formerSound or MTF.DEFAULT_CHIME_SOUND
-        local seconds = learned[chime.key]
-        if type(seconds) == "number" and seconds >= LEARNED_MIN and seconds <= LEARNED_MAX then
-            db.chimes.learned[chime.key] = seconds
-        end
-    end
+    -- db.shield, db.reminders, and db.chimes (MTF 1.1 and older) stay exactly
+    -- as they are: Dyre's Shields Up and Dyre's Buff Reminders copy them once
+    -- per character, also when installed later.
     return db
 end
 
@@ -521,36 +357,6 @@ local function InstallInputHooks()
     WorldFrame:HookScript("OnMouseDown", OnInput)
 end
 
--- The shield display (Shield.lua) is a component other AddOns may ship too; MTF
--- hands it MTF's settings and chat, and it decides whether this copy draws.
-function MTF.InitializeShield()
-    -- Not even a candidate in the display's election: Dyre's Shields Up draws it.
-    if MTF.ShieldStandAside() then
-        return
-    end
-    -- With Dyre's Toolkit the ring drags and snaps with every Dyre's AddOn's
-    -- frames; without it, it moves freely, as before.
-    local toolkit = MTF.toolkit
-    local layout = toolkit and {register = toolkit.RegisterMovable, beginDrag = toolkit.BeginDrag,
-        endDrag = toolkit.EndDrag}
-    MTF.ShieldDisplay.Initialize({settings = function() return MTF.db.shield end, report = MTF.Report,
-        unlockHint = "Drag to move · /mtf lock when done", missingSounds = MTF.ReportMissingSounds,
-        layout = layout})
-end
-
-function MTF.RefreshShield()
-    MTF.ShieldDisplay.Refresh()
-    MTF.ShieldDisplay.ApplyBreakSound()
-end
-
-function MTF.ResetShieldPosition()
-    MTF.ShieldDisplay.ResetPosition()
-end
-
-function MTF.ReportShieldDebug()
-    MTF.ShieldDisplay.ReportDebug(MTF.Report)
-end
-
 -- Dyre's Toolkit (required, contract 2; author-approved 2026-10-20: "all the
 -- widget layout ... centralized in Dyre's Tools"). Every movable MTF frame is
 -- a toolkit widget: the toolkit places, drags, snaps, resizes from the
@@ -560,7 +366,7 @@ end
 local TOOLKIT_CONTRACT = 2
 local TOOLKIT_FUNCTIONS = {
     "RegisterAddOn", "RegisterSettingsCategory", "IsLocked", "SetLocked", "OpenSettings", "CreateWidget",
-    "AddWidgetSettings", "ResetWidgets", "BeginDrag", "EndDrag", "RegisterMovable",
+    "AddWidgetSettings", "ResetWidgets", "AddSettingsLink",
 }
 local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit 2.0 or later: install or update it from "
     .. "CurseForge. MTF stays off until then."
@@ -583,17 +389,14 @@ function MTF.Toolkit()
     return toolkit
 end
 
--- The toolkit's lock changed: MTF's samples (the Polymorph sample, every buff
--- reminder, the portal bar with nothing known, the shield sample) show or
--- hide, quietly; the toolkit says one line for all and draws the outlines.
+-- The toolkit's lock changed: MTF's samples (the Polymorph sample, the portal
+-- bar with nothing known) show or hide, quietly; the toolkit says one line for
+-- all and draws the outlines.
 local function ApplyFramesLocked(locked)
     MTF.db.locked = locked
-    MTF.db.shield.locked = locked
     MTF.RefreshConjure()
     MTF.RefreshPortals()
     MTF.RefreshPolymorph()
-    MTF.RefreshReminders()
-    MTF.RefreshShield()
 end
 
 -- /mtf unlock and /mtf lock: one layout mode for every Dyre's AddOn.
@@ -610,12 +413,9 @@ function MTF.Lock()
 end
 
 -- /mtf reset: every MTF widget back to its default place (the toolkit waits
--- out combat for those holding secure buttons), the buff reminders back to
--- their size, and the shield display (not a widget yet) to its place.
+-- out combat for those holding secure buttons).
 function MTF.ResetPositions()
-    MTF.ResetRemindersSize()
     MTF.toolkit.ResetWidgets(addonName)
-    MTF.ResetShieldPosition()
     if InCombatLockdown() then
         MTF.Report("MTF frames move back to their default places after combat.")
     end
@@ -684,15 +484,11 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     -- Called directly rather than from each file's own PLAYER_LOGIN handler,
     -- so startup never depends on event handler order.
     InstallInputHooks()
-    local locked = MTF.toolkit.IsLocked() ~= false
-    MTF.db.locked = locked
-    MTF.db.shield.locked = locked
+    MTF.db.locked = MTF.toolkit.IsLocked() ~= false
     MTF.InitializeConjure()
     MTF.InitializePortals()
     MTF.InitializePolymorph()
-    MTF.InitializeReminders()
-    MTF.InitializeShield()
-    MTF.InitializeChimes()
     MTF.InitializeOptions()
     RegisterWithToolkit()
+    ReportMissingCompanions()
 end)

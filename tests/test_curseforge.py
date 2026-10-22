@@ -155,9 +155,11 @@ class CurseForgeTests(unittest.TestCase):
         metadata = json.loads(parts[0].get_payload(decode=True))
         self.assertEqual(metadata, {"gameVersions": [12345], "releaseType": "beta",
                                    "changelog": notes, "changelogType": "markdown",
-                                   "relations": {"projects": [{"slug": "dyres-sounds",
+                                   "relations": {"projects": [{"slug": "dyres-toolkit",
                                                                "type": "requiredDependency"},
-                                                              {"slug": "dyres-toolkit",
+                                                              {"slug": "dyres-shields-up",
+                                                               "type": "requiredDependency"},
+                                                              {"slug": "dyres-buff-reminders",
                                                                "type": "requiredDependency"}]}})
         self.assertEqual(parts[1].get_filename(), self.archive.name)
         self.assertEqual(parts[1].get_content_type(), "application/zip")
@@ -192,10 +194,11 @@ class CurseForgeTests(unittest.TestCase):
                     self.publish()
                 self.assert_no_network()
 
-    def test_dyres_sounds_and_toolkit_are_the_only_relations_and_required(self):
-        # Required, so the CurseForge app installs the sounds and the toolkit with MTF.
+    def test_toolkit_shields_up_and_buff_reminders_are_the_only_relations_and_required(self):
+        # Required, so the CurseForge app installs them with MTF (author, 1.2.0);
+        # MTF plays no sound itself, so Dyre's Sounds comes with DSU and DBR.
         projects = publisher.RELATIONS["projects"]
-        self.assertEqual([p["slug"] for p in projects], ["dyres-sounds", "dyres-toolkit"])
+        self.assertEqual([p["slug"] for p in projects], ["dyres-toolkit", "dyres-shields-up", "dyres-buff-reminders"])
         self.assertTrue(all(p["type"] == "requiredDependency" for p in projects))
 
     def test_strict_tag(self):

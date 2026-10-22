@@ -4,9 +4,41 @@
 
 Mage Tools Forever (MTF) is a World of Warcraft: Forever AddOn: a suite of
 quality-of-life tools for Mages, the counterpart of the author's Warlock Tools
-Forever (WTF). Each tool has its own switch on the main settings page and its
-own subpage. Keep this feature set; do not add speculative features or
-frameworks without agreement.
+Forever (WTF): Conjure, Portals, the Polymorph bar, and Announce. Each tool has
+its own switch on the main settings page and its own subpage. Keep this
+feature set; do not add speculative features or frameworks without agreement.
+
+### Dyre's Shields Up and Dyre's Buff Reminders (built 1.2.0; author-approved)
+
+- John, for "virality": MTF no longer duplicates the family's stand-alone
+  AddOns, it depends on them, so the CurseForge app installs them and players
+  meet them on their other classes. Dyre's Shields Up (DSU, `DyresShieldsUp`,
+  CurseForge `dyres-shields-up`, project 1751302) draws the shield display;
+  Dyre's Buff Reminders (DBR, `DyresBuffReminders`, `dyres-buff-reminders`,
+  project 1753804) shows Arcane Intellect, your armor, and Dampen or Amplify
+  Magic (DBR adds it, off by default) and plays the cooldown chimes. MTF's
+  own copies (Shield.lua, Reminders.lua, Chimes.lua, the crescent textures,
+  scripts/build_arc.py) are gone, and so is Dyre's Sounds: MTF plays no sound.
+- TOC `## OptionalDeps: DyresShieldsUp, DyresBuffReminders`, so MTF loads
+  without them; CurseForge lists both as required dependencies, with
+  `dyres-toolkit` (`RELATIONS`). Without one, Core says once at login (after
+  the modules start) "Install <AddOn> from CurseForge for <what>.", or
+  "Enable <AddOn> in the AddOn list for <what>." when `C_AddOns.GetAddOnInfo`
+  says it is installed (its reason is not "MISSING") (`MTF.COMPANIONS`,
+  `MTF.CompanionMessage`). Only CurseForge is named.
+- Settings are linked, not mirrored: the Shield, Buff Reminders, and Cooldown
+  Chimes pages hold only the toolkit's `AddSettingsLink` button ("Open Shield
+  settings", "Open Buff Reminders settings"), which opens that AddOn's own
+  page, is greyed while it has not joined the toolkit, says the same
+  install or enable line when clicked then, and never opens in combat.
+- The saved keys `db.shield`, `db.reminders`, and `db.chimes` (MTF 1.1 and
+  older) stay exactly as they were, also through unlock, lock, and reset (a
+  test checks): DSU copies the shield settings and DBR the reminder switches,
+  the group switch, the last armor, Dampen, and the chimes, once per
+  character, also when installed later. Reminder icon places start fresh in
+  DBR (John). Arcane Powder is counted by DBR's Consumables; the portal bar
+  keeps the runes.
+
 
 ### Conjure (built)
 
@@ -71,9 +103,8 @@ frameworks without agreement.
   click casts one spell; never cast two from one click). Macro
   "! Food & Water" uses the best carried item of each, to stay within 255
   letters. Its icon is half water, half food.
-- Size settings (author-approved): conjure bar and shield display, 50-150%
-  in steps of 5, default 100; the bar's applies out of combat (secure
-  buttons), the shield's at once.
+- Size setting (author-approved): Bar size, 50-150% in steps of 5, default
+  100; it applies out of combat (secure buttons).
 - Mana gems (author-approved): like WTF's Healthstones without trading.
   Left- and middle-click use your best gem; right-click conjures the best rank
   you do not carry (each rank is unique in your bags). Before a gem rank is
@@ -102,162 +133,13 @@ frameworks without agreement.
   Mage does not carry), so each rank's Classic required level stands in
   until then.
 
-### Shield display (built; a shared component)
-
-- Shield.lua is self-contained (author-approved, important): it uses nothing
-  from MTF and takes only a settings table getter and a report function in
-  `ShieldDisplay.Initialize`, so it can ship unchanged in other AddOns (a
-  standalone shield AddOn, WTF, Priest or Paladin tools). It owns its
-  defaults (`ShieldDisplay.Sanitize`). Core adapts it for MTF
-  (`MTF.InitializeShield` and friends); the ring texture path follows the
-  host's folder, so each host ships Textures/ShieldArc.tga.
-- Duplicates reconcile to one ring: each copy registers in the global
-  `ShieldForeverRegistry` as its file loads (before any `PLAYER_LOGIN`), and
-  takes part only once its AddOn calls `Initialize` (MTF stays off on a
-  Warlock, WTF on a Mage), so login order never decides. Among the copies
-  taking part, the newest `VERSION`, then the first registered, draws the
-  ring; a copy that was drawing stands down when a newer one joins (protocol
-  2: each copy's start and stop are in the registry); the others draw
-  nothing and say once which AddOn shows it. Version 1 copies elect among
-  every registered copy. WTF and DSU ship the same file: keep every copy
-  byte-identical and bump `VERSION` in all with every behavior change
-  (through the coordinator; tests pin MTF's version in the debug_shield
-  text and use a newer one for the take-over test).
-- Version 3: bubbles (Divine Shield, Divine Protection: Paladin; Blessing
-  of Protection: anyone) are timed, drawing a gold innermost crescent
-  (Textures/ShieldArcInnermost.tga) that drains with their time left
-  (Classic IDs; check on Forever). In combat the display stays shown, since
-  buffs others cast cannot be read: the outer crescent is invisible with no
-  absorb, and the engine shows each icon and timed crescent only while its
-  buff is up.
-- Version 4: each crescent texture spans its own height (scripts/build_arc.py
-  stretches it; Shield.lua's `*_SPAN` constants match, checked by a Python
-  test), and every crescent texture and bar is drawn at that height. A
-  StatusBar fills its whole height, so across the full square a timed bar
-  emptied a segment or more before its buff ended (found in client; the
-  fix confirmed on a Mage).
-- Version 5 (with MTF and WTF; found in client): absorbs
-  under the larger of 25 points and 5% of max health (25 when max health is
-  secret) never show; a Paladin's Seal of Righteousness proc, 10-20 points,
-  flickered the ring. The absorb cannot be compared, so a hidden gate
-  StatusBar, one point wide and ending at the minimum, takes it as its value,
-  and a clipping frame anchored to the gate's fill holds the crescent and the
-  number (confirmed on a Paladin). Fixed constants, no setting.
-- Version 6 (with MTF and WTF; found in client): the break sound is chosen
-  in a dropdown under the sound switch (author-approved: a default you can
-  change, Fading slow disappear). The client plays no game sound by path
-  (RaidWarning.ogg stayed silent), while an AddOn's file plays, also through
-  `C_UnitAuras.AddAuraSound` when a buff runs out. Turning the sound on, or
-  choosing one, plays it once.
-- Version 7 (with MTF and WTF; found in client): every crescent is anchored
-  to the display itself. In v5 and v6 the outer crescent was fitted to its
-  parent, the minimum-absorb clipping frame, which reaches 40 px below the
-  display for the number, so it was drawn lower and taller than the inner
-  crescents (seen on a Mage with Fire Ward and Mana Shield).
-- Version 8 (with MTF, WTF, and Dyre's Shields Up, DSU): no AddOn but Dyre's
-  Sounds ships sound files (author-approved, mandatory: one copy for all of
-  Dyre's AddOns). The break sound comes from the library Dyre's Sounds
-  (`DyresSounds.RequireContract(1)`; its aura sounds: Dyre's Picks and game
-  file IDs). Interface: `SoundChoices()` and `SetupSoundMenu(initializer)`
-  replace `BREAK_SOUNDS`; the shield page builds its dropdown with
-  `Settings.CreateDropdown(page, sound, display.SoundChoices, ...)` and
-  `display.SetupSoundMenu(dropdown)`, under the sound switch. Saved keys
-  (v6 and v7 saved the library's keys) are kept. Without the library the
-  display works, a saved choice is kept, and turning the sound on says once in
-  chat to install Dyre's Sounds. Shield.lua is byte-identical to DSU's copy.
-  MTF passes `missingSounds = MTF.ReportMissingSounds` to `Initialize`, so the
-  shield sound and the chimes share one line (author-approved: one per AddOn).
-- Version 9 (with MTF, WTF, and DSU; coordinator-approved): an optional
-  `layout = {register(frame, save), beginDrag(frame), endDrag(frame)}` in
-  `Initialize` moves the ring through the host's layout (Dyre's Toolkit);
-  `save` stores `{point, relativePoint, x, y}` in the shield settings.
-  Without it the ring moves freely and saves its own point.
-- Version 10 (DSU 1.1.0; MTF 1.1.1 copies it): a widget host may pass
-  `layout = {adopt(frame), resetPosition(frame)}` and own the ring's layout.
-  MTF still passes v9's `{register, beginDrag, endDrag}` (adopting the ring
-  as a toolkit widget is optional, later). For such a host, a size change
-  keeps the ring's center and saves `{CENTER, BOTTOMLEFT, x, y}`, only when
-  it is placed and the scale really changed (found in client: a bare
-  `SetScale` moved the ring right and up as it grew). Shield.lua never names
-  Dyre's Toolkit.
-- Version 11 (with v10; author-approved: large crescents with a large
-  number were disconcerting): `shield.scale` sizes the crescents only. The
-  number and the icon row have their own sizes, `textScale` and `iconScale`
-  (50-150%, sanitized by the display); MTF has no sliders for them, so they
-  stay at 100%. The engine's slots are never resized: icons and timed
-  crescents are separate slots in two AuraContainers (`frame.icons`,
-  `frame.crescents`), each set up only in its initializeFrame.
-- MTF's copy is byte-identical with DSU's (Shield.lua sha256 for v11:
-  0d09d196498024d8c6725914f2b47af4185071aa4fbfea70d2dae35aed68fa13); a test
-  compares it with ../DyresShieldsUp/Shield.lua when that folder is there.
-  Never edit it here: changes go through DSU and the coordinator.
-- The icon row holds the player's own class's shields (`class` on each
-  entry), then the shared ones (Power Word: Shield), one spot each: a Mage's
-  Ice Barrier, Mana Shield, Fire Ward, Frost Ward, Power Word: Shield; a
-  Warlock's Shadow Ward, Sacrifice, Power Word: Shield. Break sounds cover
-  the same shields. Any other absorb fills the crescent in the other-shield
-  color without an icon; Paladin bubbles are immunities with no absorb.
-- A segmented crescent (white, tinted per shield) to the right of your
-  character, filled from the bottom by a vertical StatusBar with your
-  remaining absorb from any source, against the shield's size as it landed
-  (author-approved, after NaN Shield; measuring against maximum health, as
-  frame AddOns shade absorbs, filled too little to read). The size is the
-  absorb total captured at your shield cast and in the next 0.5 s, or at the
-  absorb change that starts another player's shield window: stored and passed
-  to `SetMinMaxValues`, never read; maximum health until one is known. The
-  number sits under the crescent; a dim track shows the used part. Known colors: Ice Barrier, Mana Shield, Fire Ward, Frost Ward,
-  Power Word: Shield, Shadow Ward, Sacrifice; any other absorb (another
-  player's, a trinket, a Forever Paladin shield) shows in a neutral color. The
-  amount shows as a number (a setting, on by default).
-- `UnitGetTotalAbsorbs` is always secret. It is passed, unread, to
-  `StatusBar:SetValue`/`SetMinMaxValues`, through `AbbreviateNumbers` to
-  `FontString:SetText`, and as the opacity (`SetAlpha`) of the frame holding
-  everything visible, all `AllowedWhenTainted` in the pinned docs; opacity
-  stops at 1, so the ring drops the moment the absorb is 0, also in combat
-  (author: important). Curve objects refuse secrets from AddOn code, so
-  never try to derive values from the absorb. Never compare or do math on it.
-- Two kinds of shield (author-approved, like frame AddOns' absorb shading):
-  absorb shields (Ice Barrier, the wards, Power Word: Shield) live in the
-  outer crescent, which moves only as they absorb and drops when they break
-  or expire; shields with no absorb amount (`timed`: Mana Shield) get the
-  inner crescent (Textures/ShieldArcInner.tga, same center), driven by the
-  AuraContainer slot's `SetDurationBar` (RemainingTime), so it drains with
-  the time left and disappears with the buff, also in combat. That slot's
-  frame covers the display and never takes the mouse; its icon sits in its
-  spot. Only absorb shields color the outer crescent (the latest one up); a
-  timed shield keeps the display up but never colors it (in client a Mana
-  Shield cast after a ward turned both crescents purple).
-- Several shields at once (Ice Barrier, Mana Shield, a ward): the client
-  gives AddOns only the combined absorb, so the crescent shows the total,
-  re-captured as each shield lands (author-approved). An icon row under the
-  number shows which shields are up: a Blizzard AuraContainer (as WTF's DoT
-  tracker) on `player`, filter `HELPFUL`, a slot per known shield with
-  `includeSpellIDs` = a set `{[rankID] = true}` of its ranks (a list matches
-  nothing, found in client) (Classic IDs match on Forever: Mana Shield
-  1463, Fire Ward 543, Power Word: Shield), icon and cooldown swipe; the
-  engine shows and hides each icon, also in combat. `IsShown` on those icons is secret to AddOn code
-  (found in client), so each shield has a fixed spot (mage shields 1-4,
-  others share 5); never lay them out by visibility. The row sits outside the
-  opacity frame, so a shield the total leaves out still shows its icon:
-  Mana Shield is not in `UnitGetTotalAbsorbs` on Forever (its buff has no
-  points; Fire Ward's points matched the total). Without
-  the AuraContainer template the row is left out.
-- Show/hide windows (a backstop to the opacity): your own shield cast (by
-  name, any rank) for the shield's Classic length; any absorb change while no
-  known shield is up, or just ended, for 30 s; out of combat your buffs are
-  read (`GetAuraDataBySpellName`), so shields that broke early end and
-  shields others cast on you show. Aura APIs error in combat; never call them
-  then.
-- A plain frame, locked by default; it takes the mouse only while unlocked, to
-  show a sample of every part to drag, so it never blocks world clicks.
-
 ### Dyre's Toolkit widgets (built; author-approved, 2026-10-20)
 
 - Dyre's Toolkit (`src/DyresToolkit`, owned by the coordinator; never edit
-  it, ask there) is required, contract 2 (Toolkit 2.0): TOC `## Dependencies:
-  DyresToolkit` and `## OptionalDeps: DyresSounds`, `## Group:
-  DyresToolkit`; CurseForge required dependencies `dyres-sounds` and
-  `dyres-toolkit` (`RELATIONS`). John: all widget layout is centralized in the
+  it, ask there) is required, contract 2 (Toolkit 2.0; 2.3 for
+  `AddSettingsLink`): TOC `## Dependencies: DyresToolkit` and `## Group:
+  DyresToolkit`; CurseForge required dependency `dyres-toolkit`
+  (`RELATIONS`). John: all widget layout is centralized in the
   toolkit; MTF was its first client and keeps no layout code of its own
   (no Layout.lua, mover, grid, unlock or grid switches, resize helper, or
   fallback).
@@ -267,7 +149,7 @@ frameworks without agreement.
   (`TOOLKIT_MISSING`). After the modules start, `RegisterAddOn` with
   `setLocked` (MTF refreshes its samples and visibility, quietly; the
   toolkit says one line for all and draws the outlines) and `openSettings`.
-  `MTF.db.locked` and `db.shield.locked` are copies of the toolkit's lock.
+  `MTF.db.locked` is a copy of the toolkit's lock.
 - Every movable frame is a widget (`DyresToolkit.CreateWidget`), with
   `store` = its saved table, so the saved keys carry over unchanged
   (`position` as {point, relativePoint, x, y}, `scale`, and the Polymorph
@@ -281,14 +163,10 @@ frameworks without agreement.
     (MTF's click-through rule), sizes scale (Bar size), width, barHeight
     (saved as "height": the toolkit reserves "height" for a frame height),
     textScale, opacity; `measure` gives the frame size; `onLayout` and
-    `onOpacity` lay out the visible bar and rebuild the engine slot;
-  - each buff reminder icon `MageToolsForeverReminder_<key>`: mouse "always",
-    store `reminders.icons[key]`, scale 50-200% in steps of 10 (mouse wheel
-    while unlocked: `SetSetting("scale")`; no slider).
+    `onOpacity` lay out the visible bar and rebuild the engine slot.
   Every conjure and portal button is a drag handle of its bar
   (`widget:AddDragHandle(button)`: the buttons cover most of it; clicks
-  still reach them). The reminder icons' outline hint says "scroll to
-  resize" (`spec.hint`).
+  still reach them).
 - The toolkit owns placement, dragging, snapping (also to other AddOns'
   frames), the grid, Shift and Ctrl, the gold outline and hint, resizing
   from the center, waiting out combat for protected widgets, repairing the
@@ -299,86 +177,10 @@ frameworks without agreement.
   StartMoving, or EnableMouse on a widget, except EnableMouse on the
   Polymorph holder (a test wraps those methods and checks).
 - `/mtf unlock` and `/mtf lock` call the toolkit's `SetLocked`. `/mtf reset`
-  resets the reminder sizes, then `ResetWidgets("MageToolsForever")`, then
-  the shield display's place.
+  calls `ResetWidgets("MageToolsForever")`.
 - Settings: MTF's page is `RegisterSettingsCategory("Mage Tools Forever")`
   under "Dyre's AddOns", its pages under that; `/mtf` opens it through the
   toolkit's `OpenSettings` (never in combat).
-- The shield display (shared Shield.lua v9) is not a widget yet: it gets
-  `layout = {register = RegisterMovable, beginDrag = BeginDrag, endDrag =
-  EndDrag}` (contract-1 functions, still in contract 2), so it drags and
-  snaps with the others; DSU's step moves it. Optional sound when a shield
-  ends (off by default): `C_UnitAuras.AddAuraSound` with trigger Removed for
-  every Classic rank ID, deferred during encounters.
-
-### Cooldown chimes (built)
-
-- A sound just before a chosen spell's cooldown ends (author-approved, after
-  MageAlert), also in combat. Spells, defaults on: Blink, Frost Nova,
-  Counterspell, Ice Block, Ice Barrier, Mana Shield, Evocation; off: Cold Snap,
-  Fire Ward, Frost Ward, Cone of Cold, Fire Blast, Presence of Mind, Arcane
-  Power, Combustion. Each has a switch.
-- The combat log is closed to AddOns and `C_Spell.GetSpellCooldown` is secret
-  under cooldown restrictions, with no event when a cooldown ends. So MTF times
-  each chime from your own cast: the length it last read for that spell out of
-  combat (saved per character), else the Classic length, minus the lead
-  (setting 0-3 s in 0.5 s steps, default 0.5, as MageAlert's 14.5 s Blink).
-  0.1 s after a cast it reads the real cooldown when readable and reschedules.
-  Cold Snap cancels the Frost chimes. Mana Shield has no Classic cooldown and
-  chimes only if the client reports one.
-- Each chime has its own sound (author-approved), picked under its switch.
-  The sounds, the nested menu (like the Cooldown Manager's sound picker), and
-  the playing all come from the library AddOn Dyre's Sounds
-  (`src/DyresSounds`, author-approved, mandatory: only it ships sound files,
-  so MTF ships none). Core's `MTF.SoundLibrary()` is
-  `DyresSounds.RequireContract(1)` with `List`, `Groups`, `Label`, `Resolve`,
-  `Play`, `Choices`, and `SetupMenu` checked as functions. A chime plays with
-  `Play(key, "<Spell> ready")` (the speech for Text to Speech); a sound that
-  cannot play (no voice) falls back to the default. The dropdown is
-  `Settings.CreateDropdown(page, sound, library.Choices(), ...)` plus
-  `library.SetupMenu(dropdown)`; choosing a sound plays it. Saved keys are
-  sanitized with `Resolve` (MTF's old "effect..." and `popclick` keys are its
-  aliases); without the library a saved key is kept as it is, so a missing
-  library never resets a choice. Every spell defaults to Interface: Talent
-  ready (author-approved: a good sound for a spell becoming available;
-  players discover they can change it); a sound chosen for all chimes before
-  each had its own (`chimes.sound`, read once) carries over. MageAlert's own
-  sound files are not ours to ship.
-- The TOC lists the library as `## OptionalDeps: DyresSounds` (never
-  `## Dependencies`, which would stop MTF loading without it), and CurseForge
-  as a required dependency (`RELATIONS` in scripts/publish_curseforge.py,
-  slug `dyres-sounds`), so the CurseForge app installs it. Without the
-  library, or with an older contract, chimes still time but play nothing, the
-  page shows the switches without sound menus, and MTF says once per session
-  in chat what to install or update.
-- A settings page whose feature a stand-alone Dyre's AddOn runs is listed as
-  "<Page> (<AddOn>)" and starts with a heading "<Feature> are now managed by
-  <AddOn>" with a tooltip naming its slash command (author-approved; Options.lua
-  ManagedTitle and ManagedHeading).
-- The stand-alone Dyre's AddOn wins when installed (author's rule for every
-  shared feature until the class AddOns drop their copies). Dyre's Shields Up:
-  while `C_AddOns.IsAddOnLoaded("DyresShieldsUp")` is true (MTF.ShieldStandAside),
-  MTF never calls ShieldDisplay.Initialize, so its copy draws nothing and is
-  no candidate in the election; every shield setting is greyed out with a
-  tooltip pointing to `/dsu`; saved shield settings stay as they are.
-- Dyre's Buff Reminders (DBR, `src/DyresBuffReminders`) shows buff reminders for
-  every class (author-approved two-step move). While
-  `C_AddOns.IsAddOnLoaded("DyresBuffReminders")` is true, MTF's own reminder
-  icons stay hidden, also unlocked (MTF.RemindersStandAside), and the reminder
-  settings are greyed out (author-approved) with tooltips saying DBR shows them; MTF's saved reminder settings stay as they are. Later MTF drops
-  its reminders.
-- Cooldown chimes for every class (author-approved two-step move) are in
-  DBR's Cooldown Chimes section from DBR 0.2.0-beta; Dyre's Cooldown Chimes
-  (DCC, never released) merged into it. Step two, from MTF 0.3.2-beta (DBR's
-  `OTHER_CHIMES` treats MTF as standing aside from 0.3.2 on, so it warns
-  only about older MTF): while `MTF.ChimesOwner()` finds DyresBuffReminders,
-  or DyresCooldownChimes (kept while the author still has it installed), MTF
-  plays no chimes (no install message either), every chime setting is greyed
-  out, and the page title, heading, and tooltips name that AddOn and its slash
-  command. MTF keeps its saved chime settings untouched, since that AddOn
-  copies them on its first run on a character. Later MTF drops its chimes,
-  with a CHANGELOG note and a chat message.
-
 ### Portals (built)
 
 - A movable bar (author-approved, after PortalMage) with a secure button for
@@ -444,9 +246,8 @@ frameworks without agreement.
   frames are unlocked (`EnableMouse` in `ApplyClick`, out of combat only;
   after a sheep forgotten in combat, clicks pass through again when combat
   ends). The bar on top never takes the mouse. Every other MTF frame that
-  takes the mouse is visible (the conjure and portal bars and their buttons,
-  the buff reminder icons, which hide when not needed) or takes it only while
-  unlocked (the shield display).
+  takes the mouse is visible (the conjure and portal bars and their
+  buttons).
 - One block in WTF's Bars format (author-approved; only one Polymorph of
   yours is up at a time): the mob's name above one bar line, an
   AuraContainer slot (`HARMFUL|PLAYER`, `includeSpellIDs` = Classic Polymorph,
@@ -514,70 +315,33 @@ frameworks without agreement.
   same-named mobs can be confused. Verify `/targetlasttarget` after
   `/cleartarget` in client.
 
-### Buff reminders (built)
-
-- One icon per buff (author-approved, instead of the Cooldown Manager's),
-  shown only while the buff is missing, with a solid gold border that pulses
-  (an Alpha animation, BOUNCE). Arcane Intellect (Arcane Brilliance counts;
-  optionally group members who use mana, not warriors or rogues, skipping
-  dead, offline, or out-of-sight members; the icon shows the count and its
-  tooltip who), Armor (Frost, Ice, or Mage Armor), and Dampen or Amplify
-  Magic (off by default). Only buffs you know. Matched by name, so every rank
-  counts.
-- Clicking an icon casts the missing buff (author-approved): a
-  `SecureActionButtonTemplate` button with `type1` spell, `spell1` by name
-  (highest rank), and `unit1`. Arcane Intellect goes to you first, then the
-  first group member who lacks it and is in range (`C_Spell.IsSpellInRange`
-  not false), else the first; as each buff lands (`UNIT_AURA`), the click
-  moves to the next. With two or more missing, Arcane Brilliance (known, and
-  Arcane Powder 17020 carried) instead. Warriors and rogues are never counted
-  or targeted. Armor and Dampen/Amplify recast the last one you cast (saved
-  per character in `reminders.last`), else the best known (Mage, Ice, then
-  Frost Armor; Dampen, then Amplify). Unlocked icons cast nothing, so
-  dragging is safe.
-- Aura APIs refuse AddOn code in combat, so MTF reads auras only out of
-  combat. Secure icons change only out of combat, so they sit in a holder
-  (`MageToolsForeverReminders`) hidden for combat by
-  `RegisterStateDriver(holder, "visibility", "[combat] hide; show")`; changes
-  asked for in combat wait for `PLAYER_REGEN_ENABLED`. Each icon is a Dyre's
-  Toolkit widget with its own place and size (50-200%, mouse wheel while
-  unlocked, 10% steps), saved per character; `/mtf reset` restores sizes and
-  places (a row, 20 apart).
-
 ### Planned (pass 2, agreed)
 
-- Reagent counter (like WTF's shard counter), proc sounds (Clearcasting and
-  Forever's new procs, via `AddAuraSound`), and conjure emotes on the next
-  hardware input, with flavor and credit.
+- Conjure emotes on the next hardware input, with flavor and credit. (Proc
+  sounds are DBR's, and Arcane Powder is counted by DBR's Consumables.)
 
 ### Resizing (built; author's rule, 1.1.0)
 
 - Every MTF frame resizes from its center: the toolkit's widgets do it
   (`DyresToolkit.ResizeFromCenter`). Found in client: a frame placed by an
   offset from a screen corner moved right and up as it grew, because the
-  offset scales with the frame. The shield display (shared Shield.lua, not
-  a widget) scales from its center itself since v10 (MTF 1.1.1).
+  offset scales with the frame.
 
 ## Project structure
 
 - Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
-  Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, loaded in that order, plus
-  Textures/ShieldArc.tga, Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga. Shield.lua is the
-  shared component above; keep it free of MTF references. Commands parses `/mtf`; Core owns saved settings and
-  their defaults, the Dyre's Sounds check, the Dyre's Toolkit link, and the
-  stand-aside checks,
-  the login banner, class and install checks, slash conflict
-  reporting, the hardware-input hooks trade placement waits for, and startup;
-  Conjure, Shield, and Chimes own their modules and `/mtf debug_*` commands;
-  Options owns the settings pages.
+  Portals.lua, Polymorph.lua, Options.lua, loaded in that order; no media.
+  Commands parses `/mtf`; Core owns saved settings and their defaults, the
+  Dyre's Toolkit link, the companion AddOns' lines, the login banner, class
+  and install checks, slash conflict reporting, the hardware-input hooks
+  trade placement waits for, and startup; Conjure, Portals, and Polymorph own
+  their modules and `/mtf debug_*` commands; Options owns the settings pages.
 - tests/run.lua holds the Lua 5.1 mock suite. It loads Dyre's Toolkit's real
   Core, Layout, Widgets, and Settings files from a copy in tests/toolkit (CI
   has only this repository); a test fails when that copy differs from
   ../DyresToolkit, so copy the toolkit's files again after it changes.
-  tests/test_*.py cover the release
-  helpers in scripts/, including that the committed ShieldArc.tga matches
-  scripts/build_arc.py. .github/workflows/ holds CI, opt-in publishing, and the
-  approval gate check.
+  tests/test_*.py cover the release helpers in scripts/. .github/workflows/
+  holds CI, opt-in publishing, and the approval gate check.
 - README.md is the user-facing overview, TESTING.md the verification method,
   source evidence, and in-client checklist, docs/RELEASE_PLAN.md the release
   process, docs/CURSEFORGE_LISTING.md the CurseForge form text, and CHANGELOG.md
@@ -591,10 +355,8 @@ frameworks without agreement.
 - The TOC uses `## Group: DyresToolkit`, so the in-game AddOn list nests MTF
   under Dyre's Toolkit (the family groups there). `## Category: Mage` stays
   identical to the CurseForge main category.
-- The runtime assets are Textures/ShieldArc.tga, ShieldArcInner.tga, and
-  ShieldArcInnermost.tga; regenerate them with scripts/build_arc.py. MTF ships no
-  sounds (Dyre's Sounds does). Add no other runtime assets
-  without agreement.
+- MTF ships no runtime assets (no textures, no sounds). Add none without
+  agreement.
 - Git origin: git@github.com:jbedworth/MageToolsForever.git. Inspect Git state
   before acting and preserve user work. Text is LF under .gitattributes.
 
@@ -630,8 +392,7 @@ frameworks without agreement.
 - Lua 5.1 syntax and libraries only. Four-space indentation. Prefer local
   variables and functions; share state through the AddOn namespace. Expose
   globals only when WoW requires them (slash commands, saved variables, the
-  conjure bar and its secure buttons), prefixed `MageToolsForever` or `MTF`,
-  and the shared `ShieldForeverRegistry`.
+  conjure bar and its secure buttons), prefixed `MageToolsForever` or `MTF`.
 - Centralize meaningful constants; avoid unexplained magic numbers.
 - Comment sparingly: non-obvious intent, API constraints, or tradeoffs.
 - Event-driven work only; no polling or idle `OnUpdate` handlers.
@@ -669,8 +430,8 @@ frameworks without agreement.
   changes; the builder puts it at the top of release-notes.md and fails
   without it.
 - Package only MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
-  Portals.lua, Polymorph.lua, Reminders.lua, Shield.lua, Chimes.lua, Options.lua, LICENSE, Textures/ShieldArc.tga,
-  Textures/ShieldArcInner.tga, and Textures/ShieldArcInnermost.tga (no sounds: they come from Dyre's Sounds) under the top-level `MageToolsForever/` folder, named
+  Portals.lua, Polymorph.lua, Options.lua, and LICENSE under the top-level
+  `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
   `release.json` (flavor `forever`) attached for WowUp.
 - Publishing requires repository variables `ENABLE_GITHUB_RELEASES='true'` and,

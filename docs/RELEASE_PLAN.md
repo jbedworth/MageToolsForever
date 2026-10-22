@@ -40,14 +40,8 @@ MageToolsForever/
     Conjure.lua
     Portals.lua
     Polymorph.lua
-    Reminders.lua
-    Shield.lua
-    Chimes.lua
     Options.lua
     LICENSE
-    Textures/ShieldArc.tga
-    Textures/ShieldArcInner.tga
-    Textures/ShieldArcInnermost.tga
 ```
 
 The validator permits one optional empty root directory entry. Additional files
@@ -57,20 +51,22 @@ agent guidance, generated logs, and all credentials/player data.
 
 Use an explicit file allowlist. Do not ZIP the checkout and maintain a growing
 list of exclusions. Keep `LICENSE` in the package, but do not load it in the TOC.
-MTF ships three textures, `Textures/ShieldArc.tga`, `ShieldArcInner.tga`, and
-`ShieldArcInnermost.tga`, the shield display's crescents, built by `scripts/build_arc.py`. The builder
-requires each to be an uncompressed 32-bit square TGA with power-of-two sides.
-MTF ships no sounds: they come from the library AddOn Dyre's Sounds, listed in
-the TOC as `## OptionalDeps: DyresSounds` and on CurseForge as a required
-dependency (`RELATIONS` in `scripts/publish_curseforge.py`, slug
-`dyres-sounds`, sent with every upload's metadata).
+MTF ships no media (`MEDIA_FILES` is empty since 1.2.0; the builder would
+require each texture to be an uncompressed 32-bit square TGA with power-of-two
+sides) and no sounds. The shield display, the buff reminders, and the cooldown
+chimes are Dyre's Shields Up's and Dyre's Buff Reminders', listed in the TOC
+as `## OptionalDeps: DyresShieldsUp, DyresBuffReminders`. CurseForge lists
+Dyre's Toolkit, Dyre's Shields Up, and Dyre's Buff Reminders as required
+dependencies (`RELATIONS` in `scripts/publish_curseforge.py`, slugs
+`dyres-toolkit`, `dyres-shields-up`, and `dyres-buff-reminders`, sent with
+every upload's metadata).
 
 Validate the actual archive, not only the staging folder:
 
 1. Check CRC/integrity, non-empty files, and the exact file list.
 2. Reject absolute paths, traversal paths, symlinks, and extra root folders.
-3. Verify the TOC name, Interface `16001`, and Commands/Core/Conjure/Portals/Polymorph/Reminders/Shield/Chimes/
-   Options load order. Every listed runtime file must exist inside the archive.
+3. Verify the TOC name, Interface `16001`, and Commands/Core/Conjure/Portals/Polymorph/Options
+   load order. Every listed runtime file must exist inside the archive.
 4. Verify the packaged version matches the selected tag, with one leading `v`
    removed. Verify the packaged MIT copyright/permission notice is intact.
 5. Check the packaged Lua files with Lua 5.1 syntax validation.

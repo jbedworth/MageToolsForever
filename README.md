@@ -5,12 +5,15 @@ has its own switch on the main settings page and its own settings page in
 **Options → AddOns → Mage Tools Forever**, or type `/mtf`. Settings are saved
 per character.
 
-**Sounds need Dyre's Sounds.** The cooldown chimes and the sound when a
-shield ends come from Dyre's Sounds, a small library AddOn that all of Dyre's
-AddOns share, so your computer keeps one copy of the sound files. The
-CurseForge app installs it with Mage Tools Forever; otherwise get it from
-CurseForge or [GitHub](https://github.com/jbedworth/DyresSounds). Without it,
-MTF works but plays no sounds, and says so once in chat.
+**Shields, buff reminders, and cooldown chimes come from Dyre's Shields Up
+and Dyre's Buff Reminders.** Since 1.2.0, MTF no longer has its own copies:
+**Dyre's Shields Up** draws the shield display, and **Dyre's Buff Reminders**
+shows Arcane Intellect, your armor, and Dampen or Amplify Magic, and plays the
+cooldown chimes, for every class. The CurseForge app installs both with Mage
+Tools Forever, and they take over your MTF settings once. MTF's Shield, Buff
+Reminders, and Cooldown Chimes settings pages each have a button that opens
+their settings. Without one of them, MTF works and says once in chat what to
+install (or enable).
 
 **Needs Dyre's Toolkit 2.0.** Dyre's Toolkit is the home of all of Dyre's
 AddOns: one layout mode for every Dyre's AddOn's frames, a grid, and one
@@ -124,26 +127,6 @@ target, and if the Polymorph breaks early, the bar empties so you see it.
   the bar at once, also in combat; a size change in combat applies when
   combat ends.
 
-## Buff reminders
-
-An icon with a pulsing gold border for each buff you are missing, out of
-combat: **Arcane Intellect** (also for group members who use mana, with a
-count; the tooltip says who), your **armor** (Frost, Ice, or Mage Armor), and,
-if you turn it on, **Dampen or Amplify Magic**. Each icon disappears as soon as
-the buff is up, and they all hide in combat, when the game keeps buffs from
-AddOns.
-
-**Click an icon to cast the buff.** Arcane Intellect goes to you first, then
-to the first group member in range who lacks it; click again as each one
-lands until the icon goes away. With two or more missing, it casts Arcane
-Brilliance if you know it and carry Arcane Powder. Warriors and rogues are
-never counted or buffed. Armor recasts the armor you used last (or your best),
-and Dampen or Amplify Magic the same.
-
-Unlock frames to drag each icon where you want it and scroll over it to
-resize it; like every MTF frame, they snap together (see
-[Moving frames](#moving-frames)).
-
 ## Announce
 
 The Announce settings page holds every message MTF sends, each with its own
@@ -154,75 +137,13 @@ count, `%I` the item, `%T` the player's full name, `%D` the portal's or
 teleport's city, and, in the emote, `%T` is you and `%Z` your zone when it is sent. Press Enter to keep
 an edit or Escape to undo it; **Defaults** restores the page.
 
-## Shield display
-
-A segmented crescent beside your character that fills with your remaining shield:
-**Ice Barrier** (blue), **Mana Shield** (purple), **Fire Ward** (orange),
-**Frost Ward** (pale blue), and shields others put on you, like a Priest's
-**Power Word: Shield**: full when the shield lands and draining as it absorbs,
-with the amount as a number below. It tracks live, also in
-combat, and drops away the moment the shield is used up.
-
-- With several shields up (say Ice Barrier, Mana Shield, and a ward), the
-  crescent shows their combined total, refilled as each one lands, and a row
-  of icons under the number shows which are up, each in its own spot; each
-  icon drops the moment its shield breaks or ends, also in combat.
-- A Paladin's **Blessing of Protection** on you has no absorb either: it shows
-  as a gold arc innermost of all, draining with its time left.
-- Mana Shield spends your mana rather than adding to your absorb, so the game
-  leaves it out of the total. It gets its own thinner crescent, nested
-  inside, that drains with its time left and disappears when it breaks or
-  ends. Absorb shields drain only as they absorb, and drop when they break or
-  expire.
-- The shield display works for any shield, so other AddOns can ship it too.
-  If more than one does (Warlock Tools Forever ships it too), you still see one
-  ring, from the newest version among the AddOns running on your character.
-- **Display size** on the Shield settings page shrinks or grows it (50-150%).
-- While frames are unlocked (see [Moving frames](#moving-frames)) it shows a
-  full sample of every part to drag; locked (the default), it never blocks
-  clicks on the world.
-- Optional: a sound when a shield ends or breaks, also in combat, chosen
-  from Dyre's Sounds.
-
-## Cooldown chimes
-
-A sound just before a spell is ready again, also in combat: **Blink**,
-**Frost Nova**, **Counterspell**, **Ice Block**, **Ice Barrier**, and
-**Evocation** by default; Cold Snap, the wards, Cone of Cold, Fire Blast,
-Presence of Mind, Arcane Power, and Combustion are off by default. Each spell
-has its own switch and its own sound, picked from Dyre's Sounds' menu, like
-the Cooldown Manager's sound picker: Dyre's Picks, the game's interface
-sounds, the Cooldown Manager's 93 alert sounds, and Text to Speech, which says
-the spell's name ("Blink ready"). Every spell starts on Talent ready. Pick how
-early it plays (default half a second) on the Cooldown Chimes settings page.
-Without Dyre's Sounds, the chimes play nothing.
-
-**Dyre's Shields Up** shows the shield display for every class. With it
-installed, MTF draws no shield ring of its own and greys out its shield
-settings; use `/dsu` for them.
-
-**Dyre's Buff Reminders** shows buff reminders for every class. With it
-installed, MTF hides its own reminder icons, so you never see two for one
-buff, and keeps its own reminder settings as they are. Use `/dbr` for them.
-
-**Dyre's Buff Reminders** also plays these chimes for every class. With it
-installed, MTF plays no chimes of its own (so you never hear two), and its
-chime settings are greyed out; use `/dbr` instead. On its first run it copies
-your MTF chime settings, and MTF keeps its own as they are.
-
-The game hides cooldowns from AddOns in combat, so MTF times each one from your
-cast, using the real cooldown it read the last time you cast the spell out of
-combat. Cold Snap cancels the Frost chimes, since it makes them ready at once.
-
 ## Moving frames
 
 Dyre's Toolkit moves every MTF frame (the conjure, portal, and Polymorph
-bars, the buff reminders, and the shield display), together with the frames
-of your other Dyre's AddOns. Type `/mtf unlock` or `/dyre unlock`, tick
+bars), together with the frames of your other Dyre's AddOns. Type `/mtf unlock` or `/dyre unlock`, tick
 **Unlock frames** on the Dyre's AddOns settings page, or click the minimap
 button: every frame gets a gold outline, and you can drag it; drag the
-conjure and portal bars from any of their buttons, and scroll over a buff
-reminder to resize it. Frames are magnetic: drop one near another and it
+conjure and portal bars from any of their buttons. Frames are magnetic: drop one near another and it
 snaps beside it. Hold **Shift** while dragging to move a whole snapped group
 together. `/mtf lock` (or `/dyre lock`) locks them again, and `/mtf reset`
 puts MTF's frames back in their default places and sizes. Everything starts
@@ -240,11 +161,8 @@ sliders on each page have a gold mark at their default.
 | `/mtf lock` | Lock them again where they are |
 | `/mtf reset` | Move the MTF frames back to their default places |
 | `/mtf debug_conjure` | Diagnostics: each conjure rank as the client knows it, macros, recent trades |
-| `/mtf debug_shield` | Diagnostics: the absorb APIs and the shields MTF tracks |
-| `/mtf debug_chimes` | Diagnostics: each chime spell, its cooldown, and the sound |
 | `/mtf debug_portals` | Diagnostics: each teleport and portal as the client knows it, and your runes |
 | `/mtf debug_polymorph` | Diagnostics: the Polymorph IDs, the sheeped mob, the click, and the moon setting |
-| `/mtf debug_reminders` | Diagnostics: each buff reminder and who lacks the buff |
 | `/mtf debug_click` | Diagnostics: what each conjure button does for each mouse button |
 
 `/magetools` works the same, in case another AddOn uses `/mtf`.
@@ -257,8 +175,7 @@ with one chat message. Spell and item IDs are Classic's; `/mtf debug_conjure`
 shows what your client knows.
 
 WowUp users (2.24.0 or later): install from the repository URL, and Dyre's
-Sounds (github.com/jbedworth/DyresSounds) and Dyre's Toolkit
-the same way; GitHub releases carry
+Toolkit, Dyre's Shields Up, and Dyre's Buff Reminders the same way; GitHub releases carry
 the Forever metadata WowUp needs.
 
 ## Support

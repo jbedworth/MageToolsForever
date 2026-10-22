@@ -1,8 +1,7 @@
 local _, MTF = ...
 
-local USAGE = "Use /mtf, /mtf options, /mtf conjure, /mtf unlock, /mtf lock, /mtf reset, /mtf debug_conjure, /mtf debug_shield, "
-    .. "/mtf debug_chimes, /mtf debug_portals, /mtf debug_polymorph, "
-    .. "/mtf debug_reminders, or /mtf debug_click."
+local USAGE = "Use /mtf, /mtf options, /mtf conjure, /mtf unlock, /mtf lock, /mtf reset, /mtf debug_conjure, "
+    .. "/mtf debug_portals, /mtf debug_polymorph, or /mtf debug_click."
 local UNAVAILABLE = "Mage Tools Forever is unavailable. Check the MTF login message."
 
 -- Each command is one word; "" opens the settings. Handlers live in the other
@@ -15,11 +14,8 @@ local COMMANDS = {
     unlock = {handler = "Unlock"},
     lock = {handler = "Lock"},
     debug_conjure = {handler = "ReportConjureDebug", always = true},
-    debug_shield = {handler = "ReportShieldDebug", always = true},
-    debug_chimes = {handler = "ReportChimesDebug", always = true},
     debug_portals = {handler = "ReportPortalsDebug"},
     debug_polymorph = {handler = "ReportPolymorphDebug"},
-    debug_reminders = {handler = "ReportRemindersDebug"},
     debug_click = {handler = "ReportClickDebug"},
 }
 

@@ -257,35 +257,17 @@ class ReleaseTests(unittest.TestCase):
             with self.subTest(header=data[:18]), self.assertRaises(ValueError):
                 builder._validate_tga("icon.tga", data)
 
-    def test_package_ships_the_shield_arc(self):
-        self.assertEqual(builder.MEDIA_FILES, ("Textures/ShieldArc.tga", "Textures/ShieldArcInner.tga",
-                                               "Textures/ShieldArcInnermost.tga"),
-                         "sounds come from Dyre's Sounds")
+    def test_package_ships_no_media(self):
+        # The shield display and its crescents moved to Dyre's Shields Up (1.2.0);
+        # sounds come with Dyre's Shields Up and Dyre's Buff Reminders.
+        self.assertEqual(builder.MEDIA_FILES, ())
+        for gone in ("Shield.lua", "Reminders.lua", "Chimes.lua"):
+            self.assertNotIn(gone, builder.RUNTIME_FILES)
         path, _ = self.build()
         with zipfile.ZipFile(path) as archive:
-            self.assertIn("MageToolsForever/Textures/ShieldArc.tga", archive.namelist())
-            self.assertIn("MageToolsForever/Textures/ShieldArcInner.tga", archive.namelist())
-            self.assertIn("MageToolsForever/Textures/ShieldArcInnermost.tga", archive.namelist())
-            self.assertFalse(any("Sounds/" in name for name in archive.namelist()))
-            self.assertEqual(len(archive.namelist()), len(builder.PACKAGE_FILES))
-
-    def test_committed_shield_arc_matches_the_build(self):
-        spec = importlib.util.spec_from_file_location("build_arc", ROOT / "scripts" / "build_arc.py")
-        arc = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(arc)
-        for name in arc.CRESCENTS:
-            self.assertEqual((ROOT / "Textures" / name).read_bytes(), arc.build(name), name)
-
-    def test_shield_lua_draws_each_crescent_at_its_height(self):
-        spec = importlib.util.spec_from_file_location("build_arc", ROOT / "scripts" / "build_arc.py")
-        arc = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(arc)
-        source = (ROOT / "Shield.lua").read_text(encoding="utf-8")
-        for name, constant in (("ShieldArc.tga", "OUTER_SPAN"), ("ShieldArcInner.tga", "INNER_SPAN"),
-                               ("ShieldArcInnermost.tga", "INNERMOST_SPAN")):
-            match = re.search(r"local " + constant + r" = (\d+) / (\d+)$", source, re.MULTILINE)
-            self.assertIsNotNone(match, constant)
-            self.assertEqual(int(match.group(1)) / int(match.group(2)), arc.span(name), name)
+            names = archive.namelist()
+            self.assertFalse(any("Textures/" in name or "Sounds/" in name for name in names))
+            self.assertEqual(len(names), len(builder.PACKAGE_FILES))
 
     def test_release_notes_start_with_the_versions_changelog_section(self):
         changelog = self.source / builder.CHANGELOG_NAME

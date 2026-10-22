@@ -4,6 +4,17 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.2.0
+
+### Other changes
+
+- The shield display, the buff reminders, and the cooldown chimes moved out of Mage Tools Forever into Dyre's AddOns that work for every class: **Dyre's Shields Up** draws the shield display, and **Dyre's Buff Reminders** shows Arcane Intellect, your armor, and Dampen or Amplify Magic, and plays the cooldown chimes. The CurseForge app installs both with Mage Tools Forever.
+- Your MTF settings for them carry over once: Dyre's Shields Up takes your shield settings, and Dyre's Buff Reminders your reminder switches, your last armor, and your chime settings. Buff reminder icons start in Dyre's Buff Reminders' own places.
+- MTF's Shield, Buff Reminders, and Cooldown Chimes settings pages now each have a button that opens Dyre's Shields Up's or Dyre's Buff Reminders' settings.
+- Without Dyre's Shields Up or Dyre's Buff Reminders, MTF still works and says once in chat to install or enable them from CurseForge.
+- MTF plays no sounds anymore, so it no longer needs Dyre's Sounds (Dyre's Shields Up and Dyre's Buff Reminders bring it). `/mtf debug_shield`, `/mtf debug_chimes`, and `/mtf debug_reminders` are gone.
+- Arcane Powder is counted by Dyre's Buff Reminders' Consumables bar; the portal bar still counts your runes.
+
 ## 1.1.2
 
 ### Other changes

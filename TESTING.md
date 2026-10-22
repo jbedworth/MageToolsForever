@@ -15,7 +15,7 @@
 
 ```sh
 .tools/luarocks-3.13.0-win32/win32/lua5.1/bin/lua5.1.exe tests/run.lua
-.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Conjure.lua Portals.lua Polymorph.lua Reminders.lua Shield.lua Chimes.lua Options.lua tests/run.lua
+.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Conjure.lua Portals.lua Polymorph.lua Options.lua tests/run.lua
 .tools/python-3.13.7/python.exe -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -25,39 +25,12 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 
 ## Source findings
 
-- `UnitGetTotalAbsorbs` has `SecretReturns = true` (always secret);
-  `UnitHealthMax` has `SecretWhenUnitHealthMaxRestricted`. `UNIT_ABSORB_AMOUNT_CHANGED`
-  carries the unit. `StatusBar:SetValue`, `SetMinMaxValues`, and
-  `SetStatusBarColor`, `FontString:SetText`, `Region:SetAlpha` (adding the
-  Alpha secret aspect), and `AbbreviateNumbers` declare
-  `SecretArguments = "AllowedWhenTainted"`, read here as accepting secrets from
-  AddOn code; `SetShown`, `StatusBar:SetTimerDuration`, and curve objects'
-  `Evaluate` (`AllowedWhenUntainted`) do not.
-- `C_Spell.GetSpellCooldown` has `SecretWhenCooldownsRestricted`; in its
-  result only `isEnabled`, `isActive`, and `isOnGCD` are never secret. No event
-  fires when a cooldown ends. `C_Secrets.GetSpellCooldownSecrecy` reports a
-  spell's cooldown secrecy (printed by `/mtf debug_chimes`).
 - `C_Item.GetItemCount` and the `C_Container` item APIs carry no secret flags.
-- Every sound comes from the library AddOn Dyre's Sounds (its own suite and
-  TESTING.md cover the catalog and the menu); MTF's mocks fake it with a few
-  sounds of each kind, and leave it out to test the missing-library path.
-- AuraContainer `includeSpellIDs` is a set, `{[spellID] = true}`
-  (Blizzard_CustomAuraContainer.lua: "Map of permitted spell IDs"); a list
-  matched nothing in client, so no shield icon showed. With the set, Mana Shield's inner
-  crescent (draining with time) and the shield icons showed, nested with Fire
-  Ward's outer crescent (draining with absorption).
-- Forever's shield buffs carry Classic IDs (Mana Shield 1463, Fire Ward 543).
-  Fire Ward's aura points (164) matched `UnitGetTotalAbsorbs`; Mana Shield's
-  buff has no points and is not in the total. The AuraContainer icons'
-  `IsShown` is secret to AddOn code.
 - `/mtf debug_conjure` on a level ~25 Mage: Conjure Water and Conjure Food
   ranks 1-3 use Classic's spell IDs (5504-5506, 587/597/990) with "(Rank N)"
   names; Purified Water (2136) and Rye (1114) need level 15. Items not
   carried had no item data (no name, no level), so MTF falls back to
   Classic's required levels. A Food & Water trade placed both stacks.
-- `/mtf debug_chimes`: Classic IDs and names for every chime spell; out of
-  combat MTF read Blink's 15 s, Frost Nova's 25 s, and the wards' 30 s
-  cooldowns; `C_Secrets.GetSpellCooldownSecrecy` returned 2 for all.
 - A stack split into an empty bag slot at the click was not yet filled when
   the trade window opened; waiting for the slot to settle (empty, other item,
   or locked; `ITEM_LOCK_CHANGED` and `BAG_UPDATE_DELAYED`, up to 5 s) placed
@@ -69,23 +42,11 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
   readable in combat; aura APIs error in combat for AddOn code; `/click` does
   not press AddOn buttons; trade placement from `TRADE_SHOW` works; macros need
   `Constants.MacroConsts.MAX_CHARACTER_MACROS`.
-- The minimum-absorb gate (shield display v5) works: a frame anchored to a
-  StatusBar's fill texture follows a secret value, and its clipping hides the
-  crescent while the fill is empty. A Paladin's Seal of Righteousness shield
-  no longer flickers the ring (confirmed on a Paladin).
-- The break sound: the client plays no game sound by path (RaidWarning.ogg
-  stayed silent); an AddOn's own file plays, also through `AddAuraSound`
-  with trigger Removed when Blessing of Protection runs out.
 
 ### Open client questions
 
 1. Forever's mana gem IDs (Conjure Mana Agate at level 28) and higher conjure
    ranks.
-2. Whether `SetAlpha` with the secret absorb hides the crescent at 0 in
-   combat.
-3. Whether a chime played through Dyre's Sounds plays from a timer in combat, which cooldowns are
-   readable out of combat, and whether the Mainline SOUNDKIT sounds exist.
-4. Whether the break sound plays when a shield breaks from damage in combat.
 
 ## In-client checklist
 
@@ -109,17 +70,13 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] Food & Water: with a friend targeted, one left-click trades 10 water and
       10 food with one whisper; untargeted, it eats and drinks at once;
       right-click conjures water, then food, on the next click.
-- [ ] Bar size and Display size at 60% shrink each frame; the bar's applies
+- [ ] Bar size at 60% shrinks the conjure bar; a change in combat applies
       after combat.
 - [ ] Middle-click eats or drinks your own best with someone targeted.
 - [ ] Below level 28 the gem button is greyed out and says level 28; no
       "! Mana Gem" macro.
 - [ ] "! Water" and "! Food" appear in your character macros; left-click uses,
       right-click conjures, also as a keybind.
-- [ ] Ice Barrier, Mana Shield, Fire Ward, Frost Ward: the ring shows in the
-      shield's color and empties as you take damage, also in combat, and the
-      whole ring drops the moment the shield is used up. A Priest's Power Word:
-      Shield on you shows too.
 - [ ] Portal bar: one button per known teleport and portal, teleports first,
       each with its rune count; a teleport or portal casts with zero runes
       (legacy talents); a portal in a party or raid sends the group message
@@ -156,15 +113,6 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       Polymorph breaks (out of combat sheep): it re-sheeps that mob and
       returns to your target; with the mob gone, nothing is cast and your
       target stays. `/mtf debug_polymorph` lists the IDs (check Forever's).
-- [ ] Buff reminders: Arcane Intellect and armor icons pulse while missing
-      and go once buffed; a party priest without the buff counts, a rogue
-      does not; they hide as combat starts and return after; a click casts
-      the buff on you, then the next member in range who lacks it, Arcane
-      Brilliance for two or more (with powder), and your last armor; no
-      taint or blocked-action messages; unlocked, each
-      drags and resizes with the mouse wheel, and `/mtf reset` restores them;
-      a drop near another icon snaps 20 apart and aligned, also with
-      different sizes; Shift-drag moves the snapped group, a plain drag one icon.
 - [ ] Polymorph bar look (1.1.0): the bar looks as in 1.0.0 at the defaults;
       the Polymorph page has Bar width, Bar height, Text size, and Opacity,
       each with a gold mark at its default, and Reset size. Out of combat,
@@ -191,81 +139,49 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] Polymorph out of combat, click the bar to recast (it lands in combat),
       then click again in combat: each click recasts. A size change in combat
       applies after it.
-- [ ] A Blessing of Protection from a Paladin, also in combat, draws the gold
-      innermost arc and its icon; `/mtf debug_shield` confirms the IDs.
-- [ ] The conjure, portal, and Polymorph bars snap to each other and to the
-      buff reminders too; a Shift-dragged group keeps its spacing when it snaps.
-- [ ] With WTF also installed: on a Mage the shield display shows (MTF's), on
-      a Warlock it shows too (WTF's), each with only its class's shields and
-      Power Word: Shield in the icon row.
+- [ ] The conjure, portal, and Polymorph bars snap to each other; a
+      Shift-dragged group keeps its spacing when it snaps.
 - [ ] Announce page: switches and texts save, Enter keeps, Escape undoes,
       Defaults restores, the page scrolls, and each whisper uses its text.
 - [ ] Dyre's Toolkit 2.0 widgets (MTF 1.1.0): MTF is listed under Dyre's
       Toolkit in the AddOn list; MTF's page is under Options > AddOns >
-      Dyre's AddOns, with Conjure, Shield, Portals, Polymorph, Buff
+      Dyre's AddOns, with Conjure, Portals, Polymorph, Shield, Buff
       Reminders, Cooldown Chimes, and Announce under it; `/mtf` opens it
       (and says out of combat in combat). Every frame is where it was before
-      the update, at the same size (conjure, portal, and Polymorph bars,
-      every buff reminder, the shield display). `/mtf unlock`, `/dyre
+      the update, at the same size (conjure, portal, and Polymorph bars). `/mtf unlock`, `/dyre
       unlock`, the minimap button, and the toolkit's "Unlock frames" switch
       outline MTF's frames and the other Dyre's AddOns' with one "Dyre:"
       line and no "MTF:" line, each outline with its name in the hint; the
       toolkit's grid shows. The conjure and portal bars drag from any of
       their buttons; their buttons still click while locked. The Polymorph
       bar drags while unlocked and lets clicks through while locked with no
-      sheep. A buff reminder resizes with the mouse wheel from its middle. A
-      dropped MTF bar snaps beside another Dyre's AddOn's frame; with "Snap
+      sheep. A dropped MTF bar snaps beside another Dyre's AddOn's frame; with "Snap
       to the grid" on, a bar dropped alone centers on a grid point;
       Shift-drag moves a snapped group. In combat, unlock and drag: secure
       frames wait for the end of combat, with no "blocked" popup and no
       BugGrabber entry. `/mtf reset` puts every MTF frame back (after
-      combat if needed). Positions and sizes survive `/reload`. The shield
-      display (its full sample) drags, snaps beside an MTF bar, joins a
-      Shift-drag group, and keeps its place after `/reload`.
+      combat if needed). Positions and sizes survive `/reload`.
 - [ ] With Dyre's Toolkit 1.x (or disabled with MTF forced on): MTF says once
       at login that it needs Dyre's Toolkit 2.0 from CurseForge, and stays
       off with no errors.
-- [ ] Shield display v11 (MTF 1.1.1; with Dyre's Shields Up disabled, since
-      MTF stands aside while it is loaded): Size on the Shield page grows
-      and shrinks the crescents around their middle, and the display does
-      not move; the number and the icon row keep their size. Mana Shield's
-      inner crescent grows with the outer one and drains as before. The
-      place and size survive `/reload`.
-- [ ] Mana Shield alone: the inner crescent shows, drains with its time left,
-      and disappears when it breaks or ends; the outer crescent stays hidden.
-- [ ] A ward, then Mana Shield: the outer crescent keeps the ward's color and
-      the inner one is purple; the same in the other order.
-- [ ] With Mana Shield and a ward up, the crescent refills to the total and
-      both icons show; each icon drops when its shield breaks, also in combat,
-      and the row closes the gap. (Check that Forever's shield buffs match by
-      spell ID; WTF found curses did not.)
-- [ ] With a second AddOn shipping the shield display, one ring shows and the
-      other AddOn says which one draws it.
-- [ ] With Dyre's Sounds installed (and the old `Sounds/` folder gone from
-      MageToolsForever), no message about sounds at login; the chime and
-      shield Sound dropdowns open Dyre's Sounds' menu of submenus (Dyre's
-      Picks first, then Interface, the Cooldown Manager's groups, then Text to
-      Speech), show the full name of the choice, play a sound when chosen, and
-      other AddOns' dropdowns on the settings pages still work.
-- [ ] Choices made before 0.3.0 survive the update: each chime keeps its sound
-      (an old Dyre's Picks choice shows as the same Dyre's Picks sound), and
-      the shield break sound keeps its choice and plays when a shield ends.
-- [ ] With Dyre's Sounds disabled: MTF loads, says once at login "Install
-      Dyre's Sounds to hear the chimes", the chimes page shows the switches
-      without sound menus, no chime plays, and turning on the shield sound
-      says once that Dyre's Sounds is needed. Enabling Dyre's Sounds again
-      brings back every choice unchanged.
-- [ ] With Dyre's Buff Reminders 0.2.0 or later enabled: MTF plays no chime
-      (you hear each chime once, from DBR), no MTF install message for chimes,
-      the settings list shows "Cooldown Chimes (Dyre's Buff Reminders)", its
-      heading and tooltips and the main page's Cooldown chimes tooltip name
-      DBR and `/dbr`, every chime setting is greyed out, and
-      `/mtf debug_chimes` shows `playedBy=DyresBuffReminders`. DBR does not
-      warn that MTF also plays chimes. MTF's chime settings are unchanged
-      after a `/reload`. With Dyre's Cooldown Chimes enabled instead, the
-      same holds with DCC and `/dcc`.
-- [ ] Blink and Frost Nova chime half a second before they are ready, in and
-      out of combat, with Talent ready by default; each spell's own
-      sound, switch, and the lead change it; Text to Speech
-      says "Blink ready"; Cold Snap cancels Frost Nova's chime.
+- [ ] Dyre's Shields Up and Dyre's Buff Reminders (MTF 1.2.0): with both
+      enabled, no "Install" or "Enable" line at login. A Mage with MTF 1.1
+      shield, reminder, and chime settings gets them in Dyre's Shields Up and
+      Dyre's Buff Reminders once (the shield's size, place, number, and
+      break sound; the reminder switches, the group switch, the last armor,
+      Dampen; every chime), and they do not change on a later `/reload`.
+      MTF draws no shield ring, shows no reminder icons, and plays no chime
+      of its own; you see one shield ring and hear each chime once.
+- [ ] MTF's Shield, Buff Reminders, and Cooldown Chimes pages each have one
+      button ("Open Shield settings", "Open Buff Reminders settings") that
+      opens that AddOn's own page; in combat it says the settings open out
+      of combat. `/mtf debug_shield`, `debug_chimes`, and `debug_reminders`
+      show the usage.
+- [ ] With Dyre's Shields Up disabled in the AddOn list: one line at login,
+      "Enable Dyre's Shields Up in the AddOn list for the shield display.";
+      the Shield page's button is greyed and says the same; Conjure,
+      Portals, and Polymorph work. With it uninstalled, the line says
+      "Install Dyre's Shields Up from CurseForge for the shield display."
+      The same for Dyre's Buff Reminders ("buff reminders and cooldown
+      chimes").
 - [ ] Settings survive `/reload` and stay separate on a second Mage.

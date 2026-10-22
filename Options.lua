@@ -2,7 +2,9 @@ local _, MTF = ...
 
 -- The AddOn settings: a main page with one switch per module, and a subpage
 -- per module for its details, in Blizzard's vertical layout with proxy
--- settings that read and write MageToolsForeverDB directly.
+-- settings that read and write MageToolsForeverDB directly. The Shield, Buff
+-- Reminders, and Cooldown Chimes pages link to Dyre's Shields Up's and Dyre's
+-- Buff Reminders' own settings (author, 1.2.0: linked, not mirrored).
 local TITLE = "Mage Tools Forever"
 local CONJURE_TITLE = "Conjure"
 local SHIELD_TITLE = "Shield"
@@ -64,20 +66,12 @@ local function RefreshConjure()
     end
 end
 
-local function RefreshShield()
-    MTF.RefreshShield()
-end
-
 local function RefreshPortals()
     MTF.RefreshPortals()
 end
 
 local function RefreshPolymorph()
     MTF.RefreshPolymorph()
-end
-
-local function RefreshReminders()
-    MTF.RefreshReminders()
 end
 
 -- A widget's size sliders (Dyre's Toolkit: each with a gold mark at its
@@ -136,194 +130,26 @@ local function AddPolymorphPage(parent)
     }, "Back to the bar's own width, height, and text size. Bar size and Opacity stay as they are.")
 end
 
-local REMINDERS_ELSEWHERE = " Dyre's Buff Reminders shows your buff reminders now, so these icons stay hidden. Type /dbr to change them."
-
--- Greys out a setting another Dyre's AddOn now handles (Dyre's Buff Reminders,
--- Dyre's Cooldown Chimes): it shows its saved value but cannot be changed here.
-local function Grey(initializer, aside)
-    if aside and type(initializer) == "table" and type(initializer.AddModifyPredicate) == "function" then
-        initializer:AddModifyPredicate(function() return false end)
-    end
-    return initializer
+-- A page that links to a companion AddOn's settings (Dyre's Toolkit's
+-- AddSettingsLink: the button is greyed while that AddOn has not joined the
+-- toolkit, and a click then says what to install or enable; never in combat).
+local function AddLinkPage(parent, title, companion, name, button, tooltip)
+    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, title)
+    MTF.toolkit.AddSettingsLink(page, layout, {addon = companion.addon, name = name, button = button,
+        tooltip = tooltip, missing = MTF.CompanionMessage(companion)})
+    return page
 end
 
--- A page whose feature a stand-alone Dyre's AddOn now runs (author-approved rule)
--- says so twice: its name in the settings list names that AddOn, and a heading
--- with a tooltip tops the page. Headings as Blizzard's Controls page adds them
--- (Blizzard_SettingControls.lua: CreateSettingsListSectionHeaderInitializer).
-local function ManagedTitle(title, addonTitle, managed)
-    return managed and (title .. " (" .. addonTitle .. ")") or title
-end
-
-local function ManagedHeading(layout, managed, heading, tooltip)
-    if managed and type(CreateSettingsListSectionHeaderInitializer) == "function" and type(layout) == "table"
-            and type(layout.AddInitializer) == "function" then
-        layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(heading, tooltip))
-    end
-end
-
-local function AddRemindersPage(parent)
-    local aside = MTF.RemindersStandAside()
-    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent,
-        ManagedTitle(REMINDERS_TITLE, "Dyre's Buff Reminders", aside))
-    ManagedHeading(layout, aside, "Buff reminders are now managed by Dyre's Buff Reminders",
-        "Use /dbr to change them. "
-            .. "MTF keeps its own settings as they are, and uses them again if you remove Dyre's Buff Reminders.")
-    local note = aside and REMINDERS_ELSEWHERE or ""
-    for _, reminder in ipairs(MTF.REMINDERS) do
-        local setting = Proxy(page, "MTF_REMINDER_" .. reminder.key:upper(), Settings.VarType.Boolean,
-            reminder.label, reminder.on,
-            function() return MTF.db.reminders.spells[reminder.key] end,
-            function(value)
-                MTF.db.reminders.spells[reminder.key] = value == true
-                RefreshReminders()
-            end)
-        Grey(Settings.CreateCheckbox(page, setting, "Show an icon with a pulsing border while you lack "
-            .. reminder.label .. ", out of combat." .. note), aside)
-    end
-    Grey(Flag(page, "MTF_REMINDER_GROUP", "Arcane Intellect: also your group", "reminders", "group", true,
-        "Also remind you when a party or raid member who uses mana lacks Arcane Intellect or Arcane Brilliance. "
-            .. "The icon shows how many, and its tooltip who." .. note, RefreshReminders), aside)
-end
-
--- The shield display draws in one AddOn only (Shield.lua's election); in the
--- others its settings do nothing, so they are greyed out (author-approved) with
--- a note naming the AddOn that draws it. Checked each time the page shows.
-local SHIELD_ELSEWHERE = " Dyre's Shields Up shows the shield display now, so these settings do nothing "
-    .. "here. Type /dsu to change it. MTF keeps its own shield settings as they are."
-
-local function ShieldOwnerNote(display)
-    if MTF.ShieldStandAside() then
-        return SHIELD_ELSEWHERE
-    end
-    if display.IsOwner() then
-        return ""
-    end
-    local owner = display.OwnerAddOn()
-    local title = owner and type(C_AddOns) == "table" and type(C_AddOns.GetAddOnMetadata) == "function"
-        and C_AddOns.GetAddOnMetadata(owner, "Title")
-    if type(title) ~= "string" or title == "" then
-        title = tostring(owner)
-    end
-    return " " .. title .. " draws the shield display, so use its settings for it."
-end
-
-local function GreyUnlessOwner(initializer, display)
-    if type(initializer) == "table" and type(initializer.AddModifyPredicate) == "function" then
-        initializer:AddModifyPredicate(function() return not MTF.ShieldStandAside() and display.IsOwner() end)
-    end
-    return initializer
-end
-
-local function AddShieldPage(parent)
-    local aside = MTF.ShieldStandAside()
-    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent,
-        ManagedTitle(SHIELD_TITLE, "Dyre's Shields Up", aside))
-    ManagedHeading(layout, aside, "Shields are now managed by Dyre's Shields Up",
-        "Use /dsu to change the shield display. "
-            .. "MTF keeps its own settings as they are, and uses them again if you remove Dyre's Shields Up.")
-    local display = MTF.ShieldDisplay
-    local note = ShieldOwnerNote(display)
-    GreyUnlessOwner(Flag(page, "MTF_SHIELD_NUMBER", "Show the absorb amount", "shield", "number", true,
-        "Show your remaining absorb as a number beside the ring." .. note, RefreshShield), display)
-    local soundSwitch = GreyUnlessOwner(Flag(page, "MTF_SHIELD_BREAK_SOUND", "Sound when a shield ends",
-        "shield", "breakSound", false,
-        "Play a sound when your Ice Barrier, Mana Shield, Fire Ward, or Frost Ward ends or breaks, "
-            .. "also in combat." .. note,
-        RefreshShield), display)
-    -- Which sound, under its switch (author-approved: a default you can change).
-    local sound = Proxy(page, "MTF_SHIELD_BREAK_SOUND_CHOICE", Settings.VarType.String, "Sound",
-        display.DEFAULT_BREAK_SOUND,
-        function() return MTF.db.shield.breakSoundKey end,
-        function(value)
-            MTF.db.shield.breakSoundKey = display.SanitizeBreakSound(value)
-            RefreshShield()
-            display.PreviewBreakSound()
-        end)
-    -- The sounds come from Dyre's Sounds; without it the list is empty.
-    local dropdown = Settings.CreateDropdown(page, sound, display.SoundChoices,
-        "The sound when a shield ends. Choosing one plays it once. The sounds come from Dyre's Sounds." .. note)
-    display.SetupSoundMenu(dropdown)
-    GreyUnlessOwner(dropdown, display)
-    if type(dropdown.SetParentInitializer) == "function" then
-        dropdown:SetParentInitializer(soundSwitch, function() return MTF.db.shield.breakSound end)
-    end
-    local scale = Proxy(page, "MTF_SHIELD_SCALE", Settings.VarType.Number, "Display size", display.DEFAULT_SCALE,
-        function() return MTF.db.shield.scale end,
-        function(value)
-            MTF.db.shield.scale = display.SanitizeScale(value)
-            RefreshShield()
-        end)
-    GreyUnlessOwner(Settings.CreateSlider(page, scale,
-        SliderOptions(display.SCALE_MIN, display.SCALE_MAX, display.SCALE_STEP),
-        "How big the shield display is, in percent." .. note), display)
-end
-
-local NO_SOUNDS = " Install Dyre's Sounds to hear them and to choose each spell's sound."
-
--- What the chime settings add to their tooltips: which Dyre's AddOn plays the
--- chimes, or that the sounds need Dyre's Sounds.
-local function ChimesNote(library)
-    local owner = MTF.ChimesOwner()
-    if owner then
-        return " " .. owner.title .. " is installed and plays the chimes instead, so MTF plays none: "
-            .. "use its settings (" .. owner.slash .. "). MTF keeps these settings as they are."
-    end
-    if not library then
-        return NO_SOUNDS
-    end
-    return ""
-end
-
-local function AddChimesPage(parent)
-    local owner = MTF.ChimesOwner()
-    local aside = owner ~= nil
-    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent,
-        ManagedTitle(CHIMES_TITLE, owner and owner.title, aside))
-    ManagedHeading(layout, aside, owner and ("Cooldown chimes are now managed by " .. owner.title),
-        owner and ("Use " .. owner.slash .. " to change them. "
-            .. "MTF keeps its own settings as they are, and uses them again if you remove " .. owner.title .. "."))
-    local library = MTF.SoundLibrary()
-    local note = ChimesNote(library)
-    local lead = Proxy(page, "MTF_CHIMES_LEAD", Settings.VarType.Number, "Chime early (seconds)",
-        MTF.DEFAULT_CHIME_LEAD,
-        function() return MTF.db.chimes.lead end,
-        function(value)
-            MTF.db.chimes.lead = MTF.SanitizeChimeLead(value)
-        end)
-    Grey(Settings.CreateSlider(page, lead, SliderOptions(MTF.CHIME_LEAD_MIN, MTF.CHIME_LEAD_MAX, MTF.CHIME_LEAD_STEP),
-        "How long before a cooldown ends the chime plays, so you can act the moment it is ready." .. note), aside)
-    for _, chime in ipairs(MTF.CHIME_SPELLS) do
-        local setting = Proxy(page, "MTF_CHIME_" .. chime.key:upper(), Settings.VarType.Boolean, chime.label,
-            chime.on,
-            function() return MTF.db.chimes.spells[chime.key] end,
-            function(value) MTF.db.chimes.spells[chime.key] = value == true end)
-        local switch = Grey(Settings.CreateCheckbox(page, setting,
-            "Chime when " .. chime.label .. " is ready again." .. note), aside)
-        -- Each spell's own sound (author-approved), under its switch, in Dyre's
-        -- Sounds' menu of submenus, as the Cooldown Manager's sound picker has.
-        -- Without the library there is no list to choose from.
-        if library then
-            local sound = Proxy(page, "MTF_CHIME_SOUND_" .. chime.key:upper(), Settings.VarType.String, "Sound",
-                MTF.DEFAULT_CHIME_SOUND,
-                function() return MTF.db.chimes.sounds[chime.key] end,
-                function(value)
-                    local key = library.Resolve(value)
-                    if key then
-                        MTF.db.chimes.sounds[chime.key] = key
-                        MTF.PreviewChime(chime.key)
-                    end
-                end)
-            local dropdown = Settings.CreateDropdown(page, sound, library.Choices(),
-                "The sound for " .. chime.label .. ". Choosing one plays it once. Text to Speech says \""
-                    .. chime.label .. " ready\"." .. note)
-            library.SetupMenu(dropdown)
-            Grey(dropdown, aside)
-            if type(dropdown.SetParentInitializer) == "function" then
-                dropdown:SetParentInitializer(switch, function() return MTF.db.chimes.spells[chime.key] end)
-            end
-        end
-    end
+local function AddLinkPages(parent)
+    local shields, reminders = MTF.COMPANIONS[1], MTF.COMPANIONS[2]
+    AddLinkPage(parent, SHIELD_TITLE, shields, "Shield display", "Open Shield settings",
+        "Dyre's Shields Up draws the shield display for every class. Open its settings.")
+    AddLinkPage(parent, REMINDERS_TITLE, reminders, "Buff reminders", "Open Buff Reminders settings",
+        "Dyre's Buff Reminders shows Arcane Intellect, your armor, and Dampen or Amplify Magic for every class. "
+            .. "Open its settings.")
+    AddLinkPage(parent, CHIMES_TITLE, reminders, "Cooldown chimes", "Open Buff Reminders settings",
+        "Dyre's Buff Reminders plays a sound just before Blink, Frost Nova, and your other spells are ready. "
+            .. "Open its settings.")
 end
 
 -- Announce page --------------------------------------------------------------
@@ -482,22 +308,10 @@ function MTF.InitializeOptions()
     Flag(category, "MTF_POLYMORPH_ENABLED", "Polymorph bar", "polymorph", "enabled", true,
         "A bar with your Polymorph's time left and the sheeped mob's name; click it to sheep the mob again.",
         RefreshPolymorph)
-    local remindersAside = MTF.RemindersStandAside()
-    Grey(Flag(category, "MTF_REMINDERS_ENABLED", "Buff reminders", "reminders", "enabled", true,
-        "An icon with a pulsing border for each buff you lack, out of combat: Arcane Intellect and your armor."
-            .. (remindersAside and REMINDERS_ELSEWHERE or ""), RefreshReminders), remindersAside)
-    GreyUnlessOwner(Flag(category, "MTF_SHIELD_ENABLED", "Shield display", "shield", "enabled", true,
-        "A crescent beside your character that fills with your remaining shield, full when it lands."
-            .. ShieldOwnerNote(MTF.ShieldDisplay), RefreshShield), MTF.ShieldDisplay)
-    Grey(Flag(category, "MTF_CHIMES_ENABLED", "Cooldown chimes", "chimes", "enabled", true,
-        "A sound just before Blink, Frost Nova, and your other chosen spells are ready again."
-            .. ChimesNote(MTF.SoundLibrary())), MTF.ChimesStandAside())
     AddConjurePage(category)
-    AddShieldPage(category)
     AddPortalsPage(category)
     AddPolymorphPage(category)
-    AddRemindersPage(category)
-    AddChimesPage(category)
+    AddLinkPages(category)
     local announcePage = CreateAnnouncePage()
     MTF.announcePage = announcePage
     Settings.RegisterCanvasLayoutSubcategory(category, announcePage, ANNOUNCE_TITLE)

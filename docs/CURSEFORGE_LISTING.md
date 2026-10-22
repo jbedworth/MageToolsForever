@@ -12,7 +12,7 @@ tested.
 | Class | Addons |
 | Main category | Mage. Keep it identical to the TOC `## Category`, which groups the AddOn in the in-game AddOn list. |
 | Additional categories | Bags & Inventory, Buffs & Debuffs (CurseForge allows up to 4; unrelated ones can send the project back for changes). |
-| Relations | Dyre's Sounds, required dependency (set by each CI upload) |
+| Relations | Dyre's Toolkit (`dyres-toolkit`), Dyre's Shields Up (`dyres-shields-up`), and Dyre's Buff Reminders (`dyres-buff-reminders`): required dependencies, set by each CI upload; add them by hand on any file uploaded through the website. |
 | Author shown | Dyre, set through the CurseForge account's username |
 | License | MIT License |
 | Logo | artwork/mage-tools-forever-logo.png (1024 x 1024) |
@@ -22,7 +22,7 @@ tested.
 
 ## Summary
 
-Quality-of-life tools for Mages in World of Warcraft: Forever: conjured food and water with level-matched trading, portal and Polymorph bars, buff reminders, a shield absorb ring, and cooldown chimes.
+Quality-of-life tools for Mages in World of Warcraft: Forever: conjured food and water with level-matched trading, and portal and Polymorph bars. Comes with Dyre's Shields Up and Dyre's Buff Reminders for your shields, buffs, and cooldown chimes.
 
 ## Screenshots
 
@@ -30,15 +30,12 @@ Upload these from `artwork/screenshots/`, with these captions:
 
 | File | Caption |
 | --- | --- |
-| shield-display.png | The shield display: your remaining absorb, with an icon for each shield that is up. |
 | conjure-bar.png | The conjure bar: Water, Food, Food & Water, and Mana Gem. |
 | portal-bar.png | The portal bar: every teleport and portal you know, with your runes. |
 | polymorph-bar.png | The Polymorph bar: the sheeped mob and the time left. Click it to sheep again. |
 | unlocked-grid.png | `/mtf unlock`: a grid marks the screen's center while you drag every frame into place. |
 | settings-main.png | One switch per tool, one lock for every frame, and the grid. |
 | settings-conjure.png | Conjure settings: macros, bar size, and share stack size. |
-| settings-shield.png | Shield display settings. |
-| settings-chimes-sounds.png | Each cooldown chime has its own sound, from the same menu as the Cooldown Manager's. |
 | settings-announce.png | Every whisper, group message, and emote, each with its own switch and text. |
 
 ## Description
@@ -71,26 +68,12 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 - Click the bar to sheep your focus again. A "! Polymorph" macro focuses the mob under your mouse and sheeps it.
 - Set the bar's width, height, text size, and opacity to suit your screen.
 
-### Buff reminders
-- An icon with a pulsing gold border for each buff you are missing out of combat: Arcane Intellect (also for group members who use mana, never warriors or rogues), your armor, and optionally Dampen or Amplify Magic.
-- Click an icon to cast the buff: on you first, then each group member who lacks it, or Arcane Brilliance when two or more do.
-- Drag and resize each icon on its own. They snap together like magnets; Shift-drag moves a snapped group.
-
 ### Announce
 - Every message MTF sends has its own switch and text you can edit: the water, food, and Food & Water trade whispers, the portal and Polymorph group messages, and the teleport emote. The defaults credit Mage Tools Forever (MTF).
 
-### Shield display
-- A segmented crescent beside your character that fills with your remaining shield: full when it lands and draining as it absorbs, with the amount below, also in combat.
-- Ice Barrier blue, Mana Shield purple, the wards in fire and frost, and any shield another player puts on you, like Power Word: Shield.
-- Drops away the moment the shield is used up. Mana Shield gets its own inner crescent that drains with its time left. Optional sound when a shield ends.
-
-### Cooldown chimes
-- A sound just before Blink, Frost Nova, Counterspell, Ice Block, Ice Barrier, Evocation, and other spells you pick are ready again, also in combat.
-- Each spell has its own sound: the game's interface sounds, all 93 of the Cooldown Manager's alert sounds, or a voice that says the spell's name. Pick how early it plays.
-- With Dyre's Buff Reminders installed, it plays the chimes instead, so you never hear two.
-
-### Needs Dyre's Sounds
-The chimes and the shield sound come from **Dyre's Sounds**; the CurseForge app installs it for you. Without it, MTF says so once in chat and plays no sounds; everything else works.
+### Shields, buff reminders, and cooldown chimes
+- **Dyre's Shields Up** draws the shield display, and **Dyre's Buff Reminders** shows Arcane Intellect, your armor, and Dampen or Amplify Magic and plays your cooldown chimes, for every class. The CurseForge app installs both with Mage Tools Forever, and they take over your MTF settings once.
+- MTF's Shield, Buff Reminders, and Cooldown Chimes settings pages each open their settings with one click.
 
 ### Needs Dyre's Toolkit
 **Dyre's Toolkit** 2.0 is the home of all of Dyre's AddOns; the CurseForge app installs it for you. MTF's settings sit under Dyre's AddOns, and the frames of every Dyre's AddOn unlock, lock, snap, and resize together.
@@ -107,7 +90,7 @@ The chimes and the shield sound come from **Dyre's Sounds**; the CurseForge app 
 ### Compatibility
 Tested on the Forever beta client 1.60.1, build 70450. MTF keeps working on later beta builds; if a client update removes an API it needs, it turns that feature off with one chat message.
 
-WowUp users (2.24.0 or later): install from the repository URL, and Dyre's Sounds and Dyre's Toolkit the same way; GitHub releases carry the Forever metadata WowUp needs.
+WowUp users (2.24.0 or later): install from the repository URL, and Dyre's Toolkit, Dyre's Shields Up, and Dyre's Buff Reminders the same way; GitHub releases carry the Forever metadata WowUp needs.
 
 Source, issues, and license (MIT): https://github.com/jbedworth/MageToolsForever
 ```

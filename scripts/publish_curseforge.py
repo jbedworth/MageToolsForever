@@ -27,10 +27,13 @@ FOREVER_TYPE_ID = 88568
 TIMEOUT = 30
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 RECEIPT_NAME = "curseforge-upload.json"
-# Dyre's Sounds and Dyre's Toolkit are required on CurseForge, so the app installs
-# them with MTF; the TOC lists them as OptionalDeps, so MTF still loads without them.
-RELATIONS = {"projects": [{"slug": "dyres-sounds", "type": "requiredDependency"},
-                          {"slug": "dyres-toolkit", "type": "requiredDependency"}]}
+# Dyre's Toolkit, Dyre's Shields Up, and Dyre's Buff Reminders are required on
+# CurseForge, so the app installs them with MTF (author, 1.2.0). The TOC needs
+# the toolkit and lists the other two as OptionalDeps, so MTF still loads without
+# them and says what to install.
+RELATIONS = {"projects": [{"slug": "dyres-toolkit", "type": "requiredDependency"},
+                          {"slug": "dyres-shields-up", "type": "requiredDependency"},
+                          {"slug": "dyres-buff-reminders", "type": "requiredDependency"}]}
 
 
 class PublishError(Exception):
