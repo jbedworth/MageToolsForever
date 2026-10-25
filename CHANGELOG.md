@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.2.2
+
+### Features
+
+- WoW Classic Era and Anniversary: the Polymorph bar now works there, with the same look, settings, and click. It reads your Polymorph on your focus directly, where the game has no aura engine for AddOns; Forever is unchanged.
+
 ## 1.2.1
 
 ### Fixes

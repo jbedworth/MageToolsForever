@@ -25,7 +25,7 @@ local function contains(actual, fragment, context)
 end
 
 local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua"}
-local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}
+local RUNTIME_FILES = {"Commands.lua", "Core.lua", "AuraEngine.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}
 local SPELLS = {
     [5504] = "Conjure Water", [5505] = "Conjure Water", [5506] = "Conjure Water", [6127] = "Conjure Water",
     [587] = "Conjure Food", [597] = "Conjure Food", [990] = "Conjure Food", [6129] = "Conjure Food",
@@ -199,6 +199,15 @@ local function fixture(options)
     env.Enum.SpellBookSpellBank = {Player = 0}
     env.Enum.SpellBookItemType = {None = 0, Spell = 1, FutureSpell = 2, PetAction = 3, Flyout = 4}
     env.Enum.StatusBarTimerDirection = {ElapsedTime = 0, RemainingTime = 1}
+    -- options.classic: Classic Era and Anniversary, as their 1.15.9 and 2.5.6
+    -- sources show: no aura engine (Blizzard_AuraContainer), no spellbook skill
+    -- lines, and aura reads that work in combat.
+    if options.classic then
+        options.noAuraContainer = true
+        env.C_SpellBook.GetNumSpellBookSkillLines = nil
+        env.C_SpellBook.GetSpellBookSkillLineInfo = nil
+        env.C_SpellBook.GetSpellBookItemInfo = nil
+    end
     env.UnitIsDead = function(unit) return state.units[unit] ~= nil and state.units[unit].dead == true end
     env.UnitIsDeadOrGhost = function(unit) return state.units[unit] ~= nil and state.units[unit].dead == true end
     env.UnitIsConnected = function(unit) return state.units[unit] ~= nil end
@@ -2010,7 +2019,7 @@ test("MTF never calls SetRaidTarget: the moon comes only from /tm in \"! Polymor
         state.slash("debug_polymorph")
         contains(table.concat(state.messages, "|"), "moon=from the macro")
     end
-    for _, file in ipairs({"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}) do
+    for _, file in ipairs({"Commands.lua", "Core.lua", "AuraEngine.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}) do
         local handle = assert(io.open(file, "r"))
         local text = handle:read("*a")
         handle:close()
@@ -2195,6 +2204,118 @@ test("the Polymorph bar follows your focus first, so it does not go blank when t
     state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate4")
     state.emit("PLAYER_TARGET_CHANGED")
     equal(bar.container.unit, "focus", "still bound while you fight another mob")
+end)
+-- Classic Era and Anniversary: the plain-Lua aura container --------------------
+
+local function polymorphAura(state, seconds)
+    return {spellId = POLYMORPH, name = "Polymorph", icon = 136071, duration = 50,
+        expirationTime = state.now + (seconds or 50), auraInstanceID = 7}
+end
+-- AuraEngine's redraw frame: the one frame with an OnUpdate, set only while a timed slot shows.
+local function auraTicker(state)
+    for _, frame in ipairs(state.frames) do
+        if frame.scripts.OnUpdate then return frame end
+    end
+end
+local function polymorphSlot(state)
+    return state.env.MageToolsForeverPolymorphBar.container.slots[1].button
+end
+
+test("on Classic, login completes and the Polymorph bar uses the plain-Lua container", function()
+    local state = mage({classic = true, known = {[POLYMORPH] = true}})
+    for _, message in ipairs(state.messages) do
+        equal(message:find("stays off", 1, true), nil, "no feature stays off")
+        equal(message:find("lacks", 1, true), nil)
+    end
+    local bar = state.env.MageToolsForeverPolymorphBar
+    for _, frame in ipairs(state.frames) do
+        equal(frame.kind == "AuraContainer", false, "no engine container on Classic")
+    end
+    equal(type(bar.container.AddAuraSlot), "function")
+    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
+        .. "[nocombat,harm,nodead]\n/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph")
+    equal(state.env.MageToolsForeverPolymorph.shown, true, "the click area is there")
+    state.clear()
+    state.slash("debug_polymorph")
+    contains(table.concat(state.messages, "|"), "engine=lua")
+    -- The conjure and portal bars came up too: the whole login ran.
+    equal(state.env.MageToolsForeverConjure ~= nil and state.env.MageToolsForeverPortals ~= nil, true)
+end)
+test("on Classic, a Polymorph on your focus shows its time, drains, refreshes, breaks, and goes", function()
+    local state = mage({classic = true, known = {[POLYMORPH] = true}})
+    local bar = state.env.MageToolsForeverPolymorphBar
+    sheepTarget(state)
+    state.units.focus.auras = {polymorphAura(state)}
+    state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-1", POLYMORPH)
+    state.combat = true
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-1", POLYMORPH)
+    equal(bar.shown, true)
+    equal(bar.name.text, "Defias Pillager")
+    local slot = polymorphSlot(state)
+    equal(slot.shown, true, "the slot shows the aura")
+    equal(slot.display.spellName.text, "Polymorph")
+    equal(slot.display.text.text, "50 s")
+    equal(slot.display.bar.value, 50)
+    -- Drains, read in combat (nothing is secret on Classic).
+    local ticker = auraTicker(state)
+    equal(ticker ~= nil, true, "ticks while a timed slot shows")
+    state.now = state.now + 20
+    ticker.scripts.OnUpdate(ticker, 0.2)
+    equal(slot.display.text.text, "30 s")
+    equal(slot.display.bar.value, 30)
+    -- Refreshed: a new Polymorph on the same mob.
+    state.units.focus.auras = {polymorphAura(state)}
+    state.emit("UNIT_AURA", "focus")
+    equal(slot.display.text.text, "50 s")
+    -- Broken early: the aura goes, the slot hides, and the ticking stops.
+    state.units.focus.auras = {}
+    state.emit("UNIT_AURA", "focus")
+    equal(slot.shown, false, "broken")
+    equal(auraTicker(state), nil, "no OnUpdate left")
+    equal(bar.shown, true, "the bar stays with its dim line until the mob is forgotten")
+    -- The mob dies: forgotten.
+    state.units.focus.dead = true
+    state.emit("UNIT_HEALTH", "focus")
+    equal(bar.shown, false)
+    equal(bar.container.unit, "none")
+    -- Another player's Polymorph or one on your target only shows nothing:
+    -- the slot reads your own auras on your focus (HARMFUL|PLAYER).
+    local other = mage({classic = true, known = {[POLYMORPH] = true}})
+    other.units.target = {name = "Defias Bandit", guid = "mob-2", level = 20, auras = {polymorphAura(other)}}
+    castPolymorph(other)
+    equal(other.env.MageToolsForeverPolymorphBar.shown, false, "not your focus")
+end)
+test("on Classic, the unlocked Polymorph sample shows with /mtf unlock and /dyre unlock", function()
+    for _, unlock in ipairs({
+        function(state) state.slash("unlock") end,
+        function(state) state.env.SlashCmdList.DYRESTOOLKIT("unlock") end,
+    }) do
+        local state = mage({classic = true})
+        unlock(state)
+        local bar = state.env.MageToolsForeverPolymorphBar
+        equal(bar.shown, true)
+        equal(bar.name.text, "Polymorph (sample)")
+        equal(state.env.MageToolsForeverPolymorph.shown, true, "the drag area is there")
+        equal(state.env.MageToolsForeverPolymorph.mouse, true, "it takes the mouse to drag")
+    end
+end)
+test("Forever keeps the engine container; a client with neither says the bar stays off", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local engine = false
+    for _, frame in ipairs(state.frames) do
+        if frame.kind == "AuraContainer" then engine = true end
+    end
+    equal(engine, true, "Forever: Blizzard's engine")
+    state.clear()
+    state.slash("debug_polymorph")
+    contains(table.concat(state.messages, "|"), "engine=engine")
+    local none = mage({classic = true, remove = {"C_UnitAuras"}})
+    local said = false
+    for _, message in ipairs(none.messages) do
+        if message:find("The Polymorph bar stays off: this client lacks CustomAuraContainerTemplate and "
+            .. "C_UnitAuras.GetAuraDataByIndex.", 1, true) then said = true end
+    end
+    equal(said, true)
 end)
 test("unlocked, the Polymorph bar shows a sample to drag", function()
     local state = mage()

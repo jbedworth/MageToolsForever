@@ -7,7 +7,10 @@ local _, MTF = ...
 -- On Forever, AddOn code cannot read enemy auras in combat, so the bar is a
 -- Blizzard AuraContainer slot, as in WTF's DoT tracker: the engine reads the
 -- mob's unit and draws the icon, bar, and time left into regions MTF made;
--- MTF never sees the timer.
+-- MTF never sees the timer. Classic Era and Anniversary have no such engine
+-- (John, 1.2.2: "MTF should do the same, once we have it proven working on
+-- WTF"), so AuraEngine.lua gives the same container in plain Lua there, with
+-- the real durations.
 --
 -- The bar tracks your focus only (John, 1.2.1: "Let the macro set focus and
 -- mark the sheeped mob. Have the sheep-tracker box depend on it being the
@@ -50,7 +53,6 @@ local MOON = 5
 local MARK_FOCUS = "/tm [@focus,harm,nodead,exists] !" .. MOON .. "\n"
 local CAST_FOCUS = "/use [@focus,exists,harm,nodead] "
 local AURA_FILTER = "HARMFUL|PLAYER"
-local CONTAINER_TEMPLATE = "CustomAuraContainerTemplate"
 local ANNOUNCE_REPEAT_SECONDS = 3
 
 -- WTF's Bars theme: the name line, then a bar line with an icon. The width,
@@ -94,17 +96,6 @@ end
 local function IsDead(unit)
     local dead = UnitIsDead(unit)
     return not MTF.IsSecret(dead) and dead == true
-end
-
-local function HasAuraContainer()
-    if type(C_XMLUtil) ~= "table" or type(C_XMLUtil.GetTemplateInfo) ~= "function"
-        or type(C_AddOns) ~= "table" or type(C_AddOns.LoadAddOn) ~= "function" then
-        return false
-    end
-    if not C_AddOns.IsAddOnLoaded("Blizzard_AuraContainer") then
-        C_AddOns.LoadAddOn("Blizzard_AuraContainer")
-    end
-    return C_XMLUtil.GetTemplateInfo(CONTAINER_TEMPLATE) ~= nil
 end
 
 -- Every Polymorph spell ID: the Classic ones and the spellbook's of the same
@@ -363,7 +354,7 @@ local function BuildBar()
         bar.container:SetUnit("none")
         bar.container:Hide()
     end
-    local container = CreateFrame("AuraContainer", nil, bar, CONTAINER_TEMPLATE)
+    local container = MTF.CreateAuraContainer(bar)
     container:SetPoint("TOPLEFT", bar, "TOPLEFT")
     container:SetSize(1, 1)
     container:AddAuraSlot("polymorph", AURA_FILTER, {
@@ -641,8 +632,8 @@ local function CreateWidget()
 end
 
 function MTF.InitializePolymorph()
-    if not HasAuraContainer() then
-        MTF.Report("The Polymorph bar stays off: this client lacks " .. CONTAINER_TEMPLATE .. ".")
+    if not MTF.AuraEngineKind() then
+        MTF.Report("The Polymorph bar stays off: this client lacks " .. MTF.AURA_ENGINE_MISSING .. ".")
         return
     end
     BuildSpellSet()
@@ -663,8 +654,8 @@ end
 
 -- /mtf debug_polymorph: the IDs, the tracked mob, and the click.
 function MTF.ReportPolymorphDebug()
-    MTF.Report(string.format("debug_polymorph available=%s known=%s", tostring(sheep.available),
-        tostring(KnowsPolymorph())))
+    MTF.Report(string.format("debug_polymorph available=%s known=%s engine=%s", tostring(sheep.available),
+        tostring(KnowsPolymorph()), tostring(MTF.AuraEngineKind())))
     if not sheep.available then
         return
     end

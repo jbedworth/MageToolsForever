@@ -99,7 +99,8 @@ style as Warlock Tools Forever's DoT bars. It shows your **focus** while you
 have it sheeped, so it keeps the timer when you change target, and if the
 Polymorph breaks early, the bar empties so you see it. Sheep with the
 **"! Polymorph"** macro: it focuses the mob, marks it with the moon, and
-sheeps it.
+sheeps it. On WoW Classic Era and Anniversary the bar reads your Polymorph
+directly; it looks and works the same.
 
 - As you start casting in a group, MTF tells your party or raid: "Sheeping
   Defias Pillager; you spank it, you tank it."

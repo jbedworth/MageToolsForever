@@ -253,7 +253,17 @@ feature set; do not add speculative features or frameworks without agreement.
   AuraContainer slot (`HARMFUL|PLAYER`, `includeSpellIDs` = Classic Polymorph,
   Pig, Turtle, and Cow IDs plus spellbook spells of those names) that the
   engine draws with `SetDurationBar` (RemainingTime), `SetSpellName`, and
-  `SetDurationText`; a dim line behind it shows a broken Polymorph. The bar
+  `SetDurationText`; a dim line behind it shows a broken Polymorph. The
+  container comes from `MTF.CreateAuraContainer` (AuraEngine.lua, John,
+  1.2.2: "MTF should do the same, once we have it proven working on WTF"):
+  on Forever Blizzard's engine (CustomAuraContainerTemplate), unchanged; on
+  Classic Era 1.15.9 and Anniversary 2.5.6, which have no
+  Blizzard_AuraContainer, a plain-Lua container with the same methods that
+  reads `C_UnitAuras.GetAuraDataByIndex(unit, i, "HARMFUL|PLAYER")` (no
+  secrets there, also in combat), with the real duration, and ticks only
+  while a timed slot shows. With neither, the bar stays off with one line.
+  Classic has no spellbook skill-line APIs: BuildSpellSet checks them and
+  keeps the Classic IDs. `/mtf debug_polymorph` says `engine=engine|lua`. The bar
   tracks your focus only (John, 1.2.1: "Let the macro set focus and mark the
   sheeped mob. Have the sheep-tracker box depend on it being the 'focus' mob,
   and just resheep it."). At `UNIT_SPELLCAST_SENT`, MTF locks the GUID only
@@ -335,8 +345,11 @@ feature set; do not add speculative features or frameworks without agreement.
 
 ## Project structure
 
-- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
-  Portals.lua, Polymorph.lua, Options.lua, loaded in that order; no media.
+- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, AuraEngine.lua,
+  Conjure.lua, Portals.lua, Polymorph.lua, Options.lua, loaded in that order;
+  no media. AuraEngine is a copy of WTF's (its uncommitted 1.3.2 work, sha256
+  49853236f2ff..., namespace renamed, as DSU's copy); keep its code identical
+  to WTF's until it moves into Dyre's Toolkit.
   Commands parses `/mtf`; Core owns saved settings and their defaults, the
   Dyre's Toolkit link, the companion AddOns' lines, the login banner, class
   and install checks, slash conflict reporting, the hardware-input hooks
@@ -435,8 +448,8 @@ feature set; do not add speculative features or frameworks without agreement.
 - Every release needs a `## <version>` section in CHANGELOG.md with player-facing
   changes; the builder puts it at the top of release-notes.md and fails
   without it.
-- Package only MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
-  Portals.lua, Polymorph.lua, Options.lua, and LICENSE under the top-level
+- Package only MageToolsForever.toc, Commands.lua, Core.lua, AuraEngine.lua,
+  Conjure.lua, Portals.lua, Polymorph.lua, Options.lua, and LICENSE under the top-level
   `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
   `release.json` (flavor `forever`) attached for WowUp.

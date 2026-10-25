@@ -37,6 +37,7 @@ MageToolsForever/
     MageToolsForever.toc
     Commands.lua
     Core.lua
+    AuraEngine.lua
     Conjure.lua
     Portals.lua
     Polymorph.lua

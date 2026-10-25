@@ -15,7 +15,7 @@
 
 ```sh
 .tools/luarocks-3.13.0-win32/win32/lua5.1/bin/lua5.1.exe tests/run.lua
-.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Conjure.lua Portals.lua Polymorph.lua Options.lua tests/run.lua
+.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua AuraEngine.lua Conjure.lua Portals.lua Polymorph.lua Options.lua tests/run.lua
 .tools/python-3.13.7/python.exe -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -115,6 +115,13 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       name and drains, stays when you tab away, empties when it breaks, and
       goes when the mob dies. Click the bar after the Polymorph breaks: it
       re-sheeps your focus; your target does not change. `/mtf debug_polymorph` lists the IDs (check Forever's).
+- [ ] Classic Era (1.2.2), a Mage, "Load out of date AddOns" on: no Lua
+      error at login; `/mtf debug_polymorph` says `engine=lua`. Sheep a mob
+      with "! Polymorph": the bar shows its name, the Polymorph icon, and the
+      time left, draining, also in combat; it empties when the sheep breaks
+      and goes when the mob dies or you focus another mob. A bar click
+      sheeps your focus again. `/mtf unlock` and `/dyre unlock` show the
+      sample to drag. On Forever, `engine=engine` and the bar is as before.
 - [ ] Polymorph bar look (1.1.0): the bar looks as in 1.0.0 at the defaults;
       the Polymorph page has Bar width, Bar height, Text size, and Opacity,
       each with a gold mark at its default, and Reset size. Out of combat,
