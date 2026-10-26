@@ -100,7 +100,11 @@ have it sheeped, so it keeps the timer when you change target, and if the
 Polymorph breaks early, the bar empties so you see it. Sheep with the
 **"! Polymorph"** macro: it focuses the mob, marks it with the moon, and
 sheeps it. On WoW Classic Era and Anniversary the bar reads your Polymorph
-directly; it looks and works the same.
+directly; it looks the same. Classic Era has no focus target: there
+"! Polymorph" marks and sheeps the mob under your mouse, else your target,
+the bar shows its time through your target or its nameplate (or its name and
+the time left as text), and the bar takes no click; sheep again with the
+macro. MTF finds out by itself whether focus works on your client.
 
 - As you start casting in a group, MTF tells your party or raid: "Sheeping
   Defias Pillager; you spank it, you tank it."
@@ -164,9 +168,11 @@ sliders on each page have a gold mark at their default.
 | `/mtf unlock` | Unlock every MTF frame, so you can drag them |
 | `/mtf lock` | Lock them again where they are |
 | `/mtf reset` | Move the MTF frames back to their default places |
+| `/mtf reset_focus` | Check again whether focus works on this client (see the Polymorph bar) |
 | `/mtf debug_conjure` | Diagnostics: each conjure rank as the client knows it, macros, recent trades |
 | `/mtf debug_portals` | Diagnostics: each teleport and portal as the client knows it, and your runes |
 | `/mtf debug_polymorph` | Diagnostics: the Polymorph IDs, the sheeped mob, the click, and the moon setting |
+| `/mtf debug_focus` | Diagnostics: whether MTF has seen a focus work on this client |
 | `/mtf debug_click` | Diagnostics: what each conjure button does for each mouse button |
 
 `/magetools` works the same, in case another AddOn uses `/mtf`.

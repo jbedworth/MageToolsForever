@@ -263,7 +263,32 @@ feature set; do not add speculative features or frameworks without agreement.
   secrets there, also in combat), with the real duration, and ticks only
   while a timed slot shows. With neither, the bar stays off with one line.
   Classic has no spellbook skill-line APIs: BuildSpellSet checks them and
-  keeps the Classic IDs. `/mtf debug_polymorph` says `engine=engine|lua`. The bar
+  keeps the Classic IDs. `/mtf debug_polymorph` says `engine=engine|lua`.
+  Focus detection (shared with WTF, the same rule; John's go 2026-10-25):
+  Classic Era keeps no focus unit, though its UI has /focus and FocusUnit
+  (John's probe: after /focus on a hostile target, UnitExists("focus") is
+  false and SecureCmdOptionParse("[@focus,exists] yes; no") is "no"), and no
+  API or game rule says so, so MTF never chooses by version. The account
+  SavedVariable `MageToolsForeverAccountDB.focusWorks` (per client install,
+  for every character) is nil until PLAYER_FOCUS_CHANGED fires with a
+  readable, non-secret UnitExists("focus") true; then true, never set back
+  to false on its own (`/mtf reset_focus` clears it; `/mtf debug_focus`
+  prints it). Until then "! Polymorph" is the chain `/tm [@focus,harm,nodead,
+  exists] !5; [@mouseover,harm,nodead] !5; [harm,nodead] !5` and `/use
+  [@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead]` (238
+  letters, 254 with "Polymorph: Turtle"), with the /focus line kept so a
+  client with focus learns it on the first press; the cast locks the same
+  chain's mob (focus, else mouseover if one exists, else target; its name
+  and a readable GUID, attackable, alive); the bar binds through focus,
+  target, or a nameplate by GUID (never mouseover), rebinding on target and
+  nameplate events, and when none shows the sheep it shows the name and the
+  time left as text from the last aura read (`C_UnitAuras`, readable on
+  those clients), counting down with a 1 s C_Timer while that lasts; the
+  bar takes no click (no secure macro can find the sheep without a focus:
+  no marker targeting exists, and `/targetexact` picks the nearest of that
+  name). Once true, the macro (out of combat) and the click are the Forever
+  ones, byte for byte. Mock: `classic` starts fresh, `noFocus` hides the
+  focus unit, `accountDB` sets the flag. The bar
   tracks your focus only (John, 1.2.1: "Let the macro set focus and mark the
   sheeped mob. Have the sheep-tracker box depend on it being the 'focus' mob,
   and just resheep it."). At `UNIT_SPELLCAST_SENT`, MTF locks the GUID only
@@ -452,7 +477,9 @@ feature set; do not add speculative features or frameworks without agreement.
   Conjure.lua, Portals.lua, Polymorph.lua, Options.lua, and LICENSE under the top-level
   `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
-  `release.json` (flavor `forever`) attached for WowUp.
+  `release.json` (flavor `forever`) attached for WowUp. The TOC has
+  `## SavedVariables: MageToolsForeverAccountDB` (the focus flag) and
+  `## SavedVariablesPerCharacter: MageToolsForeverDB`.
 - Publishing requires repository variables `ENABLE_GITHUB_RELEASES='true'` and,
   for CurseForge, `ENABLE_CURSEFORGE_UPLOADS='true'`, plus
   `CURSEFORGE_PROJECT_ID`, `CURSEFORGE_GAME_VERSION_ID`, and the `release`

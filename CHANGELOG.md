@@ -4,6 +4,13 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.2.3
+
+### Fixes
+
+- WoW Classic Era has no focus target, so "! Polymorph" did nothing there and the Polymorph bar stayed empty. Until MTF sees a focus work on your client, "! Polymorph" now marks and sheeps your focus, else the mob under your mouse, else your target. The bar shows that mob's time through your target or its nameplate, and its name with the time left as text while neither shows it. Without a focus the bar takes no click: sheep again with "! Polymorph". The first time a focus works (Forever, Anniversary), MTF remembers it for every character on that client and uses the focus macro and the bar's click as before.
+- `/mtf debug_focus` shows what MTF knows about the focus on your client, and `/mtf reset_focus` makes it check again.
+
 ## 1.2.2
 
 ### Features

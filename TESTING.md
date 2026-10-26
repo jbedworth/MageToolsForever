@@ -115,13 +115,23 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       name and drains, stays when you tab away, empties when it breaks, and
       goes when the mob dies. Click the bar after the Polymorph breaks: it
       re-sheeps your focus; your target does not change. `/mtf debug_polymorph` lists the IDs (check Forever's).
-- [ ] Classic Era (1.2.2), a Mage, "Load out of date AddOns" on: no Lua
-      error at login; `/mtf debug_polymorph` says `engine=lua`. Sheep a mob
-      with "! Polymorph": the bar shows its name, the Polymorph icon, and the
-      time left, draining, also in combat; it empties when the sheep breaks
-      and goes when the mob dies or you focus another mob. A bar click
-      sheeps your focus again. `/mtf unlock` and `/dyre unlock` show the
-      sample to drag. On Forever, `engine=engine` and the bar is as before.
+- [ ] Classic Era (1.2.3), a Mage, "Load out of date AddOns" on: no Lua
+      error at login; `/mtf debug_polymorph` says `engine=lua`, and
+      `/mtf debug_focus` says `focusWorks=nil`, `click=off`. "! Polymorph"
+      (character macros) has the chain lines. Mouse over a mob and press it:
+      the moon goes on that mob and it is sheeped, also in combat; the bar
+      shows its name, icon, and time left while it is your target or its
+      nameplate shows; tab away with its plate gone: its name and the time
+      left as grey text, counting down. With no mouseover, the macro sheeps
+      your target. Clicks on the bar pass through to the world. It empties
+      when the sheep breaks and goes when the mob dies. `/mtf unlock` and
+      `/dyre unlock` show the sample to drag.
+- [ ] Anniversary (or Forever after `/mtf reset_focus`): the first press of
+      "! Polymorph" that sets a focus makes `debug_focus` say
+      `focusWorks=true`; out of combat the macro becomes the Forever text and
+      the bar's click sheeps your focus again. After `/reload` and on another
+      character it stays so. On Forever, `engine=engine` and the bar is as
+      before.
 - [ ] Polymorph bar look (1.1.0): the bar looks as in 1.0.0 at the defaults;
       the Polymorph page has Bar width, Bar height, Text size, and Opacity,
       each with a gold mark at its default, and Reset size. Out of combat,

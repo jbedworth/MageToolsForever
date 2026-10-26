@@ -973,6 +973,20 @@ local function fixture(options)
     end
 
     for _, name in ipairs(options.remove or {}) do env[name] = nil end
+    -- options.noFocus: Classic Era, whose client keeps no focus unit (John's
+    -- probe: after /focus, UnitExists("focus") is false).
+    if options.noFocus then
+        local unitExists = env.UnitExists
+        env.UnitExists = function(unit)
+            if unit == "focus" then return false end
+            return unitExists(unit)
+        end
+        local unitGUID = env.UnitGUID
+        env.UnitGUID = function(unit)
+            if unit == "focus" then return nil end
+            return unitGUID(unit)
+        end
+    end
     -- Dyre's Toolkit, its real files (a copy in tests/toolkit, checked against
     -- ../DyresToolkit when that folder is there): MTF requires it. Not the
     -- minimap, which needs the embedded libraries. options.noToolkit leaves it
@@ -1003,6 +1017,13 @@ local function fixture(options)
         chunk("MageToolsForever", state.mtf)
     end
     env.MageToolsForeverDB = options.db
+    -- Per client: a Forever client has seen a focus; a Classic one starts
+    -- fresh. options.accountDB sets it (false: fresh).
+    local accountDB = options.accountDB
+    if accountDB == nil then
+        accountDB = not options.classic and {focusWorks = true} or false
+    end
+    env.MageToolsForeverAccountDB = accountDB or nil
     state.env = env
     state.emit("ADDON_LOADED", "DyresToolkit")
     state.openedCompanion = {}
@@ -2232,8 +2253,8 @@ test("on Classic, login completes and the Polymorph bar uses the plain-Lua conta
         equal(frame.kind == "AuraContainer", false, "no engine container on Classic")
     end
     equal(type(bar.container.AddAuraSlot), "function")
-    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
-        .. "[nocombat,harm,nodead]\n/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph")
+    -- A fresh Classic client has seen no focus yet: the chain macro.
+    contains(macroBody(state, "! Polymorph"), "[@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead]")
     equal(state.env.MageToolsForeverPolymorph.shown, true, "the click area is there")
     state.clear()
     state.slash("debug_polymorph")
@@ -2242,7 +2263,8 @@ test("on Classic, login completes and the Polymorph bar uses the plain-Lua conta
     equal(state.env.MageToolsForeverConjure ~= nil and state.env.MageToolsForeverPortals ~= nil, true)
 end)
 test("on Classic, a Polymorph on your focus shows its time, drains, refreshes, breaks, and goes", function()
-    local state = mage({classic = true, known = {[POLYMORPH] = true}})
+    -- Anniversary, where focus works and MTF has seen it.
+    local state = mage({classic = true, accountDB = {focusWorks = true}, known = {[POLYMORPH] = true}})
     local bar = state.env.MageToolsForeverPolymorphBar
     sheepTarget(state)
     state.units.focus.auras = {polymorphAura(state)}
@@ -2280,7 +2302,7 @@ test("on Classic, a Polymorph on your focus shows its time, drains, refreshes, b
     equal(bar.container.unit, "none")
     -- Another player's Polymorph or one on your target only shows nothing:
     -- the slot reads your own auras on your focus (HARMFUL|PLAYER).
-    local other = mage({classic = true, known = {[POLYMORPH] = true}})
+    local other = mage({classic = true, accountDB = {focusWorks = true}, known = {[POLYMORPH] = true}})
     other.units.target = {name = "Defias Bandit", guid = "mob-2", level = 20, auras = {polymorphAura(other)}}
     castPolymorph(other)
     equal(other.env.MageToolsForeverPolymorphBar.shown, false, "not your focus")
@@ -2316,6 +2338,141 @@ test("Forever keeps the engine container; a client with neither says the bar sta
             .. "C_UnitAuras.GetAuraDataByIndex.", 1, true) then said = true end
     end
     equal(said, true)
+end)
+-- Clients without a focus (Classic Era): the learned focusWorks flag ------------
+
+local CHAIN_MACRO = "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
+    .. "/tm [@focus,harm,nodead,exists] !5; [@mouseover,harm,nodead] !5; [harm,nodead] !5\n"
+    .. "/use [@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead] Polymorph"
+local FOREVER_MACRO = "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
+    .. "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph"
+
+local function era()
+    return mage({classic = true, noFocus = true, known = {[POLYMORPH] = true}})
+end
+local function sheepAt(state, unit, data)
+    state.units[unit] = data
+    state.emit("UNIT_SPELLCAST_SENT", "player", data.name, "cast-e", POLYMORPH)
+    state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-e", POLYMORPH)
+end
+local function pillager(state, guid)
+    return {name = "Defias Pillager", guid = guid or "mob-1", level = 20, auras = {polymorphAura(state)}}
+end
+
+test("Era with no focus: the chain macro, a lock from the mouseover or the target, and no click", function()
+    local state = era()
+    equal(macroBody(state, "! Polymorph"), CHAIN_MACRO)
+    equal(#CHAIN_MACRO <= 255, true, "fits a macro")
+    equal(#CHAIN_MACRO:gsub("Polymorph", "Polymorph: Turtle") <= 255, true, "with the longest Polymorph name too")
+    -- The mob under the mouse, with another mob targeted: the mouseover's GUID.
+    state.units.target = {name = "Defias Bandit", guid = "mob-2", level = 20}
+    sheepAt(state, "mouseover", pillager(state, "mob-7"))
+    local bar, holder = state.env.MageToolsForeverPolymorphBar, state.env.MageToolsForeverPolymorph
+    equal(bar.shown, true)
+    contains(bar.name.text, "Defias Pillager")
+    equal(bar.container.unit, "none", "never bound to mouseover")
+    equal(holder.attributes.type1, nil, "no click without a focus")
+    equal(holder.mouse, false, "clicks pass through to the world")
+    state.clear()
+    state.slash("debug_polymorph")
+    contains(table.concat(state.messages, "|"), "from=mouseover")
+    -- Its nameplate shows it: the bar binds there.
+    state.units.nameplate3 = state.units.mouseover
+    state.units.mouseover = nil
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate3")
+    equal(bar.container.unit, "nameplate3")
+    -- No mouseover: your target's GUID.
+    local target = era()
+    sheepAt(target, "target", pillager(target))
+    equal(target.env.MageToolsForeverPolymorphBar.container.unit, "target")
+    equal(polymorphSlot(target).display.text.text, "50 s")
+    target.clear()
+    target.slash("debug_polymorph")
+    contains(table.concat(target.messages, "|"), "from=target")
+end)
+test("Era with no focus: the time through your target, its nameplate, or as text when neither shows it", function()
+    local state = era()
+    local bar = state.env.MageToolsForeverPolymorphBar
+    sheepAt(state, "target", pillager(state))
+    equal(bar.container.unit, "target")
+    equal(bar.name.text, "Defias Pillager", "the slot draws the time")
+    -- Tab away, no plate: its name and the time left as text.
+    local sheep = state.units.target
+    state.units.target = {name = "Defias Bandit", guid = "mob-2", level = 20}
+    state.combat = true
+    state.emit("PLAYER_TARGET_CHANGED")
+    equal(bar.container.unit, "none")
+    equal(bar.name.text, "Defias Pillager  |cff99999950 s|r")
+    advance(state, 10)
+    equal(bar.name.text, "Defias Pillager  |cff99999940 s|r", "counts down")
+    -- Its plate comes into view: the slot again.
+    state.units.nameplate4 = sheep
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate4")
+    equal(bar.container.unit, "nameplate4")
+    equal(bar.name.text, "Defias Pillager")
+    -- A refresh read there moves the end time.
+    sheep.auras = {polymorphAura(state)}
+    state.emit("UNIT_AURA", "nameplate4")
+    state.units.nameplate4 = nil
+    state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate4")
+    equal(bar.name.text, "Defias Pillager  |cff99999950 s|r")
+    -- Ran out: the name alone, then forgotten after the longest Polymorph.
+    advance(state, 51)
+    equal(bar.name.text, "Defias Pillager")
+    advance(state, 5)
+    equal(bar.shown, false)
+    -- Its death through any unit forgets it.
+    local dies = era()
+    sheepAt(dies, "target", pillager(dies))
+    dies.units.target.dead = true
+    dies.emit("UNIT_HEALTH", "target")
+    equal(dies.env.MageToolsForeverPolymorphBar.shown, false)
+end)
+test("once a focus is seen, the Forever macro and the click come back, and the flag persists", function()
+    -- Anniversary-like: a fresh client where focus works.
+    local state = mage({classic = true, known = {[POLYMORPH] = true}})
+    equal(macroBody(state, "! Polymorph"), CHAIN_MACRO)
+    equal(state.env.MageToolsForeverAccountDB.focusWorks, nil)
+    -- In combat the macro waits; the flag does not.
+    state.combat = true
+    state.units.focus = {name = "Defias Pillager", guid = "mob-1", level = 20}
+    state.emit("PLAYER_FOCUS_CHANGED")
+    equal(state.env.MageToolsForeverAccountDB.focusWorks, true)
+    equal(macroBody(state, "! Polymorph"), CHAIN_MACRO, "macros change only out of combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(macroBody(state, "! Polymorph"), FOREVER_MACRO)
+    state.units.target = state.units.focus
+    castPolymorph(state)
+    equal(state.env.MageToolsForeverPolymorph.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph")
+    equal(state.env.MageToolsForeverPolymorphBar.container.unit, "focus")
+    -- Saved per client: the next login starts with the Forever form.
+    local again = mage({classic = true, accountDB = state.env.MageToolsForeverAccountDB, known = {[POLYMORPH] = true}})
+    equal(macroBody(again, "! Polymorph"), FOREVER_MACRO)
+    -- On Era, PLAYER_FOCUS_CHANGED with no focus learns nothing.
+    local none = era()
+    none.emit("PLAYER_FOCUS_CHANGED")
+    equal(none.env.MageToolsForeverAccountDB.focusWorks, nil)
+    equal(macroBody(none, "! Polymorph"), CHAIN_MACRO)
+    -- A damaged saved value is repaired to unknown.
+    local damaged = mage({classic = true, accountDB = {focusWorks = "yes"}, known = {[POLYMORPH] = true}})
+    equal(damaged.env.MageToolsForeverAccountDB.focusWorks, nil)
+end)
+test("/mtf debug_focus prints the flag, and /mtf reset_focus clears it", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    state.clear()
+    state.slash("debug_focus")
+    contains(state.last(), "debug_focus focusWorks=true")
+    contains(state.last(), "click=on")
+    state.slash("reset_focus")
+    equal(state.env.MageToolsForeverAccountDB.focusWorks, nil)
+    contains(state.last(), "Focus check reset")
+    equal(macroBody(state, "! Polymorph"), CHAIN_MACRO)
+    state.clear()
+    state.slash("debug_focus")
+    contains(state.last(), "focusWorks=nil")
+    contains(state.last(), "macro=focus, mouseover, target")
+    contains(state.last(), "click=off")
 end)
 test("unlocked, the Polymorph bar shows a sample to drag", function()
     local state = mage()

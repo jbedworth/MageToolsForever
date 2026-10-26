@@ -61,7 +61,7 @@ local REQUIRED_NAMESPACE = {
     "CharacterMacrosAvailable", "WriteCharacterMacro", "DeleteCharacterMacro", "ApplyPolymorphMacro",
     "AddInputHandler", "RunOnNextInput",
     "InitializePortals", "RefreshPortals", "ReportPortalsDebug",
-    "InitializePolymorph", "RefreshPolymorph", "ReportPolymorphDebug",
+    "InitializePolymorph", "RefreshPolymorph", "ReportPolymorphDebug", "ReportFocusDebug", "ResetFocus",
     "InitializeOptions", "OpenSettings",
 }
 
@@ -435,9 +435,17 @@ SLASH_MAGETOOLSFOREVER1 = PRIMARY_SLASH
 SLASH_MAGETOOLSFOREVER2 = BACKUP_SLASH
 SlashCmdList[SLASH_KEY] = MTF.HandleCommand
 
+-- Per client install (every client keeps its own SavedVariables), for all
+-- characters: only focusWorks (see Polymorph.lua), true or nil.
+function MTF.SanitizeAccountDB(db)
+    return {focusWorks = type(db) == "table" and db.focusWorks == true or nil}
+end
+
 local function LoadDB()
     MageToolsForeverDB = MTF.SanitizeDB(MageToolsForeverDB)
     MTF.db = MageToolsForeverDB
+    MageToolsForeverAccountDB = MTF.SanitizeAccountDB(MageToolsForeverAccountDB)
+    MTF.accountDB = MageToolsForeverAccountDB
 end
 
 local events = CreateFrame("Frame")

@@ -31,6 +31,19 @@ local _, MTF = ...
 -- log is closed to AddOns, so a resist cannot be seen; a successful cast
 -- counts as landed.
 --
+-- Without a focus (shared rule with WTF, John's go 2026-10-25): Classic Era
+-- keeps no focus unit, though its UI has /focus (John's probe: after /focus,
+-- UnitExists("focus") is false and [@focus,exists] does not match), and no
+-- API says so. So MTF learns it per client: MageToolsForeverAccountDB.
+-- focusWorks is nil until PLAYER_FOCUS_CHANGED fires with a readable
+-- UnitExists("focus") true, then true for good (only /mtf reset_focus clears
+-- it). Until then "! Polymorph" tries your focus, then the mob under the
+-- mouse, then your target, for the moon and the cast; MTF locks the cast's
+-- mob from the same chain (mouseover, else target, by name and a readable
+-- GUID), the bar shows it through your target or its nameplate (its name and
+-- the time left as text when neither shows it), and the bar takes no click.
+-- Once focus is seen, the macro and the click are the Forever ones.
+--
 -- Clicking the bar re-sheeps your focus (John: no /tm, no targeting, no
 -- mouseover). Secure attributes change only out of combat, so the click is
 -- set as the cast starts (a pull's Polymorph starts before combat); a
@@ -52,6 +65,13 @@ local MOON = 5
 -- whether the macro has its /tm line; the click never marks.
 local MARK_FOCUS = "/tm [@focus,harm,nodead,exists] !" .. MOON .. "\n"
 local CAST_FOCUS = "/use [@focus,exists,harm,nodead] "
+-- Until focus is seen to work: focus, then mouseover, then target.
+local MARK_CHAIN = "/tm [@focus,harm,nodead,exists] !" .. MOON .. "; [@mouseover,harm,nodead] !" .. MOON
+    .. "; [harm,nodead] !" .. MOON .. "\n"
+local CAST_CHAIN = "/use [@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead] "
+local MAX_NAMEPLATE_UNITS = 40
+-- The time-left text, while no unit shows the sheep, redraws this often.
+local TEXT_TICK = 1
 local AURA_FILTER = "HARMFUL|PLAYER"
 local ANNOUNCE_REPEAT_SECONDS = 3
 
@@ -75,6 +95,7 @@ local DEFAULT_POINT = {point = "CENTER", relativePoint = "CENTER", x = -260, y =
 local SAMPLE_NAME = "Polymorph (sample)"
 
 local sheep = {available = false, casts = {}, ids = {}, names = {}}
+local Rebind
 local holder, bar
 
 local function ReadGUID(unit)
@@ -137,11 +158,51 @@ end
 
 -- The mob a cast sent at targetName goes to, locked as it starts: your focus,
 -- when its name is the cast's, its GUID is readable, and you can attack it.
-local function LockFocusGUID(targetName)
-    local guid = ReadGUID("focus")
-    local hostile = UnitCanAttack("player", "focus")
-    if guid and ReadName("focus") == targetName and not MTF.IsSecret(hostile) and hostile == true then
+local function FocusWorks()
+    return MTF.accountDB.focusWorks == true
+end
+
+-- The unit's GUID when it is the attackable mob of that name, alive.
+local function LockUnitGUID(unit, targetName)
+    local guid = ReadGUID(unit)
+    local hostile = UnitCanAttack("player", unit)
+    if guid and ReadName(unit) == targetName and not MTF.IsSecret(hostile) and hostile == true
+        and not IsDead(unit) then
         return guid
+    end
+end
+
+local function LockFocusGUID(targetName)
+    return LockUnitGUID("focus", targetName)
+end
+
+-- Without a known focus, the macro's chain: focus, mouseover, target.
+local function LockChainGUID(targetName)
+    local guid = LockFocusGUID(targetName)
+    if guid then
+        return guid, "focus"
+    end
+    if UnitExists("mouseover") then
+        guid = LockUnitGUID("mouseover", targetName)
+        return guid, guid and "mouseover" or nil
+    end
+    guid = LockUnitGUID("target", targetName)
+    return guid, guid and "target" or nil
+end
+
+-- Without a known focus, the unit showing the sheep: target, then a
+-- nameplate, by a readable GUID. Never mouseover: it moves with the pointer.
+local function FindUnit(guid)
+    for _, unit in ipairs({"focus", "target"}) do
+        if ReadGUID(unit) == guid then
+            return unit
+        end
+    end
+    for index = 1, MAX_NAMEPLATE_UNITS do
+        local unit = "nameplate" .. index
+        if UnitExists(unit) and ReadGUID(unit) == guid then
+            return unit
+        end
     end
 end
 
@@ -165,7 +226,15 @@ local function Layout()
         return
     end
     if sheep.guid then
-        bar.name:SetText(sheep.mobName)
+        local text = sheep.mobName
+        -- No unit shows the sheep (no focus on this client): the time left as text.
+        if bar.boundUnit == "none" and sheep.expires then
+            local remaining = sheep.expires - GetTime()
+            if remaining > 0 then
+                text = text .. "  |cff999999" .. math.ceil(remaining) .. " s|r"
+            end
+        end
+        bar.name:SetText(text)
         bar:Show()
     elseif sample then
         bar.name:SetText(SAMPLE_NAME)
@@ -187,7 +256,8 @@ local function ApplyClick()
     -- change only here, out of combat (in client a Polymorph that landed in
     -- combat once rescaled it there, after which its clicks failed). Its
     -- place and size are Dyre's Toolkit's, which also waits out combat.
-    local spell = sheep.clickSpell
+    -- No click until focus is seen to work: it casts on your focus.
+    local spell = FocusWorks() and sheep.clickSpell or nil
     if spell then
         holder:SetAttribute("type1", "macro")
         holder:SetAttribute("macrotext1", CAST_FOCUS .. spell)
@@ -207,19 +277,76 @@ local function ApplyClick()
     Layout()
 end
 
+-- Without a known focus: the sheep's own Polymorph, read where a unit shows
+-- it (nothing is secret on the clients without focus), for the time-left text.
+local function ReadSheepAura(unit)
+    if FocusWorks() or not unit or type(C_UnitAuras) ~= "table" then
+        return
+    end
+    for index = 1, 40 do
+        local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, AURA_FILTER)
+        if not aura then
+            break
+        end
+        local id, expires = aura.spellId, aura.expirationTime
+        if not MTF.IsSecret(id) and sheep.ids[id] and not MTF.IsSecret(expires) and type(expires) == "number" then
+            sheep.expires = expires > 0 and expires or nil
+            return
+        end
+    end
+    sheep.expires = nil
+end
+
+-- While no unit shows the sheep, the text counts down; it stops on its own.
+local function TickText()
+    local token = {}
+    sheep.textToken = token
+    local function Step()
+        if sheep.textToken ~= token or not sheep.guid or bar.boundUnit ~= "none" or not sheep.expires
+            or sheep.expires <= GetTime() then
+            Layout()
+            return
+        end
+        Layout()
+        C_Timer.After(TEXT_TICK, Step)
+    end
+    Step()
+end
+
+-- Without a known focus: bind to the unit that shows the sheep now.
+function Rebind()
+    if not sheep.guid or FocusWorks() then
+        return
+    end
+    local unit = FindUnit(sheep.guid)
+    if unit then
+        ReadSheepAura(unit)
+    end
+    Bind(unit)
+    if not unit then
+        TickText()
+    else
+        Layout()
+    end
+end
+
 local function Forget()
-    sheep.guid, sheep.mobName, sheep.clickSpell = nil, nil, nil
+    sheep.guid, sheep.mobName, sheep.clickSpell, sheep.expires = nil, nil, nil, nil
     Bind(nil)
     Layout()
     ApplyClick()
 end
 
 local function Track(guid, mobName, spellName)
-    sheep.guid, sheep.mobName, sheep.spellName = guid, mobName, spellName
+    sheep.guid, sheep.mobName, sheep.spellName, sheep.expires = guid, mobName, spellName, nil
     sheep.clickSpell = spellName
     local token = {}
     sheep.token = token
-    Bind("focus")
+    if FocusWorks() then
+        Bind("focus")
+    else
+        Rebind()
+    end
     Layout()
     ApplyClick()
     C_Timer.After(LONGEST_SECONDS + FORGET_SLACK, function()
@@ -233,6 +360,9 @@ local function ShowTooltip(button)
     GameTooltip:SetOwner(button, "ANCHOR_TOP")
     if button.spellName then
         GameTooltip:SetText("Click: " .. button.spellName .. " your focus again.", 1, 1, 1)
+    elseif not FocusWorks() then
+        GameTooltip:SetText("Sheep again with \"! Polymorph\": mouse over the mob, or target it.",
+            0.7, 0.7, 0.7, true)
     else
         GameTooltip:SetText("Sheep a mob with \"! Polymorph\", then click here to sheep your focus again.",
             0.7, 0.7, 0.7, true)
@@ -363,7 +493,7 @@ local function BuildBar()
     })
     bar.container = container
     bar.boundUnit = nil
-    Bind(sheep.guid and "focus" or nil)
+    Bind(sheep.guid and (FocusWorks() and "focus" or FindUnit(sheep.guid)) or nil)
     ApplyOpacity()
 end
 
@@ -416,9 +546,13 @@ function MTF.PolymorphMacroBody()
     if not spell then
         return nil
     end
-    -- John's macro, exactly (1.2.1).
+    local mark, cast = MARK_FOCUS, CAST_FOCUS
+    if not FocusWorks() then
+        mark, cast = MARK_CHAIN, CAST_CHAIN
+    end
+    -- John's macro, exactly (1.2.1), once focus is seen; the chain until then.
     return "#showtooltip " .. spell .. "\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
-        .. (MTF.db.polymorph.mark and MARK_FOCUS or "") .. CAST_FOCUS .. spell
+        .. (MTF.db.polymorph.mark and mark or "") .. cast .. spell
 end
 
 -- Out of combat only; turning the macro off deletes it.
@@ -469,16 +603,22 @@ local function OnCastSent(target, castGUID, spellID)
         or type(target) ~= "string" or target == "" or not sheep.ids[spellID] then
         return
     end
-    local guid = LockFocusGUID(target)
+    local guid, from
+    if FocusWorks() then
+        guid = LockFocusGUID(target)
+        from = guid and "focus" or nil
+    else
+        guid, from = LockChainGUID(target)
+    end
     sheep.casts[castGUID] = {target = target, spellID = spellID, guid = guid}
-    sheep.lastCast = {spellID = spellID, target = target, focus = guid ~= nil}
+    sheep.lastCast = {spellID = spellID, target = target, focus = from == "focus", from = from}
     if not MTF.db.polymorph.enabled then
         return
     end
     AnnounceCast(target)
     -- A pull's Polymorph starts out of combat and lands in it: set the click
     -- now, while the game still allows it.
-    if guid and not InCombatLockdown() then
+    if guid and FocusWorks() and not InCombatLockdown() then
         sheep.clickSpell = C_Spell.GetSpellName(spellID)
         sheep.casts[castGUID].setClick = true
         ApplyClick()
@@ -494,7 +634,8 @@ local function OnCastSucceeded(castGUID)
     if not cast or not MTF.db.polymorph.enabled then
         return
     end
-    -- Only a cast at your focus drives the bar.
+    -- Only a cast at your focus drives the bar (without a known focus, at the
+    -- macro chain's mob).
     if cast.guid then
         Track(cast.guid, cast.target, C_Spell.GetSpellName(cast.spellID))
     end
@@ -503,6 +644,19 @@ end
 -- Your focus is no longer the sheep: another mob, or none. A focus whose GUID
 -- is secret stays bound (it cannot be told apart).
 local function CheckFocus()
+    if not FocusWorks() then
+        local exists = UnitExists("focus")
+        if MTF.IsSecret(exists) or exists ~= true then
+            return
+        end
+        -- Focus works on this client: from now on the Forever macro and click.
+        MTF.accountDB.focusWorks = true
+        MTF.ApplyPolymorphMacro()
+        if sheep.guid then
+            sheep.clickSpell = sheep.spellName
+        end
+        ApplyClick()
+    end
     if not sheep.guid then
         return
     end
@@ -553,6 +707,13 @@ events:SetScript("OnEvent", function(_, event, unit, first, second, third)
         end
     elseif event == "PLAYER_FOCUS_CHANGED" then
         CheckFocus()
+    elseif event == "UNIT_AURA" then
+        if sheep.guid and not FocusWorks() and unit == bar.boundUnit then
+            ReadSheepAura(unit)
+        end
+    else
+        -- PLAYER_TARGET_CHANGED and nameplates: where the sheep shows now.
+        Rebind()
     end
 end)
 
@@ -640,7 +801,8 @@ function MTF.InitializePolymorph()
     CreateBar()
     CreateWidget()
     sheep.available = true
-    for _, event in ipairs({"PLAYER_REGEN_ENABLED", "PLAYER_FOCUS_CHANGED", "SPELLS_CHANGED", "UNIT_HEALTH"}) do
+    for _, event in ipairs({"PLAYER_REGEN_ENABLED", "PLAYER_FOCUS_CHANGED", "SPELLS_CHANGED", "UNIT_HEALTH",
+        "UNIT_AURA", "PLAYER_TARGET_CHANGED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED"}) do
         events:RegisterEvent(event)
     end
     for _, event in ipairs({"UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED",
@@ -667,11 +829,31 @@ function MTF.ReportPolymorphDebug()
     MTF.Report("debug_polymorph ids=" .. table.concat(ids, ","))
     local last = sheep.lastCast
     if last then
-        MTF.Report(string.format("debug_polymorph lastCast spell=%d target=%s focus=%s", last.spellID, last.target,
-            tostring(last.focus)))
+        MTF.Report(string.format("debug_polymorph lastCast spell=%d target=%s focus=%s from=%s", last.spellID,
+            last.target, tostring(last.focus), tostring(last.from)))
     end
     MTF.Report(string.format("debug_polymorph mob=%s unit=%s moon=%s", tostring(sheep.mobName),
         tostring(bar.boundUnit), MTF.db.polymorph.mark and "from the macro" or "off"))
     MTF.Report(string.format("debug_polymorph click shown=%s type=%s macro=%s", tostring(holder:IsShown()),
         tostring(holder:GetAttribute("type1")), tostring(holder:GetAttribute("macrotext1")):gsub("\n", " | ")))
+end
+
+-- /mtf debug_focus: what MTF learned about the focus on this client.
+function MTF.ReportFocusDebug()
+    local exists = UnitExists("focus")
+    MTF.Report(string.format("debug_focus focusWorks=%s focusNow=%s macro=%s click=%s",
+        tostring(MTF.accountDB.focusWorks), MTF.Describe(exists),
+        FocusWorks() and "focus" or "focus, mouseover, target", FocusWorks() and "on" or "off (no focus seen)"))
+end
+
+-- /mtf reset_focus: forget it, so the chain macro comes back until a focus is
+-- seen again (the macro and the click wait out combat).
+function MTF.ResetFocus()
+    MTF.accountDB.focusWorks = nil
+    if sheep.available then
+        MTF.ApplyPolymorphMacro()
+        ApplyClick()
+    end
+    MTF.Report("Focus check reset: \"! Polymorph\" tries your focus, the mob under the mouse, then your target, "
+        .. "until MTF sees a focus again.")
 end
