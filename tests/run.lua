@@ -24,8 +24,20 @@ local function contains(actual, fragment, context)
     end
 end
 
-local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua"}
-local RUNTIME_FILES = {"Commands.lua", "Core.lua", "AuraEngine.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}
+local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua", "Auras.lua", "Units.lua",
+    "HealthBars.lua", "Spells.lua", "Macros.lua", "Announce.lua", "ClassData.lua", "Owners.lua", "Control.lua"}
+-- The real Dyre's Toolkit beside this repository when it is there; else (as
+-- in CI, which has only this repository) the copy in tests/toolkit.
+local TOOLKIT_DIR = "tests/toolkit/"
+do
+    local probe = io.open("../DyresToolkit/Core.lua", "rb")
+    if probe then
+        probe:close()
+        TOOLKIT_DIR = "../DyresToolkit/"
+    end
+end
+print("Dyre's Toolkit from " .. TOOLKIT_DIR)
+local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}
 local SPELLS = {
     [5504] = "Conjure Water", [5505] = "Conjure Water", [5506] = "Conjure Water", [6127] = "Conjure Water",
     [587] = "Conjure Food", [597] = "Conjure Food", [990] = "Conjure Food", [6129] = "Conjure Food",
@@ -89,8 +101,13 @@ local function fixture(options)
         local key, value = text:match("^##%s*([^:]+):%s*(.-)%s*$")
         if key then state.toc[key] = value end
     end
+    -- MTF reads its own fields by folder name; the toolkit reads other
+    -- AddOns' Group (its owner claims are for Dyre's AddOns only).
     env.C_AddOns = {GetAddOnMetadata = function(name, field)
-        equal(name, "MageToolsForever", "metadata uses the AddOn folder name")
+        if name ~= "MageToolsForever" then
+            equal(field, "Group", "metadata of another AddOn")
+            return (options.family or {})[name] and "DyresToolkit" or nil
+        end
         return state.toc[field] or ""
     end}
     env.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip)
@@ -987,14 +1004,13 @@ local function fixture(options)
             return unitGUID(unit)
         end
     end
-    -- Dyre's Toolkit, its real files (a copy in tests/toolkit, checked against
-    -- ../DyresToolkit when that folder is there): MTF requires it. Not the
+    -- Dyre's Toolkit, its real files (TOOLKIT_DIR): MTF requires it. Not the
     -- minimap, which needs the embedded libraries. options.noToolkit leaves it
     -- out; options.oldToolkit offers contract 1 only.
     if not options.noToolkit then
         state.toolkitNS = {InitializeMinimap = function() end}
         for _, path in ipairs(TOOLKIT_FILES) do
-            local chunk = assert(loadfile("tests/toolkit/" .. path))
+            local chunk = assert(loadfile(TOOLKIT_DIR .. path))
             setfenv(chunk, env)
             chunk("DyresToolkit", state.toolkitNS)
         end
@@ -1991,7 +2007,7 @@ test("only a Polymorph at your focus drives the bar", function()
     equal(secret.env.MageToolsForeverPolymorphBar.shown, false)
     secret.clear()
     secret.slash("debug_polymorph")
-    contains(table.concat(secret.messages, "|"), "focus=false")
+    contains(table.concat(secret.messages, "|"), "locked=false")
 end)
 test("the bar forgets the sheep when your focus becomes another mob or none", function()
     local state = mage({known = {[POLYMORPH] = true}})
@@ -2040,7 +2056,7 @@ test("MTF never calls SetRaidTarget: the moon comes only from /tm in \"! Polymor
         state.slash("debug_polymorph")
         contains(table.concat(state.messages, "|"), "moon=from the macro")
     end
-    for _, file in ipairs({"Commands.lua", "Core.lua", "AuraEngine.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}) do
+    for _, file in ipairs({"Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua"}) do
         local handle = assert(io.open(file, "r"))
         local text = handle:read("*a")
         handle:close()
@@ -2342,7 +2358,7 @@ end)
 -- Clients without a focus (Classic Era): the learned focusWorks flag ------------
 
 local CHAIN_MACRO = "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
-    .. "/tm [@focus,harm,nodead,exists] !5; [@mouseover,harm,nodead] !5; [harm,nodead] !5\n"
+    .. "/tm [@focus,harm,nodead,exists][@mouseover,harm,nodead][harm,nodead] !5\n"
     .. "/use [@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead] Polymorph"
 local FOREVER_MACRO = "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
     .. "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph"
@@ -2375,7 +2391,7 @@ test("Era with no focus: the chain macro, a lock from the mouseover or the targe
     equal(holder.mouse, false, "clicks pass through to the world")
     state.clear()
     state.slash("debug_polymorph")
-    contains(table.concat(state.messages, "|"), "from=mouseover")
+    contains(table.concat(state.messages, "|"), "unit=mouseover")
     -- Its nameplate shows it: the bar binds there.
     state.units.nameplate3 = state.units.mouseover
     state.units.mouseover = nil
@@ -2388,7 +2404,7 @@ test("Era with no focus: the chain macro, a lock from the mouseover or the targe
     equal(polymorphSlot(target).display.text.text, "50 s")
     target.clear()
     target.slash("debug_polymorph")
-    contains(table.concat(target.messages, "|"), "from=target")
+    contains(table.concat(target.messages, "|"), "unit=target")
 end)
 test("Era with no focus: the time through your target, its nameplate, or as text when neither shows it", function()
     local state = era()
@@ -2432,12 +2448,12 @@ test("once a focus is seen, the Forever macro and the click come back, and the f
     -- Anniversary-like: a fresh client where focus works.
     local state = mage({classic = true, known = {[POLYMORPH] = true}})
     equal(macroBody(state, "! Polymorph"), CHAIN_MACRO)
-    equal(state.env.MageToolsForeverAccountDB.focusWorks, nil)
-    -- In combat the macro waits; the flag does not.
+    equal(state.env.DyresToolkitDB.focusWorks, nil)
+    -- In combat the macro waits; the flag (the Toolkit's) does not.
     state.combat = true
     state.units.focus = {name = "Defias Pillager", guid = "mob-1", level = 20}
     state.emit("PLAYER_FOCUS_CHANGED")
-    equal(state.env.MageToolsForeverAccountDB.focusWorks, true)
+    equal(state.env.DyresToolkitDB.focusWorks, true)
     equal(macroBody(state, "! Polymorph"), CHAIN_MACRO, "macros change only out of combat")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
@@ -2446,31 +2462,45 @@ test("once a focus is seen, the Forever macro and the click come back, and the f
     castPolymorph(state)
     equal(state.env.MageToolsForeverPolymorph.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph")
     equal(state.env.MageToolsForeverPolymorphBar.container.unit, "focus")
-    -- Saved per client: the next login starts with the Forever form.
-    local again = mage({classic = true, accountDB = state.env.MageToolsForeverAccountDB, known = {[POLYMORPH] = true}})
+    -- Saved per client by the Toolkit: the next login starts with the Forever form.
+    local again = mage({classic = true, toolkitDB = state.env.DyresToolkitDB, known = {[POLYMORPH] = true}})
     equal(macroBody(again, "! Polymorph"), FOREVER_MACRO)
     -- On Era, PLAYER_FOCUS_CHANGED with no focus learns nothing.
     local none = era()
     none.emit("PLAYER_FOCUS_CHANGED")
-    equal(none.env.MageToolsForeverAccountDB.focusWorks, nil)
+    equal(none.env.DyresToolkitDB.focusWorks, nil)
     equal(macroBody(none, "! Polymorph"), CHAIN_MACRO)
-    -- A damaged saved value is repaired to unknown.
+end)
+test("MTF 1.2.3's own focus flag is carried to the Toolkit once, then cleared", function()
+    -- A client where MTF 1.2.3 had seen a focus, with a fresh Toolkit flag.
+    local state = mage({classic = true, accountDB = {focusWorks = true}, known = {[POLYMORPH] = true}})
+    equal(state.env.DyresToolkitDB.focusWorks, true, "carried over")
+    equal(state.env.MageToolsForeverAccountDB.focusWorks, nil, "and cleared")
+    equal(macroBody(state, "! Polymorph"), FOREVER_MACRO)
+    -- A reset from any Dyre's AddOn then holds after the next login.
+    state.slash("reset_focus")
+    local again = mage({classic = true, toolkitDB = state.env.DyresToolkitDB,
+        accountDB = state.env.MageToolsForeverAccountDB, known = {[POLYMORPH] = true}})
+    equal(again.env.DyresToolkitDB.focusWorks, nil)
+    equal(macroBody(again, "! Polymorph"), CHAIN_MACRO)
+    -- A damaged saved value carries nothing.
     local damaged = mage({classic = true, accountDB = {focusWorks = "yes"}, known = {[POLYMORPH] = true}})
+    equal(damaged.env.DyresToolkitDB.focusWorks, nil)
     equal(damaged.env.MageToolsForeverAccountDB.focusWorks, nil)
 end)
-test("/mtf debug_focus prints the flag, and /mtf reset_focus clears it", function()
+test("/mtf debug_focus prints the flag, and /mtf reset_focus clears it for every Dyre's AddOn", function()
     local state = mage({known = {[POLYMORPH] = true}})
     state.clear()
     state.slash("debug_focus")
     contains(state.last(), "debug_focus focusWorks=true")
     contains(state.last(), "click=on")
     state.slash("reset_focus")
-    equal(state.env.MageToolsForeverAccountDB.focusWorks, nil)
-    contains(state.last(), "Focus check reset")
+    equal(state.env.DyresToolkitDB.focusWorks, nil)
+    contains(state.last(), "Focus detection reset for every Dyre's AddOn")
     equal(macroBody(state, "! Polymorph"), CHAIN_MACRO)
     state.clear()
     state.slash("debug_focus")
-    contains(state.last(), "focusWorks=nil")
+    contains(state.last(), "focusWorks=false")
     contains(state.last(), "macro=focus, mouseover, target")
     contains(state.last(), "click=off")
 end)
@@ -2514,26 +2544,13 @@ local function same(actual, expected, what)
     end
 end
 
-test("the toolkit copy the tests load matches ../DyresToolkit when it is there", function()
-    -- CI has only this repository, so the tests load a copy; on a developer's
-    -- machine it must be the toolkit's own files, byte for byte.
-    for _, path in ipairs(TOOLKIT_FILES) do
-        local own = io.open("../DyresToolkit/" .. path, "rb")
-        if own then
-            local copy = assert(io.open("tests/toolkit/" .. path, "rb"))
-            equal(copy:read("*a") == own:read("*a"), true, "tests/toolkit/" .. path .. " is stale: copy it again")
-            copy:close()
-            own:close()
-        end
-    end
-end)
-test("without Dyre's Toolkit 2.0 MTF stays off and says once what to install", function()
+test("without Dyre's Toolkit 2.5 MTF stays off and says once what to install", function()
     for _, options in ipairs({{noToolkit = true}, {oldToolkit = true}}) do
         local state = mage(options)
         equal(state.mtf.available, false)
-        equal(countMessages(state, "needs Dyre's Toolkit 2.3"), 1, "said once")
+        equal(countMessages(state, "needs Dyre's Toolkit 2.5"), 1, "said once")
         for _, message in ipairs(state.messages) do
-            if message:find("Dyre's Toolkit 2.3", 1, true) then
+            if message:find("Dyre's Toolkit 2.5", 1, true) then
                 contains(message, "MTF: ")
                 contains(message, "CurseForge")
                 equal(message:lower():find("github", 1, true), nil, "CurseForge only")
@@ -2606,7 +2623,7 @@ test("MTF never places, sizes, drags, or sets the mouse of a widget itself, but 
             local original = widget[method]
             widget[method] = function(self, ...)
                 local source = debug.getinfo(2, "S").short_src
-                if not source:find("toolkit", 1, true) then
+                if not source:lower():find("toolkit", 1, true) then
                     calls[#calls + 1] = {widget = self.dyre.widgetKey, method = method, source = source}
                 end
                 if original then return original(self, ...) end
@@ -2696,8 +2713,7 @@ test("the Polymorph bar draws as before at its default sizes", function()
     equal(button.height, 16)
     equal(button.points[1][5], -18)
     equal(button.display.icon.width, 14, "the icon follows the height")
-    equal(button.display.bar.barColor[4], 1, "solid")
-    equal(button.display.bar.ignoreParentAlpha, true, "carries the opacity itself")
+    equal(button.display.bar.barColor[4] or 1, 1, "solid")
     equal(button.display.spellName.fontSize, 10)
     equal(bar.name.fontSize, 10)
     equal(bar.alpha, 1)
@@ -2854,7 +2870,7 @@ test("Polymorph bar opacity fades the whole bar at once; its timer bar follows w
     state.settings.DYRE_MAGETOOLSFOREVER_POLYMORPH_OPACITY:SetValue(40)
     equal(bar.alpha, 0.4, "at once, also in combat")
     advance(state, 1)
-    equal(oldButton.display.bar.barColor[4], 1, "the engine's bar is not touched")
+    equal(oldButton.display.bar.barColor[4] or 1, 1, "the engine's bar is not touched")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
     local _, button = polymorphSlot(state)

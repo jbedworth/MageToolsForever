@@ -1,366 +1,88 @@
-local _, MTF = ...
+local addonName, MTF = ...
 
 -- Polymorph bar (author-approved): one block in WTF's Bars format, the
 -- sheeped mob's name above a bar that drains with the Polymorph's time left.
 -- Only one Polymorph of yours can be up at a time, so there is one bar.
 --
--- On Forever, AddOn code cannot read enemy auras in combat, so the bar is a
--- Blizzard AuraContainer slot, as in WTF's DoT tracker: the engine reads the
--- mob's unit and draws the icon, bar, and time left into regions MTF made;
--- MTF never sees the timer. Classic Era and Anniversary have no such engine
--- (John, 1.2.2: "MTF should do the same, once we have it proven working on
--- WTF"), so AuraEngine.lua gives the same container in plain Lua there, with
--- the real durations.
+-- The tracking is Dyre's Toolkit's control engine (Control.lua,
+-- CreateControlTracker; Toolkit 2.5.0, lead-approved engine split,
+-- 2026-11-01), which holds the rules MTF 1.2.3 kept here: the mob locked as
+-- the cast starts, the bar an aura slot bound to a unit (never mouseover),
+-- forgotten when the mob dies, when your focus becomes another mob or none,
+-- or after the longest Polymorph; the click recasts on your focus; and, on a
+-- client without focus (Classic Era), the chain macro, the time left as text,
+-- and no click. The Polymorph spells and the "! Polymorph" macro are the
+-- Toolkit's ClassData.MAGE. Whether focus works is the Toolkit's one flag for
+-- every Dyre's AddOn (FocusWorks).
 --
--- The bar tracks your focus only (John, 1.2.1: "Let the macro set focus and
--- mark the sheeped mob. Have the sheep-tracker box depend on it being the
--- 'focus' mob, and just resheep it."). "! Polymorph" focuses the mob, marks
--- it, and sheeps it. MTF locks the mob's GUID as a cast starts, only when the
--- cast is at your focus (its name, a readable GUID, attackable), binds the
--- container to "focus", and forgets the mob when it dies, when your focus
--- becomes another mob or none, or when the longest Polymorph could have
--- ended. A Polymorph at a mob that is not your focus does not drive the bar.
--- A dim line stays behind the bar, so a Polymorph that broke early shows as
--- gone.
---
--- On cast, MTF can tell the group (Announce). The moon (author-approved) comes
--- only from the "! Polymorph" macro: its /tm runs at the key press, which the
--- game allows, also in combat. MTF never calls SetRaidTarget: from AddOn code
--- the game refused it, also from a C_Timer callback and on "target"
--- (ADDON_ACTION_FORBIDDEN in client, 0.3.3 and 1.2.1 test builds). The combat
--- log is closed to AddOns, so a resist cannot be seen; a successful cast
--- counts as landed.
---
--- Without a focus (shared rule with WTF, John's go 2026-10-25): Classic Era
--- keeps no focus unit, though its UI has /focus (John's probe: after /focus,
--- UnitExists("focus") is false and [@focus,exists] does not match), and no
--- API says so. So MTF learns it per client: MageToolsForeverAccountDB.
--- focusWorks is nil until PLAYER_FOCUS_CHANGED fires with a readable
--- UnitExists("focus") true, then true for good (only /mtf reset_focus clears
--- it). Until then "! Polymorph" tries your focus, then the mob under the
--- mouse, then your target, for the moon and the cast; MTF locks the cast's
--- mob from the same chain (mouseover, else target, by name and a readable
--- GUID), the bar shows it through your target or its nameplate (its name and
--- the time left as text when neither shows it), and the bar takes no click.
--- Once focus is seen, the macro and the click are the Forever ones.
---
--- Clicking the bar re-sheeps your focus (John: no /tm, no targeting, no
--- mouseover). Secure attributes change only out of combat, so the click is
--- set as the cast starts (a pull's Polymorph starts before combat); a
--- different Polymorph spell begun in combat updates the click when combat
--- ends. The secure button holds the bar's place; the bar is an ordinary frame
--- on top, so it can show and hide in combat.
+-- MTF passes its saved settings, frame names, unit orders, look, and texts;
+-- it owns the widget (place, size, scale), the settings, and the commands.
+-- It claims the Mage's control bar, macro, and announcement at priority 10,
+-- so with Dyre's Debuff Tracker also on, only MTF draws, writes, and says.
+-- The moon comes only from the macro's /tm; nothing calls SetRaidTarget.
 
--- Classic IDs: Polymorph ranks, then Pig, Turtle, and Cow. Every spellbook
--- spell of the same names counts too.
-local POLYMORPH_IDS = {118, 12824, 12825, 12826, 28272, 28271, 28270}
-local LONGEST_SECONDS = 50
-local FORGET_SLACK = 5
-local MOON = 5
--- Blizzard's /tm runs from the key press, untainted, so it marks in combat too
--- (pinned SlashCommands.lua). "!" keeps a second press from toggling the moon
--- off; "exists" keeps it from marking with nothing there. The macro casts with
--- /use, which casts a spell of that name (author: every letter counts), and
--- every @focus condition has exists (author). The mark switch decides
--- whether the macro has its /tm line; the click never marks.
-local MARK_FOCUS = "/tm [@focus,harm,nodead,exists] !" .. MOON .. "\n"
-local CAST_FOCUS = "/use [@focus,exists,harm,nodead] "
--- Until focus is seen to work: focus, then mouseover, then target.
-local MARK_CHAIN = "/tm [@focus,harm,nodead,exists] !" .. MOON .. "; [@mouseover,harm,nodead] !" .. MOON
-    .. "; [harm,nodead] !" .. MOON .. "\n"
-local CAST_CHAIN = "/use [@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead] "
-local MAX_NAMEPLATE_UNITS = 40
--- The time-left text, while no unit shows the sheep, redraws this often.
-local TEXT_TICK = 1
-local AURA_FILTER = "HARMFUL|PLAYER"
-local ANNOUNCE_REPEAT_SECONDS = 3
-
+local CLASS = "MAGE"
+local OWNER_PRIORITY = 10
 -- WTF's Bars theme: the name line, then a bar line with an icon. The width,
 -- the bar line's height, and the text size are settings (Core's
 -- POLYMORPH_SIZE_SPECS); at the defaults the name line is 18, the icon 14.
 local HEADER = 18
 local ICON_INSET = 2
 local PADDING = 6
-local NAME_FONT = "GameFontHighlightSmall"
-local LABEL_FONT = "GameFontDisableSmall"
--- Slider steps come quickly while a slider is dragged: the look follows each
--- at once, and the rebuild runs once, this long after the last.
-local BUILD_DELAY = 0.2
-local BROWN = {0.28, 0.16, 0.07, 0.85}
-local IDLE_BORDER = {0.45, 0.35, 0.2}
-local LINE_BACKGROUND = {0.1, 0.1, 0.1, 0.6}
 local BAR_COLOR = {0.75, 0.45, 0.95}
-local PLACEHOLDER_ALPHA = 0.3
+-- Slider steps come quickly while a slider is dragged: the engine's slot is
+-- rebuilt once, this long after the last (each build makes a new container).
+local BUILD_DELAY = 0.2
 local DEFAULT_POINT = {point = "CENTER", relativePoint = "CENTER", x = -260, y = 60}
 local SAMPLE_NAME = "Polymorph (sample)"
+local NAMES = {row = {"MageToolsForeverPolymorphBar"}, click = {"MageToolsForeverPolymorph"}}
+-- With focus: your focus only. Without (MTF 1.2.3's chain, as the macro
+-- casts): your focus, else the mob under the mouse when there is one, else
+-- your target; an attackable mob, never a secret answer. The bar shows the
+-- mob through your focus, your target, or its nameplate.
+local FOCUS_LOCK = {units = {"focus"}}
+local CHAIN_LOCK = {units = {"focus", "mouseover", "target"}, stopAt = {mouseover = true}}
+local FIND_ORDER = {"focus", "target", "plates"}
 
-local sheep = {available = false, casts = {}, ids = {}, names = {}}
-local Rebind
-local holder, bar
+local tracker
+local buildKey, buildToken
 
-local function ReadGUID(unit)
-    local guid = UnitGUID(unit)
-    if MTF.IsSecret(guid) or type(guid) ~= "string" then
-        return nil
-    end
-    return guid
-end
-
-local function ReadName(unit)
-    local name = UnitName(unit)
-    if MTF.IsSecret(name) or type(name) ~= "string" then
-        return nil
-    end
-    return name
-end
-
-local function IsDead(unit)
-    local dead = UnitIsDead(unit)
-    return not MTF.IsSecret(dead) and dead == true
-end
-
--- Every Polymorph spell ID: the Classic ones and the spellbook's of the same
--- names, so Forever's own ranks count.
-local function BuildSpellSet()
-    local ids, names = {}, {}
-    for _, id in ipairs(POLYMORPH_IDS) do
-        ids[id] = true
-        local name = C_Spell.GetSpellName(id)
-        if name then
-            names[name] = true
-        end
-    end
-    if type(C_SpellBook) == "table" and type(C_SpellBook.GetNumSpellBookSkillLines) == "function" then
-        local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player
-        for line = 1, C_SpellBook.GetNumSpellBookSkillLines() do
-            local lineInfo = C_SpellBook.GetSpellBookSkillLineInfo(line)
-            if type(lineInfo) == "table" then
-                for index = lineInfo.itemIndexOffset + 1, lineInfo.itemIndexOffset + lineInfo.numSpellBookItems do
-                    local item = C_SpellBook.GetSpellBookItemInfo(index, bank)
-                    if type(item) == "table" and type(item.spellID) == "number" and names[item.name] then
-                        ids[item.spellID] = true
-                    end
-                end
-            end
-        end
-    end
-    sheep.ids, sheep.names = ids, names
-end
-
-local function KnowsPolymorph()
-    for id in pairs(sheep.ids) do
-        if C_SpellBook.IsSpellKnown(id) == true then
-            return true
-        end
-    end
-    return false
-end
-
--- The mob a cast sent at targetName goes to, locked as it starts: your focus,
--- when its name is the cast's, its GUID is readable, and you can attack it.
-local function FocusWorks()
-    return MTF.accountDB.focusWorks == true
-end
-
--- The unit's GUID when it is the attackable mob of that name, alive.
-local function LockUnitGUID(unit, targetName)
-    local guid = ReadGUID(unit)
-    local hostile = UnitCanAttack("player", unit)
-    if guid and ReadName(unit) == targetName and not MTF.IsSecret(hostile) and hostile == true
-        and not IsDead(unit) then
-        return guid
-    end
-end
-
-local function LockFocusGUID(targetName)
-    return LockUnitGUID("focus", targetName)
-end
-
--- Without a known focus, the macro's chain: focus, mouseover, target.
-local function LockChainGUID(targetName)
-    local guid = LockFocusGUID(targetName)
-    if guid then
-        return guid, "focus"
-    end
-    if UnitExists("mouseover") then
-        guid = LockUnitGUID("mouseover", targetName)
-        return guid, guid and "mouseover" or nil
-    end
-    guid = LockUnitGUID("target", targetName)
-    return guid, guid and "target" or nil
-end
-
--- Without a known focus, the unit showing the sheep: target, then a
--- nameplate, by a readable GUID. Never mouseover: it moves with the pointer.
-local function FindUnit(guid)
-    for _, unit in ipairs({"focus", "target"}) do
-        if ReadGUID(unit) == guid then
-            return unit
-        end
-    end
-    for index = 1, MAX_NAMEPLATE_UNITS do
-        local unit = "nameplate" .. index
-        if UnitExists(unit) and ReadGUID(unit) == guid then
-            return unit
-        end
-    end
-end
-
-local function Bind(unit)
-    local wanted = unit or "none"
-    if not bar.container or bar.boundUnit == wanted then
-        return
-    end
-    bar.boundUnit = wanted
-    bar.container:SetUnit(wanted)
-    bar.container:UpdateAllAuras()
-end
-
--- Display ----------------------------------------------------------------------
-
-local function Layout()
+-- The bar's sizes now, from its settings.
+local function Sizes()
     local settings = MTF.db.polymorph
-    local sample = not MTF.db.locked
-    if not settings.enabled then
-        bar:Hide()
-        return
-    end
-    if sheep.guid then
-        local text = sheep.mobName
-        -- No unit shows the sheep (no focus on this client): the time left as text.
-        if bar.boundUnit == "none" and sheep.expires then
-            local remaining = sheep.expires - GetTime()
-            if remaining > 0 then
-                text = text .. "  |cff999999" .. math.ceil(remaining) .. " s|r"
-            end
-        end
-        bar.name:SetText(text)
-        bar:Show()
-    elseif sample then
-        bar.name:SetText(SAMPLE_NAME)
-        bar:Show()
-    else
-        bar:Hide()
-    end
+    local text = settings.textScale / 100
+    local header = math.floor(HEADER * text + 0.5)
+    local line = settings.height
+    return {width = settings.width, header = header, line = line, icon = line - ICON_INSET, padding = PADDING,
+        height = header + line + PADDING, text = text, alpha = settings.opacity / 100, color = BAR_COLOR,
+        label = true}
 end
 
--- Out of combat only: the secure click and whether the holder is there.
-local function ApplyClick()
-    if InCombatLockdown() then
-        sheep.clickDirty = true
-        return
-    end
-    sheep.clickDirty = false
-    local settings = MTF.db.polymorph
-    -- The holder is secure: its click, whether it is there, and its mouse
-    -- change only here, out of combat (in client a Polymorph that landed in
-    -- combat once rescaled it there, after which its clicks failed). Its
-    -- place and size are Dyre's Toolkit's, which also waits out combat.
-    -- No click until focus is seen to work: it casts on your focus.
-    local spell = FocusWorks() and sheep.clickSpell or nil
-    if spell then
-        holder:SetAttribute("type1", "macro")
-        holder:SetAttribute("macrotext1", CAST_FOCUS .. spell)
-    else
-        holder:SetAttribute("type1", nil)
-        holder:SetAttribute("macrotext1", nil)
-    end
-    holder.spellName = spell
-    -- Shown while unlocked even before you learn Polymorph, so it can be placed.
-    holder:SetShown(settings.enabled and (KnowsPolymorph() or not MTF.db.locked))
-    -- The holder is invisible: it takes the mouse only while it has a sheep
-    -- to click or is unlocked to drag, so clicks pass through to the world
-    -- (players could not click through it with no bar shown). Secure: out of
-    -- combat only, so after a sheep forgotten in combat the clicks pass
-    -- through again when combat ends.
-    holder:EnableMouse(not MTF.db.locked or spell ~= nil)
-    Layout()
+-- What the engine's slot was built for: a change rebuilds it.
+local function BuildKey(size)
+    return string.format("%d:%d:%d:%d", size.width, size.line, math.floor(size.text * 100 + 0.5),
+        math.floor(size.alpha * 100 + 0.5))
 end
 
--- Without a known focus: the sheep's own Polymorph, read where a unit shows
--- it (nothing is secret on the clients without focus), for the time-left text.
-local function ReadSheepAura(unit)
-    if FocusWorks() or not unit or type(C_UnitAuras) ~= "table" then
-        return
-    end
-    for index = 1, 40 do
-        local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, AURA_FILTER)
-        if not aura then
-            break
-        end
-        local id, expires = aura.spellId, aura.expirationTime
-        if not MTF.IsSecret(id) and sheep.ids[id] and not MTF.IsSecret(expires) and type(expires) == "number" then
-            sheep.expires = expires > 0 and expires or nil
-            return
-        end
-    end
-    sheep.expires = nil
-end
-
--- While no unit shows the sheep, the text counts down; it stops on its own.
-local function TickText()
+-- A setting change: the rows' look at once, also in combat, and one rebuild
+-- of the engine slot after the slider rests (the engine waits out combat).
+local function ScheduleBuild()
+    tracker:ApplyLook()
     local token = {}
-    sheep.textToken = token
-    local function Step()
-        if sheep.textToken ~= token or not sheep.guid or bar.boundUnit ~= "none" or not sheep.expires
-            or sheep.expires <= GetTime() then
-            Layout()
-            return
-        end
-        Layout()
-        C_Timer.After(TEXT_TICK, Step)
-    end
-    Step()
-end
-
--- Without a known focus: bind to the unit that shows the sheep now.
-function Rebind()
-    if not sheep.guid or FocusWorks() then
-        return
-    end
-    local unit = FindUnit(sheep.guid)
-    if unit then
-        ReadSheepAura(unit)
-    end
-    Bind(unit)
-    if not unit then
-        TickText()
-    else
-        Layout()
-    end
-end
-
-local function Forget()
-    sheep.guid, sheep.mobName, sheep.clickSpell, sheep.expires = nil, nil, nil, nil
-    Bind(nil)
-    Layout()
-    ApplyClick()
-end
-
-local function Track(guid, mobName, spellName)
-    sheep.guid, sheep.mobName, sheep.spellName, sheep.expires = guid, mobName, spellName, nil
-    sheep.clickSpell = spellName
-    local token = {}
-    sheep.token = token
-    if FocusWorks() then
-        Bind("focus")
-    else
-        Rebind()
-    end
-    Layout()
-    ApplyClick()
-    C_Timer.After(LONGEST_SECONDS + FORGET_SLACK, function()
-        if sheep.token == token then
-            Forget()
+    buildToken = token
+    C_Timer.After(BUILD_DELAY, function()
+        if buildToken == token then
+            buildKey = BuildKey(Sizes())
+            tracker:Rebuild()
         end
     end)
 end
 
-local function ShowTooltip(button)
-    GameTooltip:SetOwner(button, "ANCHOR_TOP")
-    if button.spellName then
-        GameTooltip:SetText("Click: " .. button.spellName .. " your focus again.", 1, 1, 1)
-    elseif not FocusWorks() then
+local function ShowTooltip(holder)
+    GameTooltip:SetOwner(holder, "ANCHOR_TOP")
+    if holder.spellName then
+        GameTooltip:SetText("Click: " .. holder.spellName .. " your focus again.", 1, 1, 1)
+    elseif not MTF.toolkit.FocusWorks() then
         GameTooltip:SetText("Sheep again with \"! Polymorph\": mouse over the mob, or target it.",
             0.7, 0.7, 0.7, true)
     else
@@ -370,372 +92,46 @@ local function ShowTooltip(button)
     GameTooltip:Show()
 end
 
--- The bar's sizes now, from its settings.
-local function Sizes()
+-- The engine reads `store` live: MTF's db.polymorph, whose macro switch is
+-- saved as "macro" (the engine's "macros").
+local store = setmetatable({}, {__index = function(_, key)
     local settings = MTF.db.polymorph
-    local text = settings.textScale / 100
-    local header = math.floor(HEADER * text + 0.5)
-    local line = settings.height
-    return {width = settings.width, header = header, line = line, icon = line - ICON_INSET,
-        height = header + line + PADDING, text = text, alpha = settings.opacity / 100}
-end
+    if key == "macros" then
+        return settings.macro
+    end
+    return settings[key]
+end})
 
--- A font string at the text size: its template's own size, read once when
--- the font string is new, times the setting. Found in client (1.1.0): setting
--- the template again did not reset a size set before, so each slider step
--- multiplied the last size and the bar's label grew huge.
-local function ScaleFont(text, scale)
-    local base = text.mtfBaseFont
-    if not base then
-        local font, size, flags = text:GetFont()
-        base = {font = font, size = size, flags = flags}
-        text.mtfBaseFont = base
-    end
-    if base.font and type(base.size) == "number" then
-        text:SetFont(base.font, base.size * scale, base.flags)
-    end
-end
-
--- The engine slot's regions, at the sizes of this build. Only here may MTF
--- touch what it hands to the engine (SetIcon, SetDurationBar, SetSpellName,
--- SetDurationText): afterwards each is the engine's, and a later call raised
--- "Attempt to access forbidden object from code tainted by an AddOn" in WTF
--- (found in client). So a new size or opacity rebuilds the slot. The engine's
--- duration bar ignored its parent's opacity in WTF, so it ignores it here on
--- purpose and carries the opacity in its color, its texts too.
-local function SlotInitializer(size)
-    return function(button)
-        button:ClearAllPoints()
-        button:SetPoint("TOPLEFT", bar, "TOPLEFT", PADDING, -size.header)
-        button:SetSize(size.width - PADDING * 2, size.line)
-        button:SetMouseClickEnabled(false)
-        local icon = button:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(size.icon, size.icon)
-        icon:SetPoint("LEFT", 1, 0)
-        icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-        local status = CreateFrame("StatusBar", nil, button)
-        status:SetPoint("TOPLEFT", button, "TOPLEFT", size.icon + 4, 0)
-        status:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
-        status:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-        if type(status.SetIgnoreParentAlpha) == "function" then
-            status:SetIgnoreParentAlpha(true)
-        end
-        status:SetStatusBarColor(BAR_COLOR[1], BAR_COLOR[2], BAR_COLOR[3], size.alpha)
-        local spellName = status:CreateFontString(nil, "OVERLAY", NAME_FONT)
-        ScaleFont(spellName, size.text)
-        spellName:SetPoint("LEFT", 4, 0)
-        spellName:SetJustifyH("LEFT")
-        spellName:SetAlpha(size.alpha)
-        local timeLeft = status:CreateFontString(nil, "OVERLAY", NAME_FONT)
-        ScaleFont(timeLeft, size.text)
-        timeLeft:SetPoint("RIGHT", -4, 0)
-        timeLeft:SetAlpha(size.alpha)
-        button:SetIcon(icon)
-        local direction = Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.RemainingTime
-        button:SetDurationBar(status, {direction = direction})
-        button:SetSpellName(spellName)
-        button:SetDurationText(timeLeft, {})
-    end
-end
-
--- The whole bar fades with its opacity setting. SetAlpha is no protected
--- action, so this applies at once, also in combat; the engine's duration bar
--- follows with the next build.
-local function ApplyOpacity()
-    bar:SetAlpha(MTF.db.polymorph.opacity / 100)
-end
-
--- The bar's own regions at its size settings. The bar is no secure frame, so
--- this applies at once, also in combat.
-local function ApplyLook()
-    local size = Sizes()
-    bar:SetSize(size.width, size.height)
-    ScaleFont(bar.name, size.text)
-    bar.name:SetWidth(size.width - PADDING * 2)
-    bar.line:ClearAllPoints()
-    bar.line:SetPoint("TOPLEFT", bar, "TOPLEFT", PADDING, -size.header)
-    bar.line:SetSize(size.width - PADDING * 2, size.line)
-    bar.placeholder:SetSize(size.icon, size.icon)
-    ScaleFont(bar.label, size.text)
-    bar.label:ClearAllPoints()
-    bar.label:SetPoint("LEFT", bar.line, "LEFT", size.icon + 8, 0)
-    return size
-end
-
--- What the engine's slot was built for: a change rebuilds it.
-local function BuildKey(size)
-    return string.format("%d:%d:%d:%d", size.width, size.line, math.floor(size.text * 100 + 0.5),
-        math.floor(size.alpha * 100 + 0.5))
-end
-
--- Builds the bar at its size settings: the bar's own regions and a new
--- container (the old one lets its mob go and hides), bound again to the sheep
--- that is up. Out of combat only; a change in combat waits for the end of
--- combat. The secure holder's size and place are Dyre's Toolkit's.
-local function BuildBar()
-    if InCombatLockdown() then
-        sheep.buildDirty = true
-        return
-    end
-    sheep.buildDirty = false
-    local size = ApplyLook()
-    bar.builtKey = BuildKey(size)
-    if bar.container then
-        bar.container:SetUnit("none")
-        bar.container:Hide()
-    end
-    local container = MTF.CreateAuraContainer(bar)
-    container:SetPoint("TOPLEFT", bar, "TOPLEFT")
-    container:SetSize(1, 1)
-    container:AddAuraSlot("polymorph", AURA_FILTER, {
-        candidateFilters = {includeSpellIDs = sheep.ids},
-        initializeFrame = SlotInitializer(size),
-    })
-    bar.container = container
-    bar.boundUnit = nil
-    Bind(sheep.guid and (FocusWorks() and "focus" or FindUnit(sheep.guid)) or nil)
-    ApplyOpacity()
-end
-
-local function CreateBar()
-    holder = CreateFrame("Button", "MageToolsForeverPolymorph", UIParent, "SecureActionButtonTemplate")
-    holder:RegisterForClicks("AnyUp", "AnyDown")
-    holder:SetAttribute("useOnKeyDown", false)
-    holder:SetScript("OnEnter", ShowTooltip)
-    holder:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    -- The bar sits on the holder and takes no mouse, so clicks reach the holder.
-    -- Not its child: a secure parent would stop it showing and hiding in combat.
-    -- Centered on the holder, so it grows around its middle with it.
-    bar = CreateFrame("Frame", "MageToolsForeverPolymorphBar", UIParent, "BackdropTemplate")
-    bar:SetPoint("CENTER", holder, "CENTER")
-    bar:EnableMouse(false)
-    bar:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10,
-        insets = {left = 2, right = 2, top = 2, bottom = 2}})
-    bar:SetBackdropColor(BROWN[1], BROWN[2], BROWN[3], BROWN[4])
-    bar:SetBackdropBorderColor(IDLE_BORDER[1], IDLE_BORDER[2], IDLE_BORDER[3])
-    bar.name = bar:CreateFontString(nil, "OVERLAY", NAME_FONT)
-    bar.name:SetPoint("TOPLEFT", PADDING, -4)
-    bar.name:SetJustifyH("LEFT")
-    -- Behind the engine's bar: a dim line with the icon and the spell's name.
-    bar.line = bar:CreateTexture(nil, "BACKGROUND")
-    bar.line:SetColorTexture(LINE_BACKGROUND[1], LINE_BACKGROUND[2], LINE_BACKGROUND[3], LINE_BACKGROUND[4])
-    bar.placeholder = bar:CreateTexture(nil, "BACKGROUND", nil, 1)
-    bar.placeholder:SetTexture(C_Spell.GetSpellTexture(POLYMORPH_IDS[1]))
-    bar.placeholder:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    bar.placeholder:SetDesaturated(true)
-    bar.placeholder:SetAlpha(PLACEHOLDER_ALPHA)
-    bar.placeholder:SetPoint("LEFT", bar.line, "LEFT", 1, 0)
-    bar.label = bar:CreateFontString(nil, "BORDER", LABEL_FONT)
-    bar.label:SetText(C_Spell.GetSpellName(POLYMORPH_IDS[1]) or "Polymorph")
-    bar.boundUnit = nil
-    MTF.polymorphBar = bar
-end
-
--- The macro -----------------------------------------------------------------------
--- (author-approved, after the author's own): "! Polymorph" for your action
--- bars, once you know Polymorph. It focuses the hostile mob under the mouse
--- (or, out of combat, your target), marks it with the moon (with the mark
--- switch on), and sheeps your focus, so the macro, the bar's click, and the
--- moon agree on one mob. The /tm "!" never toggles the moon off.
-
-local MACRO_NAME = "! Polymorph"
-
-function MTF.PolymorphMacroBody()
-    local spell = C_Spell.GetSpellName(POLYMORPH_IDS[1])
-    if not spell then
-        return nil
-    end
-    local mark, cast = MARK_FOCUS, CAST_FOCUS
-    if not FocusWorks() then
-        mark, cast = MARK_CHAIN, CAST_CHAIN
-    end
-    -- John's macro, exactly (1.2.1), once focus is seen; the chain until then.
-    return "#showtooltip " .. spell .. "\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
-        .. (MTF.db.polymorph.mark and mark or "") .. cast .. spell
-end
-
--- Out of combat only; turning the macro off deletes it.
-function MTF.ApplyPolymorphMacro()
-    if InCombatLockdown() then
-        sheep.macroDirty = true
-        return
-    end
-    sheep.macroDirty = false
-    if not MTF.CharacterMacrosAvailable() then
-        return
-    end
-    local body = MTF.PolymorphMacroBody()
-    if MTF.db.polymorph.macro and body and KnowsPolymorph() then
-        MTF.WriteCharacterMacro(MACRO_NAME, body)
-    elseif not MTF.db.polymorph.macro then
-        MTF.DeleteCharacterMacro(MACRO_NAME)
-    end
-end
-
--- Casts --------------------------------------------------------------------------
-
-local function GroupChannel()
-    if IsInRaid() then
-        return "RAID"
-    end
-    if IsInGroup() then
-        return "PARTY"
-    end
-end
-
--- At the start of a cast (author-approved), raid or party only, as the portal message.
-local function AnnounceCast(targetName)
-    local announce = MTF.db.announce
-    local channel = GroupChannel()
-    local now = GetTime()
-    if not announce.polymorphGroup or not channel
-        or (sheep.lastAnnounce and now - sheep.lastAnnounce < ANNOUNCE_REPEAT_SECONDS) then
-        return
-    end
-    sheep.lastAnnounce = now
-    local send = type(C_ChatInfo) == "table" and C_ChatInfo.SendChatMessage or SendChatMessage
-    send(MTF.FormatAnnouncement(announce.polymorphGroupText, {T = targetName}), channel)
-end
-
-local function OnCastSent(target, castGUID, spellID)
-    if MTF.IsSecret(spellID) or MTF.IsSecret(target) or MTF.IsSecret(castGUID)
-        or type(target) ~= "string" or target == "" or not sheep.ids[spellID] then
-        return
-    end
-    local guid, from
-    if FocusWorks() then
-        guid = LockFocusGUID(target)
-        from = guid and "focus" or nil
-    else
-        guid, from = LockChainGUID(target)
-    end
-    sheep.casts[castGUID] = {target = target, spellID = spellID, guid = guid}
-    sheep.lastCast = {spellID = spellID, target = target, focus = from == "focus", from = from}
-    if not MTF.db.polymorph.enabled then
-        return
-    end
-    AnnounceCast(target)
-    -- A pull's Polymorph starts out of combat and lands in it: set the click
-    -- now, while the game still allows it.
-    if guid and FocusWorks() and not InCombatLockdown() then
-        sheep.clickSpell = C_Spell.GetSpellName(spellID)
-        sheep.casts[castGUID].setClick = true
-        ApplyClick()
-    end
-end
-
-local function OnCastSucceeded(castGUID)
-    if MTF.IsSecret(castGUID) then
-        return
-    end
-    local cast = sheep.casts[castGUID]
-    sheep.casts = {}
-    if not cast or not MTF.db.polymorph.enabled then
-        return
-    end
-    -- Only a cast at your focus drives the bar (without a known focus, at the
-    -- macro chain's mob).
-    if cast.guid then
-        Track(cast.guid, cast.target, C_Spell.GetSpellName(cast.spellID))
-    end
-end
-
--- Your focus is no longer the sheep: another mob, or none. A focus whose GUID
--- is secret stays bound (it cannot be told apart).
-local function CheckFocus()
-    if not FocusWorks() then
-        local exists = UnitExists("focus")
-        if MTF.IsSecret(exists) or exists ~= true then
-            return
-        end
-        -- Focus works on this client: from now on the Forever macro and click.
-        MTF.accountDB.focusWorks = true
-        MTF.ApplyPolymorphMacro()
-        if sheep.guid then
-            sheep.clickSpell = sheep.spellName
-        end
-        ApplyClick()
-    end
-    if not sheep.guid then
-        return
-    end
-    local guid = ReadGUID("focus")
-    if not UnitExists("focus") or (guid and guid ~= sheep.guid) or IsDead("focus") then
-        Forget()
-    end
-end
-
-local events = CreateFrame("Frame")
-events:SetScript("OnEvent", function(_, event, unit, first, second, third)
-    if event == "UNIT_SPELLCAST_SENT" then
-        OnCastSent(first, second, third)
-    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-        OnCastSucceeded(first)
-    elseif event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED" then
-        if not MTF.IsSecret(first) then
-            local cast = sheep.casts[first]
-            sheep.casts[first] = nil
-            -- A cast that never landed gives the click back to the sheep that
-            -- is up, or clears it.
-            if cast and cast.setClick then
-                sheep.clickSpell = sheep.guid and sheep.spellName or nil
-                ApplyClick()
+local function CreateTracker()
+    local toolkit = MTF.toolkit
+    local created, missing = toolkit.CreateControlTracker({
+        addon = addonName, priority = OWNER_PRIORITY, class = CLASS, store = store, names = NAMES, rows = 1,
+        look = Sizes,
+        locked = function() return MTF.db.locked end,
+        samples = {SAMPLE_NAME},
+        find = FIND_ORDER,
+        lock = CHAIN_LOCK,
+        focusLock = FOCUS_LOCK,
+        countdown = true,
+        clickThrough = true,
+        markerFor = function(key)
+            local marker
+            for _, def in ipairs(toolkit.ClassSpells(CLASS).control) do
+                if def.key == key then
+                    marker = def.marker
+                end
             end
-        end
-    elseif event == "UNIT_HEALTH" then
-        -- By GUID: the death can come through any unit that shows the mob.
-        if sheep.guid and ReadGUID(unit) == sheep.guid and IsDead(unit) then
-            Forget()
-        end
-    elseif event == "SPELLS_CHANGED" then
-        BuildSpellSet()
-        if bar.container then
-            bar.container:SetAuraSlotCandidateFilters("polymorph", {includeSpellIDs = sheep.ids})
-        end
-        ApplyClick()
-        MTF.ApplyPolymorphMacro()
-    elseif event == "PLAYER_REGEN_ENABLED" then
-        if sheep.macroDirty then
-            MTF.ApplyPolymorphMacro()
-        end
-        if sheep.buildDirty then
-            BuildBar()
-        end
-        if sheep.clickDirty then
-            ApplyClick()
-        end
-    elseif event == "PLAYER_FOCUS_CHANGED" then
-        CheckFocus()
-    elseif event == "UNIT_AURA" then
-        if sheep.guid and not FocusWorks() and unit == bar.boundUnit then
-            ReadSheepAura(unit)
-        end
-    else
-        -- PLAYER_TARGET_CHANGED and nameplates: where the sheep shows now.
-        Rebind()
-    end
-end)
-
-function MTF.RefreshPolymorph()
-    if not sheep.available then
-        return
-    end
-    Layout()
-    ApplyClick()
-    MTF.ApplyPolymorphMacro()
-end
-
--- A setting change: the look follows at once, and one rebuild runs after the
--- slider rests (out of combat, or when combat ends).
-local function ScheduleBuild()
-    local token = {}
-    sheep.buildToken = token
-    C_Timer.After(BUILD_DELAY, function()
-        if sheep.buildToken == token then
-            BuildBar()
-        end
-    end)
+            return MTF.db.polymorph.mark and marker or nil
+        end,
+        announce = {
+            text = function() return MTF.db.announce.polymorphGroupText end,
+            -- As MTF 1.2.3: only while the bar is on.
+            enabled = function() return MTF.db.announce.polymorphGroup and MTF.db.polymorph.enabled end,
+        },
+        keeper = {owned = MTF.db.ownedMacros, warn = MTF.Report},
+        tooltip = ShowTooltip,
+    })
+    return created, missing
 end
 
 -- The holder is a Dyre's Toolkit widget: the toolkit places, drags, snaps,
@@ -743,8 +139,8 @@ end
 -- through measure), with Bar size as its scale and the sliders on the
 -- Polymorph page. Existing saves carry over: the bar line's height is saved
 -- as "height", which the toolkit reserves for a frame height, so the setting
--- is named barHeight. Its mouse is MTF's: clicks only with a sheep to click
--- or while unlocked (ApplyClick).
+-- is named barHeight. Its mouse is the engine's: clicks only with a sheep to
+-- click or while unlocked (clickThrough).
 local function CreateWidget()
     local specs = {}
     for _, spec in ipairs(MTF.POLYMORPH_SIZE_SPECS) do
@@ -755,8 +151,9 @@ local function CreateWidget()
             percent = spec.percent}
     end
     local size = Sizes()
+    buildKey = BuildKey(size)
     MTF.polymorphWidget = MTF.toolkit.CreateWidget({
-        addon = "MageToolsForever", key = "polymorph", title = "Polymorph", frame = holder,
+        addon = addonName, key = "polymorph", title = "Polymorph", frame = tracker.rows[1].holder,
         store = MTF.db.polymorph, width = size.width, height = size.height, point = DEFAULT_POINT,
         mouse = "client", keys = {barHeight = "height"},
         sizes = {
@@ -775,17 +172,13 @@ local function CreateWidget()
             return current.width, current.height
         end,
         onLayout = function(_, _, _, scale)
-            bar:SetScale(scale)
-            local current = ApplyLook()
-            if not bar.container then
-                BuildBar()
-            elseif BuildKey(current) ~= bar.builtKey then
+            tracker:SetScale(scale)
+            if BuildKey(Sizes()) ~= buildKey then
                 ScheduleBuild()
             end
         end,
         onOpacity = function()
-            ApplyOpacity()
-            if bar.container and BuildKey(Sizes()) ~= bar.builtKey then
+            if BuildKey(Sizes()) ~= buildKey then
                 ScheduleBuild()
             end
         end,
@@ -793,67 +186,57 @@ local function CreateWidget()
 end
 
 function MTF.InitializePolymorph()
-    if not MTF.AuraEngineKind() then
-        MTF.Report("The Polymorph bar stays off: this client lacks " .. MTF.AURA_ENGINE_MISSING .. ".")
+    local missing
+    tracker, missing = CreateTracker()
+    if not tracker then
+        MTF.Report("The Polymorph bar stays off: this client lacks " .. tostring(missing) .. ".")
         return
     end
-    BuildSpellSet()
-    CreateBar()
+    MTF.polymorphTracker = tracker
+    MTF.polymorphBar = tracker.rows[1]
     CreateWidget()
-    sheep.available = true
-    for _, event in ipairs({"PLAYER_REGEN_ENABLED", "PLAYER_FOCUS_CHANGED", "SPELLS_CHANGED", "UNIT_HEALTH",
-        "UNIT_AURA", "PLAYER_TARGET_CHANGED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED"}) do
-        events:RegisterEvent(event)
-    end
-    for _, event in ipairs({"UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED",
-        "UNIT_SPELLCAST_INTERRUPTED"}) do
-        events:RegisterUnitEvent(event, "player")
-    end
-    Layout()
-    ApplyClick()
-    MTF.ApplyPolymorphMacro()
 end
 
--- /mtf debug_polymorph: the IDs, the tracked mob, and the click.
+-- Settings or the lock changed: the bar, its click, and the macro follow.
+function MTF.RefreshPolymorph()
+    if tracker then
+        tracker:Refresh()
+    end
+end
+
+-- Out of combat only (else when combat ends); turning the macro off deletes it.
+function MTF.ApplyPolymorphMacro()
+    if tracker then
+        tracker:ApplyMacros()
+    end
+end
+
+-- /mtf debug_polymorph: the engine's lines (IDs, last cast, row, click).
 function MTF.ReportPolymorphDebug()
-    MTF.Report(string.format("debug_polymorph available=%s known=%s engine=%s", tostring(sheep.available),
-        tostring(KnowsPolymorph()), tostring(MTF.AuraEngineKind())))
-    if not sheep.available then
+    MTF.Report(string.format("debug_polymorph available=%s known=%s engine=%s", tostring(tracker ~= nil),
+        tostring(tracker ~= nil and tracker:KnowsAny()), tostring(MTF.toolkit.AuraEngineKind())))
+    if not tracker then
         return
     end
-    local ids = {}
-    for id in pairs(sheep.ids) do
-        ids[#ids + 1] = id
+    for _, line in ipairs(tracker:DebugLines()) do
+        MTF.Report("debug_polymorph " .. line)
     end
-    table.sort(ids)
-    MTF.Report("debug_polymorph ids=" .. table.concat(ids, ","))
-    local last = sheep.lastCast
-    if last then
-        MTF.Report(string.format("debug_polymorph lastCast spell=%d target=%s focus=%s from=%s", last.spellID,
-            last.target, tostring(last.focus), tostring(last.from)))
-    end
-    MTF.Report(string.format("debug_polymorph mob=%s unit=%s moon=%s", tostring(sheep.mobName),
-        tostring(bar.boundUnit), MTF.db.polymorph.mark and "from the macro" or "off"))
-    MTF.Report(string.format("debug_polymorph click shown=%s type=%s macro=%s", tostring(holder:IsShown()),
-        tostring(holder:GetAttribute("type1")), tostring(holder:GetAttribute("macrotext1")):gsub("\n", " | ")))
+    MTF.Report("debug_polymorph moon=" .. (MTF.db.polymorph.mark and "from the macro" or "off"))
 end
 
--- /mtf debug_focus: what MTF learned about the focus on this client.
+-- /mtf debug_focus: what the Toolkit learned about the focus on this client.
 function MTF.ReportFocusDebug()
+    local works = MTF.toolkit.FocusWorks()
     local exists = UnitExists("focus")
-    MTF.Report(string.format("debug_focus focusWorks=%s focusNow=%s macro=%s click=%s",
-        tostring(MTF.accountDB.focusWorks), MTF.Describe(exists),
-        FocusWorks() and "focus" or "focus, mouseover, target", FocusWorks() and "on" or "off (no focus seen)"))
+    MTF.Report(string.format("debug_focus focusWorks=%s focusNow=%s macro=%s click=%s", tostring(works),
+        MTF.Describe(exists), works and "focus" or "focus, mouseover, target",
+        works and "on" or "off (no focus seen)"))
 end
 
--- /mtf reset_focus: forget it, so the chain macro comes back until a focus is
--- seen again (the macro and the click wait out combat).
+-- /mtf reset_focus: the Toolkit's reset, for every Dyre's AddOn; the chain
+-- macro comes back until a focus is seen again (macros and clicks wait out
+-- combat).
 function MTF.ResetFocus()
-    MTF.accountDB.focusWorks = nil
-    if sheep.available then
-        MTF.ApplyPolymorphMacro()
-        ApplyClick()
-    end
-    MTF.Report("Focus check reset: \"! Polymorph\" tries your focus, the mob under the mouse, then your target, "
-        .. "until MTF sees a focus again.")
+    MTF.toolkit.ResetFocusWorks()
+    MTF.Report(MTF.toolkit.FOCUS_RESET_TEXT)
 end

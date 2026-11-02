@@ -10,12 +10,15 @@
    the conjure buttons, trades, and macros, the shield display, the chimes, and
    the settings pages against a minimal mock of the client. Mocks model secret
    values as values that raise errors on comparison, concatenation, indexing,
-   or printing.
+   or printing. The suite loads Dyre's Toolkit's real files from
+   ../DyresToolkit when that folder is there, else the copy in tests/toolkit
+   (CI); its first line says which. No test compares shared files byte for
+   byte.
 3. **In-client checks.** The checklist below covers everything mocks cannot.
 
 ```sh
 .tools/luarocks-3.13.0-win32/win32/lua5.1/bin/lua5.1.exe tests/run.lua
-.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua AuraEngine.lua Conjure.lua Portals.lua Polymorph.lua Options.lua tests/run.lua
+.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Conjure.lua Portals.lua Polymorph.lua Options.lua tests/run.lua
 .tools/python-3.13.7/python.exe -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -102,7 +105,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] The bar is your focus only (1.2.1): sheep with "! Polymorph", tab to
       another mob: the bar keeps the timer. Focus another mob or clear your
       focus: the bar goes. Cast the plain spell at your target with no focus:
-      no bar (`debug_polymorph` says `focus=false`).
+      no bar (`debug_polymorph` says `locked=false`).
 - [ ] "Mark the sheep with the moon" off: after combat (or at once out of
       combat) "! Polymorph" has no `/tm` line, and no moon goes on; on again
       puts the line back. The bar's click never has a `/tm` line.
@@ -115,10 +118,11 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       name and drains, stays when you tab away, empties when it breaks, and
       goes when the mob dies. Click the bar after the Polymorph breaks: it
       re-sheeps your focus; your target does not change. `/mtf debug_polymorph` lists the IDs (check Forever's).
-- [ ] Classic Era (1.2.3), a Mage, "Load out of date AddOns" on: no Lua
+- [ ] Classic Era (1.3.0), a Mage, "Load out of date AddOns" on: no Lua
       error at login; `/mtf debug_polymorph` says `engine=lua`, and
-      `/mtf debug_focus` says `focusWorks=nil`, `click=off`. "! Polymorph"
-      (character macros) has the chain lines. Mouse over a mob and press it:
+      `/mtf debug_focus` says `focusWorks=false`, `click=off`. "! Polymorph"
+      (character macros) has the chain lines, the moon line as
+      `/tm [@focus,harm,nodead,exists][@mouseover,harm,nodead][harm,nodead] !5`. Mouse over a mob and press it:
       the moon goes on that mob and it is sheeped, also in combat; the bar
       shows its name, icon, and time left while it is your target or its
       nameplate shows; tab away with its plate gone: its name and the time
@@ -128,7 +132,8 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       `/dyre unlock` show the sample to drag.
 - [ ] Anniversary (or Forever after `/mtf reset_focus`): the first press of
       "! Polymorph" that sets a focus makes `debug_focus` say
-      `focusWorks=true`; out of combat the macro becomes the Forever text and
+      `focusWorks=true` (also in WTF's debug, one flag); out of combat the
+      macro becomes the Forever text and
       the bar's click sheeps your focus again. After `/reload` and on another
       character it stays so. On Forever, `engine=engine` and the bar is as
       before.
@@ -180,9 +185,14 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       frames wait for the end of combat, with no "blocked" popup and no
       BugGrabber entry. `/mtf reset` puts every MTF frame back (after
       combat if needed). Positions and sizes survive `/reload`.
-- [ ] With Dyre's Toolkit 1.x (or disabled with MTF forced on): MTF says once
-      at login that it needs Dyre's Toolkit 2.0 from CurseForge, and stays
-      off with no errors.
+- [ ] With Dyre's Toolkit 2.4 or older, or without it: MTF says once at
+      login that it needs Dyre's Toolkit 2.5 or later from CurseForge, and
+      stays off with no errors.
+- [ ] Toolkit engine (1.3.0): a Mage that had MTF 1.2.3 on Forever starts
+      with `debug_focus` `focusWorks=true` (carried over), the same
+      "! Polymorph" text, and the bar and click as before. With Dyre's
+      Debuff Tracker also on, `debug_polymorph` says `owner=MageToolsForever`,
+      one Polymorph bar shows, and one group message goes out per cast.
 - [ ] Dyre's Shields Up and Dyre's Buff Reminders (MTF 1.2.0): with both
       enabled, no "Install" or "Enable" line at login. A Mage with MTF 1.1
       shield, reminder, and chime settings gets them in Dyre's Shields Up and

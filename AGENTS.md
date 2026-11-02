@@ -19,8 +19,8 @@ feature set; do not add speculative features or frameworks without agreement.
   Magic (DBR adds it, off by default) and plays the cooldown chimes. MTF's
   own copies (Shield.lua, Reminders.lua, Chimes.lua, the crescent textures,
   scripts/build_arc.py) are gone, and so is Dyre's Sounds: MTF plays no sound.
-- TOC `## OptionalDeps: DyresShieldsUp, DyresBuffReminders`, so MTF loads
-  without them; CurseForge lists both as required dependencies, with
+- TOC `## OptionalDeps: DyresToolkit, DyresShieldsUp, DyresBuffReminders`
+  (family rule: no `## Dependencies`), so MTF loads without them; CurseForge lists both as required dependencies, with
   `dyres-toolkit` (`RELATIONS`). Without one, Core says once at login (after
   the modules start) "Install <AddOn> from CurseForge for <what>.", or
   "Enable <AddOn> in the AddOn list for <what>." when `C_AddOns.GetAddOnInfo`
@@ -136,17 +136,19 @@ feature set; do not add speculative features or frameworks without agreement.
 ### Dyre's Toolkit widgets (built; author-approved, 2026-10-20)
 
 - Dyre's Toolkit (`src/DyresToolkit`, owned by the coordinator; never edit
-  it, ask there) is required, contract 2 (Toolkit 2.0; 2.3 for
-  `AddSettingsLink`): TOC `## Dependencies: DyresToolkit` and `## Group:
+  it, ask there) is required, contract 2, version 2.5 or later (2.3 for
+  `AddSettingsLink`, 2.5 for the control engine that is the Polymorph bar):
+  TOC `## OptionalDeps: DyresToolkit` (lead, 2026-11-01) and `## Group:
   DyresToolkit`; CurseForge required dependency `dyres-toolkit`
   (`RELATIONS`). John: all widget layout is centralized in the
   toolkit; MTF was its first client and keeps no layout code of its own
   (no Layout.lua, mover, grid, unlock or grid switches, resize helper, or
   fallback).
 - Core's `MTF.Toolkit()` is `DyresToolkit.RequireContract(2)` with the
-  functions MTF uses checked. Without it (no toolkit, or an older one) MTF
-  stays off at login with one line naming CurseForge
-  (`TOOLKIT_MISSING`). After the modules start, `RegisterAddOn` with
+  functions MTF uses checked (2.5's `CreateControlTracker` among them: the
+  contract stays 2). Without it (no toolkit, or an older one) MTF stays off
+  at login with one line, "needs Dyre's Toolkit 2.5 or later", naming only
+  CurseForge (`TOOLKIT_MISSING`). After the modules start, `RegisterAddOn` with
   `setLocked` (MTF refreshes its samples and visibility, quietly; the
   toolkit says one line for all and draws the outlines) and `openSettings`.
   `MTF.db.locked` is a copy of the toolkit's lock.
@@ -163,7 +165,8 @@ feature set; do not add speculative features or frameworks without agreement.
     (MTF's click-through rule), sizes scale (Bar size), width, barHeight
     (saved as "height": the toolkit reserves "height" for a frame height),
     textScale, opacity; `measure` gives the frame size; `onLayout` and
-    `onOpacity` lay out the visible bar and rebuild the engine slot.
+    `onOpacity` hand the scale and look to the control engine. The engine
+    makes the holder and the bar (Polymorph.lua passes their names).
   Every conjure and portal button is a drag handle of its bar
   (`widget:AddDragHandle(button)`: the buttons cover most of it; clicks
   still reach them).
@@ -174,8 +177,9 @@ feature set; do not add speculative features or frameworks without agreement.
   (`AddWidgetSettings`, labels "Bar size" and "Bar width"; no label repeats "(%)", since the values show the % sign (John, 1.1.2); the
   Polymorph bar's "Reset size" restores width, bar height, and text size
   only, `spec.resetSizes`, John-approved; Bar size and Opacity stay). MTF never calls SetScale, SetSize, SetPoint,
-  StartMoving, or EnableMouse on a widget, except EnableMouse on the
-  Polymorph holder (a test wraps those methods and checks).
+  StartMoving, or EnableMouse on a widget; the control engine's
+  `clickThrough` sets the Polymorph holder's mouse (a test wraps those
+  methods and checks).
 - `/mtf unlock` and `/mtf lock` call the toolkit's `SetLocked`. `/mtf reset`
   calls `ResetWidgets("MageToolsForever")`.
 - Settings: MTF's page is `RegisterSettingsCategory("Mage Tools Forever")`
@@ -213,6 +217,22 @@ feature set; do not add speculative features or frameworks without agreement.
 
 ### Polymorph bar (built)
 
+- Engine (1.3.0; lead-approved engine split, 2026-11-01,
+  DyresDebuffTracker/docs/ENGINE_SPLIT.md stage D): the tracking, the click,
+  the macro, and the announcement are Dyre's Toolkit's control engine
+  (`DyresToolkit.CreateControlTracker`, Control.lua), with the Polymorph
+  spells and the "! Polymorph" macro from `ClassData.MAGE`. Polymorph.lua is
+  glue: it passes `store` (a proxy that reads `db.polymorph` live, with
+  `macro` as the engine's `macros`), `markerFor` (the moon while
+  `polymorph.mark` is on), the frame names (`MageToolsForeverPolymorph`, the
+  secure holder; `MageToolsForeverPolymorphBar`, the bar), one row, the look
+  (`Sizes`), `locked`, the sample name, the unit orders, `countdown`,
+  `clickThrough`, the announce text and switch, the macro keeper's `owned`
+  table (`db.ownedMacros`), and the tooltip. It claims the Mage's kinds
+  (`control:MAGE`, `macros:MAGE`, `announce:MAGE`) at priority 10, so with
+  Dyre's Debuff Tracker (priority 5) on, only MTF draws, writes, and says.
+  MTF keeps the widget, the settings and their repair, and the commands.
+  Do not copy engine code back here; ask the lead for engine changes.
 - Look (author-approved, 1.1.0, after WTF 1.1.0's DoT tracker): Bar width
   (120-400, step 10, default 200), Bar height (the bar line, 10-40, default
   16; the icon is 2 less), and Text size (50-200%, step 5, default 100: a
@@ -222,137 +242,93 @@ feature set; do not add speculative features or frameworks without agreement.
   (Core's `POLYMORPH_SIZE_SPECS`), and Opacity (10-100%, step 5, default
   100), each slider with a gold default mark (Dyre's Toolkit's widget
   settings, see above), and "Reset size". The defaults draw the old bar
-  exactly (name line 18, height 40). "Bar size" is the widget's scale on
-  top. The toolkit sizes the secure holder from the center (out of combat);
-  its `onLayout` scales and lays out the visible bar (`ApplyLook`) and
-  rebuilds the engine slot once, 0.2 s after a slider rests (`BuildBar`: a
-  new AuraContainer, the old one `SetUnit("none")` and hidden, bound again
-  to the sheep), only when the slot's sizes or opacity changed. The visible
-  bar is not the holder's child (a secure parent would stop it showing and
-  hiding in combat): it is anchored CENTER to the holder. Opacity: the
-  toolkit fades the holder, and `onOpacity` fades the visible bar, at once,
-  also in combat.
+  exactly (name line 18, height 40); the timer bar is purple (0.75, 0.45,
+  0.95). "Bar size" is the widget's scale on top, applied by the engine
+  (`tracker:SetScale`, out of combat). A slider change rebuilds the engine
+  slot once, 0.2 s after the slider rests (`tracker:Rebuild`: a new
+  AuraContainer, the old one `SetUnit("none")` and hidden, bound again to
+  the sheep, out of combat), only when the slot's sizes or opacity changed;
+  every step shows at once, also in combat (`tracker:ApplyLook`). The bar is not the holder's child (a secure
+  parent would stop it showing and hiding in combat).
 - Engine-owned objects (family rule, found in WTF): the slot button and what
-  MTF hands to it (`SetIcon`, `SetDurationBar`, `SetSpellName`,
-  `SetDurationText`) are set up only in `initializeFrame`
-  (`SlotInitializer`); any later change from AddOn code raises "Attempt to
-  access forbidden object from code tainted by an AddOn". The engine's
-  duration bar ignored its parent's opacity in WTF, so MTF's calls
-  `SetIgnoreParentAlpha(true)` and carries the opacity in its color and its
-  texts, set in `initializeFrame`. The mock refuses every change to handed
+  is handed to it (`SetIcon`, `SetDurationBar`, `SetSpellName`,
+  `SetDurationText`) are set up only in the engine's `initializeFrame`; any
+  later change from AddOn code raises "Attempt to access forbidden object
+  from code tainted by an AddOn". The mock refuses every change to handed
   objects after `initializeFrame` (reads still work).
 - Click-through (players reported it in 0.3.2): the secure holder is
   invisible, so it takes the mouse only while it holds a sheep to click or
-  frames are unlocked (`EnableMouse` in `ApplyClick`, out of combat only;
-  after a sheep forgotten in combat, clicks pass through again when combat
-  ends). The bar on top never takes the mouse. Every other MTF frame that
-  takes the mouse is visible (the conjure and portal bars and their
-  buttons).
-- One block in WTF's Bars format (author-approved; only one Polymorph of
-  yours is up at a time): the mob's name above one bar line, an
-  AuraContainer slot (`HARMFUL|PLAYER`, `includeSpellIDs` = Classic Polymorph,
-  Pig, Turtle, and Cow IDs plus spellbook spells of those names) that the
-  engine draws with `SetDurationBar` (RemainingTime), `SetSpellName`, and
-  `SetDurationText`; a dim line behind it shows a broken Polymorph. The
-  container comes from `MTF.CreateAuraContainer` (AuraEngine.lua, John,
-  1.2.2: "MTF should do the same, once we have it proven working on WTF"):
-  on Forever Blizzard's engine (CustomAuraContainerTemplate), unchanged; on
-  Classic Era 1.15.9 and Anniversary 2.5.6, which have no
-  Blizzard_AuraContainer, a plain-Lua container with the same methods that
-  reads `C_UnitAuras.GetAuraDataByIndex(unit, i, "HARMFUL|PLAYER")` (no
-  secrets there, also in combat), with the real duration, and ticks only
-  while a timed slot shows. With neither, the bar stays off with one line.
-  Classic has no spellbook skill-line APIs: BuildSpellSet checks them and
-  keeps the Classic IDs. `/mtf debug_polymorph` says `engine=engine|lua`.
-  Focus detection (shared with WTF, the same rule; John's go 2026-10-25):
-  Classic Era keeps no focus unit, though its UI has /focus and FocusUnit
-  (John's probe: after /focus on a hostile target, UnitExists("focus") is
-  false and SecureCmdOptionParse("[@focus,exists] yes; no") is "no"), and no
-  API or game rule says so, so MTF never chooses by version. The account
-  SavedVariable `MageToolsForeverAccountDB.focusWorks` (per client install,
-  for every character) is nil until PLAYER_FOCUS_CHANGED fires with a
-  readable, non-secret UnitExists("focus") true; then true, never set back
-  to false on its own (`/mtf reset_focus` clears it; `/mtf debug_focus`
-  prints it). Until then "! Polymorph" is the chain `/tm [@focus,harm,nodead,
-  exists] !5; [@mouseover,harm,nodead] !5; [harm,nodead] !5` and `/use
-  [@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead]` (238
-  letters, 254 with "Polymorph: Turtle"), with the /focus line kept so a
-  client with focus learns it on the first press; the cast locks the same
-  chain's mob (focus, else mouseover if one exists, else target; its name
-  and a readable GUID, attackable, alive); the bar binds through focus,
-  target, or a nameplate by GUID (never mouseover), rebinding on target and
-  nameplate events, and when none shows the sheep it shows the name and the
-  time left as text from the last aura read (`C_UnitAuras`, readable on
-  those clients), counting down with a 1 s C_Timer while that lasts; the
-  bar takes no click (no secure macro can find the sheep without a focus:
-  no marker targeting exists, and `/targetexact` picks the nearest of that
-  name). Once true, the macro (out of combat) and the click are the Forever
-  ones, byte for byte. Mock: `classic` starts fresh, `noFocus` hides the
-  focus unit, `accountDB` sets the flag. The bar
-  tracks your focus only (John, 1.2.1: "Let the macro set focus and mark the
-  sheeped mob. Have the sheep-tracker box depend on it being the 'focus' mob,
-  and just resheep it."). At `UNIT_SPELLCAST_SENT`, MTF locks the GUID only
-  when the cast is at your focus: the focus's name is the cast's, its GUID
-  is readable, and `UnitCanAttack` is readable and true (`LockFocusGUID`).
-  Never a match by name on another unit (1.2.1 in client: the moon went to a
-  far neutral Chicken and same-named mobs could be confused). On
-  `UNIT_SPELLCAST_SUCCEEDED` a locked cast binds the container to "focus".
-  It forgets the mob when it dies (`UNIT_HEALTH`, by GUID), when
-  PLAYER_FOCUS_CHANGED shows no focus or a readable GUID of another mob (a
-  secret focus GUID stays bound), after the longest Polymorph (50 s) plus
-  5 s, or on the next Polymorph at your focus. A cast at a mob that is not
-  your focus (the plain spell button on your target, mouseover) drives
-  nothing. MTF never reads the aura; a resist cannot be seen (the combat log
-  is closed), so a successful cast counts as landed.
+  frames are unlocked (the engine's `clickThrough`, out of combat only).
+  The bar on top never takes the mouse.
+- Aura slots: on Forever Blizzard's engine (CustomAuraContainerTemplate);
+  on Classic Era 1.15.9 and Anniversary 2.5.6 the Toolkit's plain-Lua
+  container (Auras.lua; MTF's own AuraEngine.lua is gone). With neither, the
+  bar stays off with one line. `/mtf debug_polymorph` says
+  `engine=engine|lua`, then the engine's debug lines.
+- Focus (one flag for every Dyre's AddOn, the Toolkit's `FocusWorks`;
+  Classic Era keeps no focus unit, though its UI has /focus: John's probe,
+  UnitExists("focus") false and SecureCmdOptionParse("[@focus,exists] yes;
+  no") "no"; no API says so, so nothing chooses by version). MTF 1.2.3's
+  own `MageToolsForeverAccountDB.focusWorks` is carried over once at login
+  (`NoteFocusWorks`) and then cleared, so a later reset holds; MTF never
+  reads or writes it otherwise (the SavedVariable stays declared for that).
+  `/mtf reset_focus` is `ResetFocusWorks` (for every Dyre's AddOn, with
+  `FOCUS_RESET_TEXT`); `/mtf debug_focus` prints the flag.
+- Unit orders MTF passes (MTF 1.2.3's): with focus, the cast locks your
+  focus only (its name is the cast's, a readable GUID, `UnitCanAttack`
+  readable and true, alive; never a secret "can attack"); without, your
+  focus, else the mob under the mouse when one exists (`stopAt`), else your
+  target. The bar finds the mob through focus, target, or a nameplate by
+  GUID (never mouseover). Never a match by name at success time (1.2.1 in
+  client: the moon went to a far neutral Chicken). With focus, the bar binds
+  to "focus" and forgets the mob when your focus becomes another mob or
+  none (a secret focus GUID stays bound); always when it dies (`UNIT_HEALTH`
+  by GUID), after the longest Polymorph (50 s) plus 5 s, or on the next
+  Polymorph (`single`). A cast at a mob that is not your focus drives
+  nothing while focus works. Without focus the bar shows the mob's name and
+  the time left as text while no unit shows it (`countdown`), and takes no
+  click (no secure macro can find the sheep without a focus). MTF never
+  reads the aura in combat on Forever; a resist cannot be seen, so a
+  successful cast counts as landed.
 - On cast start (`UNIT_SPELLCAST_SENT`, author-approved), the group message
   "Sheeping %T; you spank it, you tank it" (the author's classic line, no
-  credit), raid or party only, at most once per 3 s; switch and text on the
-  Announce page.
-- The moon (index 5, author-approved) comes only from secure `/tm` in
-  "! Polymorph" (John, 1.2.1: "What does work, 100% of the time, is the
-  marking the sheep with the macro"; Blizzard's /tm runs untainted from the
-  key press, pinned SlashCommands.lua), also in combat; "!" keeps a second
-  press from toggling it off. The bar's click never marks (John: "leave
-  target marking out of the resheep-on-click"). The "Mark the sheep with the
-  moon" switch (on by default) decides only whether the macro has its /tm
-  line; a change rebuilds it out of combat. A plain spell-button Polymorph
-  gets no moon. MTF never calls `SetRaidTarget` (family rule): 1.2.1 test
-  builds called it from a C_Timer.After(0) callback, on "target" only and
-  proven by GUID, and John's BugGrabber still showed ADDON_ACTION_FORBIDDEN
-  for it (`/mtf debug_polymorph`: "ADDON_ACTION_FORBIDDEN for target from
-  the timer"), while TankHelper's marks work; the rule is unknown, and John
-  ended the experiment. Earlier (coordinator, 0.3.3): in John's client, with MTF's
-  out-of-combat guard in place, BugGrabber showed "4x
-  [ADDON_ACTION_FORBIDDEN] AddOn 'MageToolsForever' tried to call the
-  protected function 'SetRaidTarget()'" (Polymorph.lua Mark <-
-  OnCastSucceeded <- the event handler), and the taint log "An action was
-  blocked because of taint from MageToolsForever - SetRaidTarget()". In 0.3.2
-  players saw the "blocked from an action" popup. The exact rule is unknown
-  (TankHelper's direct call on an unmarked TARGET from a C_Timer callback
-  works for John); do not work around it. The mock forbids `SetRaidTarget`
-  always, and a test checks MTF never calls it and no runtime file contains
-  a `SetRaidTarget(` call.
-- "! Polymorph" (author-approved, after the author's own, `polymorph.macro`):
-  once you know Polymorph, `#showtooltip`, `/focus [@mouseover,harm,nodead]
-  [nocombat,harm,nodead]`, `/tm [@focus,harm,nodead,exists] !5` (author's
-  line, exactly), `/use [@focus,exists,harm,nodead] Polymorph`. The "!" keeps a
-  second press from toggling the moon off. A body change is written out of
-  combat (`WriteMacro` edits a macro whose body differs), so older copies
-  update. The macro text is John's, exactly (1.2.1). Its mouseover clause
-  also focuses and marks an attackable critter: by design (John: "people are
-  aware that critters are attackable"); not called out to players.
+  credit), raid or party only, at most once per 3 s, only while the bar is
+  on (as 1.2.3); switch and text on the Announce page. The engine also fills
+  `%M` (the marker's code) and `%Z` (zone).
+- The moon (index 5, ClassData's marker, author-approved) comes only from
+  secure `/tm` in "! Polymorph" (John, 1.2.1: "What does work, 100% of the
+  time, is the marking the sheep with the macro"), also in combat; "!" keeps
+  a second press from toggling it off. The bar's click never marks (John:
+  "leave target marking out of the resheep-on-click"). "Mark the sheep with
+  the moon" (on by default) decides only whether the macro has its /tm line.
+  MTF never calls `SetRaidTarget` (family rule): 1.2.1 test builds called it
+  from a C_Timer.After(0) callback, on "target" only and proven by GUID, and
+  John's BugGrabber still showed ADDON_ACTION_FORBIDDEN; earlier (0.3.3)
+  BugGrabber showed "[ADDON_ACTION_FORBIDDEN] AddOn 'MageToolsForever' tried
+  to call the protected function 'SetRaidTarget()'". The rule is unknown; do
+  not work around it. The mock forbids `SetRaidTarget` always, and a test
+  checks MTF never calls it and no runtime file contains a `SetRaidTarget(`
+  call.
+- "! Polymorph" (author-approved, `polymorph.macro`; the engine's
+  `FocusCastMacro`, kept by the Toolkit's macro keeper, out of combat only):
+  with focus, `#showtooltip Polymorph`, `/focus [@mouseover,harm,nodead]
+  [nocombat,harm,nodead]`, `/tm [@focus,harm,nodead,exists] !5`, `/use
+  [@focus,exists,harm,nodead] Polymorph` (John's 1.2.1 text, unchanged).
+  Without focus, `/tm [@focus,harm,nodead,exists][@mouseover,harm,nodead]
+  [harm,nodead] !5` and `/use [@focus,exists,harm,nodead][@mouseover,harm,
+  nodead][harm,nodead] Polymorph`; 1.3.0 rewrites MTF 1.2.3's chain /tm
+  (three clauses each with `!5`) to this form once (lead-accepted). A macro
+  of that name from another Dyre's AddOn is adopted, never copied. Its
+  mouseover clause also focuses and marks an attackable critter: by design
+  (John: "people are aware that critters are attackable").
 - Click to re-sheep (author-approved; John, 1.2.1: "no /tm, no targeting, no
-  mouseover"): the bar sits on a secure button (`MageToolsForeverPolymorph`,
-  the drag anchor); the visible bar is an ordinary frame anchored to it, so
-  it shows and hides in combat. The macro is `/use [@focus,exists,harm,nodead]
-  <the Polymorph you cast>`, set while a sheep is up. Attributes change only
-  out of combat: the click is set as a cast at your focus starts (a pull's
-  Polymorph starts before combat); another Polymorph spell begun in combat
-  updates it when combat ends. A cast that fails out of combat gives the
-  click back to the sheep that is up, or clears it. The holder (and the bar
-  with it) is scaled only out of combat too: in client, a recast from the
-  bar that landed in combat rescaled the secure holder, and every click
-  after failed. Tests make secure frames refuse SetScale, SetPoint,
+  mouseover"): `/use [@focus,exists,harm,nodead] <the Polymorph you cast>`
+  on the secure holder, only while focus works. Attributes change only out
+  of combat: the engine sets the click as a cast at your focus starts (a
+  pull's Polymorph starts before combat), gives it back when the cast
+  fails, and clears a stale one when combat ends. The holder and the bar are
+  scaled only out of combat too (in client, a rescale in combat made every
+  later click fail). Tests make secure frames refuse SetScale, SetPoint,
   ClearAllPoints, Show, Hide, and SetAttribute in combat, as the client
   does.
 
@@ -370,20 +346,21 @@ feature set; do not add speculative features or frameworks without agreement.
 
 ## Project structure
 
-- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, AuraEngine.lua,
-  Conjure.lua, Portals.lua, Polymorph.lua, Options.lua, loaded in that order;
-  no media. AuraEngine is a copy of WTF's (its uncommitted 1.3.2 work, sha256
-  49853236f2ff..., namespace renamed, as DSU's copy); keep its code identical
-  to WTF's until it moves into Dyre's Toolkit.
+- Runtime files: MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua,
+  Portals.lua, Polymorph.lua, Options.lua, loaded in that order; no media.
+  The aura slots and the Polymorph tracking are Dyre's Toolkit's (1.3.0).
   Commands parses `/mtf`; Core owns saved settings and their defaults, the
   Dyre's Toolkit link, the companion AddOns' lines, the login banner, class
   and install checks, slash conflict reporting, the hardware-input hooks
   trade placement waits for, and startup; Conjure, Portals, and Polymorph own
   their modules and `/mtf debug_*` commands; Options owns the settings pages.
 - tests/run.lua holds the Lua 5.1 mock suite. It loads Dyre's Toolkit's real
-  Core, Layout, Widgets, and Settings files from a copy in tests/toolkit (CI
-  has only this repository); a test fails when that copy differs from
-  ../DyresToolkit, so copy the toolkit's files again after it changes.
+  files (Core, Layout, Widgets, Settings, Auras, Units, HealthBars, Spells,
+  Macros, Announce, ClassData, Owners, Control) from ../DyresToolkit when that
+  folder is there, else from the copy in tests/toolkit (CI has only this
+  repository); its first line says which. No test compares shared files
+  byte for byte (John: "that's a stupid thing to test for a shared
+  resource"); refresh the copy when a toolkit change matters to CI.
   tests/test_*.py cover the release helpers in scripts/. .github/workflows/
   holds CI, opt-in publishing, and the approval gate check.
 - README.md is the user-facing overview, TESTING.md the verification method,
@@ -473,12 +450,11 @@ feature set; do not add speculative features or frameworks without agreement.
 - Every release needs a `## <version>` section in CHANGELOG.md with player-facing
   changes; the builder puts it at the top of release-notes.md and fails
   without it.
-- Package only MageToolsForever.toc, Commands.lua, Core.lua, AuraEngine.lua,
-  Conjure.lua, Portals.lua, Polymorph.lua, Options.lua, and LICENSE under the top-level
+- Package only MageToolsForever.toc, Commands.lua, Core.lua, Conjure.lua, Portals.lua, Polymorph.lua, Options.lua, and LICENSE under the top-level
   `MageToolsForever/` folder, named
   `MageToolsForever-<version>-forever.zip`, with the builder's BigWigs-format
   `release.json` (flavor `forever`) attached for WowUp. The TOC has
-  `## SavedVariables: MageToolsForeverAccountDB` (the focus flag) and
+  `## SavedVariables: MageToolsForeverAccountDB` (MTF 1.2.3's focus flag, carried over once) and
   `## SavedVariablesPerCharacter: MageToolsForeverDB`.
 - Publishing requires repository variables `ENABLE_GITHUB_RELEASES='true'` and,
   for CurseForge, `ENABLE_CURSEFORGE_UPLOADS='true'`, plus

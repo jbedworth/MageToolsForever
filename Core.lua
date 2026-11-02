@@ -294,6 +294,15 @@ function MTF.SanitizeDB(db)
     -- The lock is Dyre's Toolkit's (one for every Dyre's AddOn); MTF keeps a
     -- copy for its modules.
     db.locked = db.locked ~= false
+    -- The toolkit's macro keeper's record of the macros MTF keeps (name ->
+    -- true), so another Dyre's AddOn's macro of that name is adopted, never copied.
+    local owned = type(db.ownedMacros) == "table" and db.ownedMacros or {}
+    db.ownedMacros = {}
+    for name, value in pairs(owned) do
+        if type(name) == "string" and value == true then
+            db.ownedMacros[name] = true
+        end
+    end
     -- db.shield, db.reminders, and db.chimes (MTF 1.1 and older) stay exactly
     -- as they are: Dyre's Shields Up and Dyre's Buff Reminders copy them once
     -- per character, also when installed later.
@@ -362,13 +371,16 @@ end
 -- a toolkit widget: the toolkit places, drags, snaps, resizes from the
 -- center, outlines, saves, and resets it, and draws the grid and the size
 -- sliders. MTF only fills the widgets with its content. Without contract 2
--- (no toolkit, or an older one) MTF stays off and says what to install.
+-- (no toolkit, or an older one) MTF stays off and says what to install. Since
+-- 1.3.0 the Polymorph bar is the toolkit's control engine (2.5.0), which
+-- keeps contract 2, so MTF checks for the engine's functions.
 local TOOLKIT_CONTRACT = 2
 local TOOLKIT_FUNCTIONS = {
     "RegisterAddOn", "RegisterSettingsCategory", "IsLocked", "SetLocked", "OpenSettings", "CreateWidget",
     "AddWidgetSettings", "ResetWidgets", "AddSettingsLink",
+    "CreateControlTracker", "ClassSpells", "AuraEngineKind", "FocusWorks", "NoteFocusWorks", "ResetFocusWorks",
 }
-local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit 2.3 or later: install or update it from "
+local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit 2.5 or later: install or update it from "
     .. "CurseForge. MTF stays off until then."
 
 -- Dyre's Toolkit with the contract and functions MTF uses, else nil.
@@ -436,9 +448,19 @@ SLASH_MAGETOOLSFOREVER2 = BACKUP_SLASH
 SlashCmdList[SLASH_KEY] = MTF.HandleCommand
 
 -- Per client install (every client keeps its own SavedVariables), for all
--- characters: only focusWorks (see Polymorph.lua), true or nil.
+-- characters: only MTF 1.2.3's focusWorks, true or nil, which login hands to
+-- Dyre's Toolkit once (CarryFocusWorks).
 function MTF.SanitizeAccountDB(db)
     return {focusWorks = type(db) == "table" and db.focusWorks == true or nil}
+end
+
+-- The Toolkit keeps one focusWorks flag for every Dyre's AddOn: MTF's own
+-- (1.2.3) is carried over once and then cleared, so a later reset holds.
+local function CarryFocusWorks()
+    if MTF.accountDB.focusWorks == true then
+        MTF.toolkit.NoteFocusWorks()
+    end
+    MTF.accountDB.focusWorks = nil
 end
 
 local function LoadDB()
@@ -493,6 +515,7 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     -- so startup never depends on event handler order.
     InstallInputHooks()
     MTF.db.locked = MTF.toolkit.IsLocked() ~= false
+    CarryFocusWorks()
     MTF.InitializeConjure()
     MTF.InitializePortals()
     MTF.InitializePolymorph()

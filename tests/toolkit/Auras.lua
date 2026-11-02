@@ -1,12 +1,13 @@
-local _, MTF = ...
+local _, ns = ...
+local DyresToolkit = ns.toolkit
 
--- Copied from Warlock Tools Forever's AuraEngine.lua (its uncommitted 1.3.2 work, sha256
--- 49853236f2ff...), with only its namespace renamed, as Dyre's Shields Up did; to move
--- into Dyre's Toolkit once a third AddOn uses it.
--- MTF uses it for the Polymorph bar's one slot.
+-- Moved from Warlock Tools Forever's AuraEngine.lua (1.4.0, sha256
+-- 49853236f2ff...) for every Dyre's AddOn (Toolkit 2.4.0; Dyre's Debuff
+-- Tracker phase 1, coordinator-approved 2026-10-30). Only its namespace and
+-- these lines changed. MTF, DSU, and DBR still carry their own copies until
+-- each switches over.
 --
--- Aura slots for WTF's DoT tracker, nameplate dots, and Control bar, and here
--- for MTF's Polymorph bar.
+-- Aura slots for Dyre's AddOns (trackers, nameplate dots, timer bars).
 -- On Forever they are Blizzard's engine AuraContainers
 -- (CustomAuraContainerTemplate from Blizzard_AuraContainer): AddOn code cannot
 -- read auras in combat there, so the engine reads them and draws into regions
@@ -40,7 +41,7 @@ local function EngineAvailable()
 end
 
 -- "engine" (Forever), "lua" (Classic: plain aura reads), or nil (neither).
-function MTF.AuraEngineKind()
+function DyresToolkit.AuraEngineKind()
     if engineKind == nil then
         if EngineAvailable() then
             engineKind = "engine"
@@ -54,7 +55,7 @@ function MTF.AuraEngineKind()
 end
 
 -- What a client without either lacks, for the "stays off" lines.
-MTF.AURA_ENGINE_MISSING = TEMPLATE .. " and C_UnitAuras.GetAuraDataByIndex"
+DyresToolkit.AURA_ENGINE_MISSING = TEMPLATE .. " and C_UnitAuras.GetAuraDataByIndex"
 
 local containers = {}
 local ticking = {}
@@ -265,8 +266,8 @@ local function NewLuaContainer(parent)
 end
 
 -- An aura container on the parent: the engine's on Forever, else the plain-Lua one.
-function MTF.CreateAuraContainer(parent)
-    if MTF.AuraEngineKind() == "engine" then
+function DyresToolkit.CreateAuraContainer(parent)
+    if DyresToolkit.AuraEngineKind() == "engine" then
         return CreateFrame("AuraContainer", nil, parent, TEMPLATE)
     end
     return NewLuaContainer(parent)

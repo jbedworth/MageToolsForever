@@ -4,6 +4,15 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.3.0
+
+### Other changes
+
+- The Polymorph bar, its click, the "! Polymorph" macro, and the group message now run on the shared tracking engine in Dyre's Toolkit, as in other Dyre's AddOns. They look and work as before. MTF now needs Dyre's Toolkit 2.5 or later; the CurseForge app installs it.
+- Whether focus works on your client is now one setting for every Dyre's AddOn. MTF hands over what it learned once. `/mtf reset_focus` now resets it for every Dyre's AddOn.
+- With Dyre's Debuff Tracker also on, MTF draws your Polymorph bar and keeps "! Polymorph", so nothing shows twice.
+- WoW Classic Era: "! Polymorph" is rewritten once to a shorter moon line. It marks and sheeps the same mob as before.
+
 ## 1.2.3
 
 ### Fixes

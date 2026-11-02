@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 ADDON = "MageToolsForever"
-RUNTIME_FILES = ("Commands.lua", "Core.lua", "AuraEngine.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua")
+RUNTIME_FILES = ("Commands.lua", "Core.lua", "Conjure.lua", "Portals.lua", "Polymorph.lua", "Options.lua")
 TEXT_FILES = (ADDON + ".toc",) + RUNTIME_FILES + ("LICENSE",)
 # Runtime media shipped in the package (the builder requires uncompressed
 # 32-bit, square, power-of-two TGAs): none since 1.2.0, when the shield

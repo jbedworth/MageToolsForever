@@ -15,11 +15,11 @@ Reminders, and Cooldown Chimes settings pages each have a button that opens
 their settings. Without one of them, MTF works and says once in chat what to
 install (or enable).
 
-**Needs Dyre's Toolkit 2.0.** Dyre's Toolkit is the home of all of Dyre's
+**Needs Dyre's Toolkit 2.5.** Dyre's Toolkit is the home of all of Dyre's
 AddOns: one layout mode for every Dyre's AddOn's frames, a grid, and one
 settings page. The CurseForge app installs it with Mage Tools Forever. MTF's
 settings are under **Options → AddOns → Dyre's AddOns → Mage Tools Forever**.
-Without Dyre's Toolkit 2.0 or later, MTF stays off and says once in chat what
+Without Dyre's Toolkit 2.5 or later, MTF stays off and says once in chat what
 to install.
 
 ## Conjure
@@ -104,7 +104,8 @@ directly; it looks the same. Classic Era has no focus target: there
 "! Polymorph" marks and sheeps the mob under your mouse, else your target,
 the bar shows its time through your target or its nameplate (or its name and
 the time left as text), and the bar takes no click; sheep again with the
-macro. MTF finds out by itself whether focus works on your client.
+macro. Dyre's Toolkit finds out by itself whether focus works on your
+client, once for every Dyre's AddOn.
 
 - As you start casting in a group, MTF tells your party or raid: "Sheeping
   Defias Pillager; you spank it, you tank it."
@@ -168,11 +169,11 @@ sliders on each page have a gold mark at their default.
 | `/mtf unlock` | Unlock every MTF frame, so you can drag them |
 | `/mtf lock` | Lock them again where they are |
 | `/mtf reset` | Move the MTF frames back to their default places |
-| `/mtf reset_focus` | Check again whether focus works on this client (see the Polymorph bar) |
+| `/mtf reset_focus` | Check again whether focus works on this client, for every Dyre's AddOn (see the Polymorph bar) |
 | `/mtf debug_conjure` | Diagnostics: each conjure rank as the client knows it, macros, recent trades |
 | `/mtf debug_portals` | Diagnostics: each teleport and portal as the client knows it, and your runes |
 | `/mtf debug_polymorph` | Diagnostics: the Polymorph IDs, the sheeped mob, the click, and the moon setting |
-| `/mtf debug_focus` | Diagnostics: whether MTF has seen a focus work on this client |
+| `/mtf debug_focus` | Diagnostics: whether a focus has been seen to work on this client |
 | `/mtf debug_click` | Diagnostics: what each conjure button does for each mouse button |
 
 `/magetools` works the same, in case another AddOn uses `/mtf`.
