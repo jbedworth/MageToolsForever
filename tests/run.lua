@@ -453,10 +453,34 @@ local function fixture(options)
             return result
         end
     end
+    -- As the client (BugGrabber, 1.3.0: "bad argument #5 to 'SetText'"): the
+    -- color is numbers; SetText takes an alpha before its wrap, AddLine does not.
+    local function checkColor(method, r, g, b)
+        for index, value in ipairs({r or 0, g or 0, b or 0}) do
+            if type(value) ~= "number" then
+                error("bad argument #" .. (index + 1) .. " to '" .. method .. "'", 3)
+            end
+        end
+    end
     env.GameTooltip = {
         SetOwner = function() state.tooltip = {} end,
-        SetText = function(_, text) state.tooltip[#state.tooltip + 1] = text end,
-        AddLine = function(_, text) state.tooltip[#state.tooltip + 1] = text end,
+        SetText = function(_, text, r, g, b, alpha, wrap)
+            checkColor("SetText", r, g, b)
+            if alpha ~= nil and (type(alpha) ~= "number" or alpha < 0 or alpha > 1) then
+                error("bad argument #5 to 'SetText' (outside of expected range)", 2)
+            end
+            if wrap ~= nil and type(wrap) ~= "boolean" then
+                error("bad argument #6 to 'SetText'", 2)
+            end
+            state.tooltip[#state.tooltip + 1] = text
+        end,
+        AddLine = function(_, text, r, g, b, wrap)
+            checkColor("AddLine", r, g, b)
+            if wrap ~= nil and type(wrap) ~= "boolean" then
+                error("bad argument #5 to 'AddLine'", 2)
+            end
+            state.tooltip[#state.tooltip + 1] = text
+        end,
         Show = function() end,
         Hide = function() end,
     }
@@ -2503,6 +2527,25 @@ test("/mtf debug_focus prints the flag, and /mtf reset_focus clears it for every
     contains(state.last(), "focusWorks=false")
     contains(state.last(), "macro=focus, mouseover, target")
     contains(state.last(), "click=off")
+end)
+test("hovering the Polymorph bar shows its tooltip in every state", function()
+    -- Focus works, nothing to click yet (BugGrabber, 1.3.0: this raised an error).
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    equal(holder.spellName, nil)
+    holder.scripts.OnEnter(holder)
+    contains(state.tooltip[1], "then click here to sheep your focus again")
+    -- With a sheep to click.
+    sheepTarget(state)
+    castPolymorph(state)
+    holder.scripts.OnEnter(holder)
+    equal(state.tooltip[1], "Click: Polymorph your focus again.")
+    -- No focus on this client.
+    local none = era()
+    local noFocus = none.env.MageToolsForeverPolymorph
+    equal(noFocus.spellName, nil)
+    noFocus.scripts.OnEnter(noFocus)
+    contains(none.tooltip[1], "mouse over the mob, or target it")
 end)
 test("unlocked, the Polymorph bar shows a sample to drag", function()
     local state = mage()

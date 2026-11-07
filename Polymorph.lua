@@ -84,10 +84,10 @@ local function ShowTooltip(holder)
         GameTooltip:SetText("Click: " .. holder.spellName .. " your focus again.", 1, 1, 1)
     elseif not MTF.toolkit.FocusWorks() then
         GameTooltip:SetText("Sheep again with \"! Polymorph\": mouse over the mob, or target it.",
-            0.7, 0.7, 0.7, true)
+            0.7, 0.7, 0.7, 1, true)
     else
         GameTooltip:SetText("Sheep a mob with \"! Polymorph\", then click here to sheep your focus again.",
-            0.7, 0.7, 0.7, true)
+            0.7, 0.7, 0.7, 1, true)
     end
     GameTooltip:Show()
 end

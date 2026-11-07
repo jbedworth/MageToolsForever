@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.3.1
+
+### Fixes
+
+- Hovering the Polymorph bar with no sheep to click raised a Lua error and showed no tooltip. It now shows the tooltip.
+
 ## 1.3.0
 
 ### Other changes
