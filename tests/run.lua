@@ -593,7 +593,15 @@ local function fixture(options)
         end
         return state.units[unit] and state.units[unit].guid
     end
-    env.UnitCanAttack = function(_, unit) return state.units[unit] ~= nil and not state.units[unit].friend end
+    env.UnitCanAttack = function(_, unit)
+        local data = state.units[unit]
+        if data and data.secretAttack then
+            local value = secret()
+            state.secrets[value] = true
+            return value
+        end
+        return data ~= nil and not data.friend
+    end
     env.UnitIsUnit = function(a, b) return state.units[a] == state.units[b] end
     -- In client, combat makes index access raise an error for AddOn code.
     local function auras(unit, filter)
@@ -2032,6 +2040,46 @@ test("only a Polymorph at your focus drives the bar", function()
     secret.clear()
     secret.slash("debug_polymorph")
     contains(table.concat(secret.messages, "|"), "locked=false")
+end)
+test("secret GUIDs (instances): a sheep on your focus locks by its nameplate and stays with your focus", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local bar = state.env.MageToolsForeverPolymorphBar
+    sheepTarget(state)
+    state.units.focus.secretAttack = true
+    state.units.nameplate2 = state.units.focus
+    state.secretGUIDs.focus, state.secretGUIDs.target, state.secretGUIDs.nameplate2 = true, true, true
+    castPolymorph(state)
+    equal(bar.shown, true, "a secret GUID and a secret \"can attack\" still lock your focus")
+    equal(bar.container.unit, "focus")
+    assert(state.env.MageToolsForeverPolymorph.attributes.type1 ~= nil, "the click re-sheeps your focus")
+    state.clear()
+    state.slash("debug_polymorph")
+    contains(table.concat(state.messages, "|"), "locked=true")
+    -- Its plate goes (out of range): your focus still shows it.
+    state.units.nameplate2 = nil
+    state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate2")
+    equal(bar.shown, true, "your focus left its plate, not you")
+    equal(bar.container.unit, "focus")
+    state.units.focus.dead = true
+    state.emit("UNIT_HEALTH", "focus")
+    equal(bar.shown, false, "gone when the mob dies")
+    -- A new focus ends it.
+    local other = mage({known = {[POLYMORPH] = true}})
+    sheepTarget(other)
+    other.units.nameplate1 = other.units.focus
+    other.secretGUIDs.focus, other.secretGUIDs.nameplate1 = true, true
+    castPolymorph(other)
+    equal(other.env.MageToolsForeverPolymorphBar.shown, true)
+    other.units.focus = {name = "Defias Bandit", guid = "mob-2", level = 20}
+    other.secretGUIDs.focus = true
+    other.emit("PLAYER_FOCUS_CHANGED")
+    equal(other.env.MageToolsForeverPolymorphBar.shown, false, "another focus")
+    -- A secret "can attack" at the mouseover never locks the chain (no focus).
+    local chain = mage({classic = true, noFocus = true, known = {[POLYMORPH] = true}})
+    chain.units.mouseover = {name = "Defias Pillager", guid = "mob-9", level = 20, secretAttack = true}
+    chain.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-c", POLYMORPH)
+    chain.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-c", POLYMORPH)
+    equal(chain.env.MageToolsForeverPolymorphBar.shown, false)
 end)
 test("the bar forgets the sheep when your focus becomes another mob or none", function()
     local state = mage({known = {[POLYMORPH] = true}})

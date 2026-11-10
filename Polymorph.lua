@@ -38,10 +38,16 @@ local SAMPLE_NAME = "Polymorph (sample)"
 local NAMES = {row = {"MageToolsForeverPolymorphBar"}, click = {"MageToolsForeverPolymorph"}}
 -- With focus: your focus only. Without (MTF 1.2.3's chain, as the macro
 -- casts): your focus, else the mob under the mouse when there is one, else
--- your target; an attackable mob, never a secret answer. The bar shows the
--- mob through your focus, your target, or its nameplate.
-local FOCUS_LOCK = {units = {"focus"}}
-local CHAIN_LOCK = {units = {"focus", "mouseover", "target"}, stopAt = {mouseover = true}}
+-- your target; an attackable mob. The bar shows the mob through your focus,
+-- your target, or its nameplate.
+-- Secret GUIDs (John, 2026-11-09, after two WTF player reports from groups;
+-- creature GUIDs are secret in instances): a mob whose GUID is secret locks
+-- by its nameplate's key (the Toolkit's plateKey), so it needs a plate as
+-- the cast starts. Your focus also counts when its "can attack" is secret:
+-- "! Polymorph" focuses only a harm target. The chain keeps "never a secret
+-- answer": a mouseover can be anything.
+local FOCUS_LOCK = {units = {"focus"}, plateKey = true, secretHostile = true}
+local CHAIN_LOCK = {units = {"focus", "mouseover", "target"}, stopAt = {mouseover = true}, plateKey = true}
 local FIND_ORDER = {"focus", "target", "plates"}
 
 local tracker

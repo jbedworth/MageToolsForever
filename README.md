@@ -115,6 +115,9 @@ client, once for every Dyre's AddOn.
   set markers. (In a raid, only the leader and assistants can mark.)
 - A Polymorph at a mob that is not your focus (the plain spell button on
   your target, for example) shows no bar.
+- In dungeons and raids the game hides mob IDs, so the bar finds your sheep
+  by its enemy nameplate as you cast (with Dyre's Toolkit 2.6 or later). Keep
+  enemy nameplates on there; after the cast, your focus keeps the bar.
 - With no sheep to click, the bar lets your clicks through to the world.
 - **"! Polymorph"** in your character macros (once you know Polymorph) focuses
   the hostile mob under your mouse (or your target, out of combat) and sheeps

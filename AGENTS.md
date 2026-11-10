@@ -275,10 +275,14 @@ feature set; do not add speculative features or frameworks without agreement.
   `/mtf reset_focus` is `ResetFocusWorks` (for every Dyre's AddOn, with
   `FOCUS_RESET_TEXT`); `/mtf debug_focus` prints the flag.
 - Unit orders MTF passes (MTF 1.2.3's): with focus, the cast locks your
-  focus only (its name is the cast's, a readable GUID, `UnitCanAttack`
-  readable and true, alive; never a secret "can attack"); without, your
-  focus, else the mob under the mouse when one exists (`stopAt`), else your
-  target. The bar finds the mob through focus, target, or a nameplate by
+  focus only (its name is the cast's, alive, attackable; a secret "can
+  attack" counts as yes, since "! Polymorph" focuses only a harm target);
+  without, your focus, else the mob under the mouse when one exists
+  (`stopAt`), else your target (never a secret "can attack"). Both lock a
+  mob whose GUID is secret by its plate key (the Toolkit's `plateKey`, 2.6;
+  John, 2026-11-09, after two WTF player reports from groups: creature
+  GUIDs are secret in instances; not yet checked in client), so that mob
+  needs a nameplate as the cast starts; without one, no bar. The bar finds the mob through focus, target, or a nameplate by
   GUID (never mouseover). Never a match by name at success time (1.2.1 in
   client: the moon went to a far neutral Chicken). With focus, the bar binds
   to "focus" and forgets the mob when your focus becomes another mob or
