@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.3.3
+
+### Fixes
+
+- In combat, "! Polymorph" did nothing on your target after your first sheep died: it kept the dead mob as your focus. Now a dead focus is cleared, and the macro focuses the mob under your mouse, else your target, in and out of combat. With no mob under your mouse, a live enemy focus stays your focus, also out of combat; Shift-click or right-click "! Polymorph" to clear it and take a new mob. Needs Dyre's Toolkit 2.9 or later.
+
 ## 1.3.2
 
 ### Fixes

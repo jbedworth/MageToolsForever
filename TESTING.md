@@ -87,7 +87,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       click after the loading screen; a spell learned in combat joins after combat;
       `/mtf debug_portals` lists the IDs (check Forever's IDs match Classic's).
 - [ ] After `/reload` out of combat, the "! Polymorph" macro (Macros,
-      character tab) has the line `/tm [@focus,harm,nodead,exists] !5` after
+      character tab) has the line `/tm [@focus,harm,nodead] !5` after
       the `/focus` line.
 - [ ] Every MTF macro (Water, Food, Food & Water, Mana Gem, Polymorph) reads
       `/use`, not `/cast`; right-click of each conjure macro still conjures
@@ -122,7 +122,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       error at login; `/mtf debug_polymorph` says `engine=lua`, and
       `/mtf debug_focus` says `focusWorks=false`, `click=off`. "! Polymorph"
       (character macros) has the chain lines, the moon line as
-      `/tm [@focus,harm,nodead,exists][@mouseover,harm,nodead][harm,nodead] !5`. Mouse over a mob and press it:
+      `/tm [@focus,harm,nodead][@mouseover,harm,nodead][harm,nodead] !5`. Mouse over a mob and press it:
       the moon goes on that mob and it is sheeped, also in combat; the bar
       shows its name, icon, and time left while it is your target or its
       nameplate shows; tab away with its plate gone: its name and the time
@@ -160,6 +160,13 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] "! Polymorph" on a bar: hovering a mob and pressing it focuses and
       sheeps it, with the moon; the bar keeps its timer while you fight
       another mob; a bar click sheeps the focus again.
+- [ ] Focus lines (1.3.3, Toolkit 2.9.0): in combat, sheep a mob, kill it,
+      target another with no mouseover, and press "! Polymorph": it focuses,
+      marks, and sheeps the target, and the bar shows it. With a live sheep as
+      focus, pressing it with another target re-sheeps the focus. Shift-press
+      it with another target: that mob becomes the focus and is sheeped.
+      Right-click it on the action bar with another target: the same. With
+      the macro on a key, the key with Shift: the same.
 - [ ] Polymorph out of combat, click the bar to recast (it lands in combat),
       then click again in combat: each click recasts. A size change in combat
       applies after it.

@@ -120,9 +120,11 @@ client, once for every Dyre's AddOn.
   enemy nameplates on there; after the cast, your focus keeps the bar.
 - With no sheep to click, the bar lets your clicks through to the world.
 - **"! Polymorph"** in your character macros (once you know Polymorph) focuses
-  the hostile mob under your mouse (or your target, out of combat) and sheeps
-  your focus. The bar follows your focus, so it keeps the timer while you fight
-  something else.
+  the hostile mob under your mouse, else your target, and sheeps your focus.
+  With no mob under the mouse, a live enemy focus stays, also in combat; a
+  dead focus is cleared, and Shift-click or right-click clears it so you can
+  take a new mob (on a key, Shift). The bar follows your focus, so it keeps the
+  timer while you fight something else.
 - **Click the bar** to sheep your focus again, with the same Polymorph you
   cast. The click does not mark or change your target. The game lets the
   click change only out of combat, so after you sheep with another Polymorph

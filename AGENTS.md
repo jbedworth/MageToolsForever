@@ -122,7 +122,11 @@ feature set; do not add speculative features or frameworks without agreement.
   uses an item of that exact name, else `CastSpellByName`, and no spell MTF
   names ("Conjure Water(Rank N)", "Conjure Mana Agate", "Polymorph",
   "Polymorph: Pig") is an item name. `/castsequence` stays. Every `@focus`
-  condition has `exists` (author). A test checks every body MTF writes.
+  clause tests the unit with `harm`, `noharm`, or `dead` (John, 2026-11-12:
+  "exists is a no-op, drop it"; `harm` is false with no unit, and the focus
+  is lost when the mob dies). The macros have no `exists`; the bar's click
+  (the Toolkit's FocusRecastMacro) still has it. A test checks every body
+  MTF writes.
 - `Constants.MacroConsts.MAX_CHARACTER_MACROS` gives the slot limit; the global
   exists only after Blizzard's Macro window loads.
 - Secure attributes change only out of combat; changes wait for
@@ -315,12 +319,26 @@ feature set; do not add speculative features or frameworks without agreement.
   call.
 - "! Polymorph" (author-approved, `polymorph.macro`; the engine's
   `FocusCastMacro`, kept by the Toolkit's macro keeper, out of combat only):
-  with focus, `#showtooltip Polymorph`, `/focus [@mouseover,harm,nodead]
-  [nocombat,harm,nodead]`, `/tm [@focus,harm,nodead,exists] !5`, `/use
-  [@focus,exists,harm,nodead] Polymorph` (John's 1.2.1 text, unchanged).
-  Without focus, `/tm [@focus,harm,nodead,exists][@mouseover,harm,nodead]
-  [harm,nodead] !5` and `/use [@focus,exists,harm,nodead][@mouseover,harm,
-  nodead][harm,nodead] Polymorph`; 1.3.0 rewrites MTF 1.2.3's chain /tm
+  with focus, `#showtooltip Polymorph`, `/clearfocus [mod:shift][btn:2]`,
+  `/focus [@mouseover,harm,nodead][@focus,noharm][@focus,dead]`, `/tm
+  [@focus,harm,nodead] !5`, `/use [@focus,harm,nodead] Polymorph`. The focus
+  lines (Toolkit 2.9.0; John, 2026-11-12, tested in client: "Once focus is
+  set, it's locked on"): Shift or a right-click clears the focus (John,
+  2026-11-13; a key binding is always button 1, so a key clears only with
+  Shift); then the mob under the
+  mouse, else, with a missing, friendly, or dead focus, your target becomes
+  the focus (John: "Focus is auto-lost if the mob dies"). A
+  live enemy focus with no mob under the mouse matches no clause and stays,
+  also in combat. The game's /focus runs `FocusUnit(action)` for a `@focus`
+  clause (SlashCommands.lua), so a `@focus` clause focuses your target and
+  cannot keep the focus. Player
+  report (CurseForge, 1.3.x): in combat, after the first mob died, a press on
+  a new target did nothing, because 1.2.1's `[nocombat,harm,nodead]` kept the
+  dead focus. The chain has no `/clearfocus` line (it would be 260 letters
+  with "Polymorph: Turtle" and marker 8; without, 236).
+  Without focus, `/tm [@focus,harm,nodead][@mouseover,harm,nodead]
+  [harm,nodead] !5` and `/use [@focus,harm,nodead][@mouseover,harm,nodead]
+  [harm,nodead] Polymorph`; 1.3.0 rewrites MTF 1.2.3's chain /tm
   (three clauses each with `!5`) to this form once (lead-accepted). A macro
   of that name from another Dyre's AddOn is adopted, never copied. Its
   mouseover clause also focuses and marks an attackable critter: by design

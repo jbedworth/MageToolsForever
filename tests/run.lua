@@ -2122,7 +2122,7 @@ test("MTF never calls SetRaidTarget: the moon comes only from /tm in \"! Polymor
         equal(state.env.MageToolsForeverPolymorphBar.shown, true, "the bar shows the sheep")
         state.combat = false
         state.emit("PLAYER_REGEN_ENABLED")
-        contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead,exists] !5")
+        contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead] !5")
         equal(state.env.MageToolsForeverPolymorph.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "the click never marks")
         state.clear()
         state.slash("debug_polymorph")
@@ -2147,7 +2147,7 @@ test("an older \"! Polymorph\" without the moon is rewritten out of combat", fun
     equal(macroBody(state, "! Polymorph"), old, "never in combat")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
-    contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead,exists] !5", "updated when combat ends")
+    contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead] !5", "updated when combat ends")
     local count = 0
     for _, macro in ipairs(state.macros) do
         if macro.name == "! Polymorph" then count = count + 1 end
@@ -2193,11 +2193,11 @@ test("the mark switch takes the /tm line out of the macro; the bar's switch hide
     contains(macroBody(state, "! Polymorph"), "/tm ", "in combat the macro waits")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
-    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
-        .. "[nocombat,harm,nodead]\n/use [@focus,exists,harm,nodead] Polymorph", "no /tm line")
+    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/clearfocus [mod:shift][btn:2]\n/focus [@mouseover,harm,nodead]"
+        .. "[@focus,noharm][@focus,dead]\n/use [@focus,harm,nodead] Polymorph", "no /tm line")
     equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph")
     state.settings.MTF_POLYMORPH_MARK:SetValue(true)
-    contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead,exists] !5", "back at once out of combat")
+    contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead] !5", "back at once out of combat")
     equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "the click never marks")
     equal(state.markCount, nil)
     equal(state.env.MageToolsForeverPolymorphBar.shown, true)
@@ -2293,9 +2293,9 @@ test("\"! Polymorph\" focuses the mob and sheeps your focus, once you know Polym
     equal(macroBody(state, "! Polymorph"), nil, "not before you learn Polymorph")
     state.known[POLYMORPH] = true
     state.emit("SPELLS_CHANGED")
-    -- The moon from the key press (author: "/tm [@focus,harm,nodead,exists] !5"), legal in combat.
-    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead]"
-        .. "[nocombat,harm,nodead]\n/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph")
+    -- The moon from the key press (author: "/tm [@focus,harm,nodead] !5"), legal in combat.
+    equal(macroBody(state, "! Polymorph"), "#showtooltip Polymorph\n/clearfocus [mod:shift][btn:2]\n/focus [@mouseover,harm,nodead]"
+        .. "[@focus,noharm][@focus,dead]\n/tm [@focus,harm,nodead] !5\n/use [@focus,harm,nodead] Polymorph")
     equal(#macroBody(state, "! Polymorph") <= 255, true, "fits a macro")
     state.settings.MTF_POLYMORPH_MACRO:SetValue(false)
     equal(macroBody(state, "! Polymorph"), nil, "turning it off deletes it")
@@ -2342,7 +2342,7 @@ test("on Classic, login completes and the Polymorph bar uses the plain-Lua conta
     end
     equal(type(bar.container.AddAuraSlot), "function")
     -- A fresh Classic client has seen no focus yet: the chain macro.
-    contains(macroBody(state, "! Polymorph"), "[@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead]")
+    contains(macroBody(state, "! Polymorph"), "[@focus,harm,nodead][@mouseover,harm,nodead][harm,nodead]")
     equal(state.env.MageToolsForeverPolymorph.shown, true, "the click area is there")
     state.clear()
     state.slash("debug_polymorph")
@@ -2429,11 +2429,11 @@ test("Forever keeps the engine container; a client with neither says the bar sta
 end)
 -- Clients without a focus (Classic Era): the learned focusWorks flag ------------
 
-local CHAIN_MACRO = "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
-    .. "/tm [@focus,harm,nodead,exists][@mouseover,harm,nodead][harm,nodead] !5\n"
-    .. "/use [@focus,exists,harm,nodead][@mouseover,harm,nodead][harm,nodead] Polymorph"
-local FOREVER_MACRO = "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead][nocombat,harm,nodead]\n"
-    .. "/tm [@focus,harm,nodead,exists] !5\n/use [@focus,exists,harm,nodead] Polymorph"
+local CHAIN_MACRO = "#showtooltip Polymorph\n/focus [@mouseover,harm,nodead][@focus,noharm][@focus,dead]\n"
+    .. "/tm [@focus,harm,nodead][@mouseover,harm,nodead][harm,nodead] !5\n"
+    .. "/use [@focus,harm,nodead][@mouseover,harm,nodead][harm,nodead] Polymorph"
+local FOREVER_MACRO = "#showtooltip Polymorph\n/clearfocus [mod:shift][btn:2]\n/focus [@mouseover,harm,nodead][@focus,noharm][@focus,dead]\n"
+    .. "/tm [@focus,harm,nodead] !5\n/use [@focus,harm,nodead] Polymorph"
 
 local function era()
     return mage({classic = true, noFocus = true, known = {[POLYMORPH] = true}})
@@ -3077,8 +3077,10 @@ local function writtenMacroText()
     end
     return texts
 end
-test("MTF's macros use /use, never /cast, and every @focus checks exists", function()
-    -- Author: "use /use instead of cast; every character counts", and @focus needs exists.
+test("MTF's macros use /use, never /cast, and every @focus tests harm, noharm, or dead", function()
+    -- Author: "use /use instead of cast; every character counts". John, 2026-11-12:
+    -- "exists is a no-op, drop it": harm is false with no unit. So every @focus
+    -- clause must test the unit with harm, noharm, or dead, never stand alone.
     local texts = writtenMacroText()
     local seen = {}
     for _, entry in ipairs(texts) do
@@ -3087,7 +3089,13 @@ test("MTF's macros use /use, never /cast, and every @focus checks exists", funct
             equal(line:find("^/cast "), nil, entry.where .. ": " .. line)
             for clause in line:gmatch("%[([^%]]*)%]") do
                 if clause:find("@focus", 1, true) then
-                    equal(clause:find("exists", 1, true) ~= nil, true, entry.where .. ": " .. line)
+                    local tested = false
+                    for word in clause:gmatch("[^,]+") do
+                        if word == "harm" or word == "noharm" or word == "dead" then
+                            tested = true
+                        end
+                    end
+                    equal(tested, true, entry.where .. ": " .. line)
                 end
             end
         end
