@@ -344,11 +344,26 @@ feature set; do not add speculative features or frameworks without agreement.
   mouseover clause also focuses and marks an attackable critter: by design
   (John: "people are aware that critters are attackable").
 - Click to re-sheep (author-approved; John, 1.2.1: "no /tm, no targeting, no
-  mouseover"): `/use [@focus,exists,harm,nodead] <the Polymorph you cast>`
-  on the secure holder, only while focus works. Attributes change only out
-  of combat: the engine sets the click as a cast at your focus starts (a
-  pull's Polymorph starts before combat), gives it back when the cast
-  fails, and clears a stale one when combat ends. The holder and the bar are
+  mouseover"): `/use [@focus,exists,harm,nodead] Polymorph` (the learned
+  spell) on the secure holder, only while focus works. Never a variant
+  (John, 2026-11-15: Pig, Turtle, and the others come from scrolls; "The
+  scrolls are in limited supply, and recasting the watermellon form, while
+  fun, has a strong chance of not working"): the Toolkit's click and
+  "! Polymorph" always cast the learned Polymorph; the bar still tracks a
+  variant's sheep. The Toolkit's `fixedClick`
+  (John, 2026-11-15: "we always use the focus target"; player report: the
+  click did not work for a Polymorph cast in combat, because the click was
+  written per cast and waited for combat to end): the click is set once, out
+  of combat, as soon as you know Polymorph, never per cast.
+  A state driver shows the holder while you have a live hostile focus
+  (`[@focus,exists,harm,nodead] show; hide`), also in combat; always while
+  unlocked; never with the bar off or focus not seen to work. Its mouse is
+  always on, so with no focus the holder is hidden and clicks reach the
+  world. While it shows with no sheep up, the bar shows dimmed with your
+  focus's name, so no click area is unseen. Known cost: with a live hostile
+  focus and no sheep, a click on the bar sheeps your focus. The tooltip says
+  "Click: <spell> your focus again." only with a sheep up. The holder and
+  the bar are
   scaled only out of combat too (in client, a rescale in combat made every
   later click fail). Tests make secure frames refuse SetScale, SetPoint,
   ClearAllPoints, Show, Hide, and SetAttribute in combat, as the client

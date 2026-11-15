@@ -109,10 +109,20 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] "Mark the sheep with the moon" off: after combat (or at once out of
       combat) "! Polymorph" has no `/tm` line, and no moon goes on; on again
       puts the line back. The bar's click never has a `/tm` line.
-- [ ] Locked, with no sheep up: left- and right-click the empty spot where
+- [ ] Locked, with no focus: left- and right-click the empty spot where
       the Polymorph bar sits; the clicks reach the world (target a mob or
-      turn the camera behind it). With a sheep up, the bar's click sheeps
-      it again; after it ends out of combat, clicks pass through again.
+      turn the camera behind it). Focus a live enemy with no sheep: the bar
+      shows dimmed with its name, and a click sheeps it. Clear the focus:
+      the bar goes, and clicks reach the world again.
+- [ ] fixedClick (Toolkit, John 2026-11-15): after `/reload`, out of combat,
+      pull a mob, then sheep a mob for the first time in combat with
+      "! Polymorph". Let it break and click the bar, still in combat: it
+      sheeps your focus again. Kill the focus in combat: the bar and its
+      click area go at once.
+- [ ] Learned Polymorph only (John, 2026-11-15): sheep your focus with a
+      scroll form (Pig, Turtle): the bar shows it. Hover the bar: "Click:
+      Polymorph your focus again."; click it after the sheep breaks: it casts
+      the learned Polymorph, not the scroll form.
 - [ ] Polymorph: in a party, the group message as the cast starts; the moon
       from the macro (also solo; in a raid as assistant); the bar shows the
       name and drains, stays when you tab away, empties when it breaks, and

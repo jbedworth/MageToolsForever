@@ -252,6 +252,8 @@ local function fixture(options)
         for frame, driver in pairs(state.drivers) do
             if driver == "[combat] hide; show" then
                 frame.shown = not state.combat
+            elseif driver == "show" or driver == "hide" then
+                frame.shown = driver == "show"
             else
                 local unit = driver:match("@(%a+)")
                 local data = state.units[unit]
@@ -1012,6 +1014,8 @@ local function fixture(options)
             ry + (spot[2] - 0.5) * height + (point[5] or 0) * scale
     end
     function state.emit(event, ...)
+        -- The game re-reads state drivers as units change, before AddOns hear of it.
+        state.applyDrivers()
         for _, frame in ipairs(state.frames) do
             local unit = frame.unitEvents[event]
             local first = ...
@@ -2020,11 +2024,15 @@ test("only a Polymorph at your focus drives the bar", function()
     state.units.target = {name = "Defias Pillager", guid = "mob-1", level = 20}
     castPolymorph(state)
     equal(state.env.MageToolsForeverPolymorphBar.shown, false, "no focus")
-    equal(state.env.MageToolsForeverPolymorph.attributes.type1, nil, "no click either")
+    -- fixedClick (John, 2026-11-15): the click is set once you know Polymorph.
+    equal(state.env.MageToolsForeverPolymorph.attributes.type1, "macro", "the click is there before any cast")
     state.units.focus = {name = "Chicken", guid = "critter-1", level = 1}
+    state.emit("PLAYER_FOCUS_CHANGED")
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-2", POLYMORPH)
     state.emit("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-2", POLYMORPH)
-    equal(state.env.MageToolsForeverPolymorphBar.shown, false, "another focus")
+    local bar = state.env.MageToolsForeverPolymorphBar
+    equal(bar.guid, nil, "another focus: no sheep")
+    equal(bar.name.text, "Chicken", "only your focus's name, dimmed, over the click")
     -- At the mob under the mouse: no bar.
     local mouse = mage({known = {[POLYMORPH] = true}})
     mouse.units.mouseover = {name = "Defias Pillager", guid = "mob-7", level = 20}
@@ -2073,7 +2081,9 @@ test("secret GUIDs (instances): a sheep on your focus locks by its nameplate and
     other.units.focus = {name = "Defias Bandit", guid = "mob-2", level = 20}
     other.secretGUIDs.focus = true
     other.emit("PLAYER_FOCUS_CHANGED")
-    equal(other.env.MageToolsForeverPolymorphBar.shown, false, "another focus")
+    local otherBar = other.env.MageToolsForeverPolymorphBar
+    equal(otherBar.guid, nil, "another focus ends the sheep")
+    equal(otherBar.name.text, "Defias Bandit", "the new focus, dimmed, over the click")
     -- A secret "can attack" at the mouseover never locks the chain (no focus).
     local chain = mage({classic = true, noFocus = true, known = {[POLYMORPH] = true}})
     chain.units.mouseover = {name = "Defias Pillager", guid = "mob-9", level = 20, secretAttack = true}
@@ -2088,8 +2098,10 @@ test("the bar forgets the sheep when your focus becomes another mob or none", fu
     castPolymorph(state)
     state.units.focus = {name = "Defias Bandit", guid = "mob-2", level = 20}
     state.emit("PLAYER_FOCUS_CHANGED")
-    equal(bar.shown, false, "another mob")
+    equal(bar.guid, nil, "another mob")
     equal(bar.container.unit, "none")
+    equal(bar.name.text, "Defias Bandit", "the new focus, dimmed, over the click")
+    equal(bar.alpha < 1, true, "dimmed")
     local none = mage({known = {[POLYMORPH] = true}})
     sheepTarget(none)
     castPolymorph(none)
@@ -2154,33 +2166,43 @@ test("an older \"! Polymorph\" without the moon is rewritten out of combat", fun
     end
     equal(count, 1, "edited in place, not added again")
 end)
-test("the invisible Polymorph click area lets clicks through unless it has a sheep or is unlocked", function()
+test("the Polymorph click area is there only with a live hostile focus, and the bar shows over it", function()
+    -- fixedClick (John, 2026-11-15): a state driver shows the click area by
+    -- your focus, also in combat, and the bar shows dimmed over it, so no
+    -- click area is unseen. Its mouse is always on.
     local state = mage({known = {[POLYMORPH] = true}})
     local holder, bar = state.env.MageToolsForeverPolymorph, state.env.MageToolsForeverPolymorphBar
-    equal(holder.shown, true)
+    equal(holder.shown, false, "no focus: no click area, clicks reach the world")
     equal(bar.shown, false, "nothing to show")
-    equal(holder.mouse, false, "locked with no sheep: clicks pass through")
+    equal(holder.mouse, true)
     equal(bar.mouse, false, "the bar never takes the mouse")
     state.slash("unlock")
-    equal(holder.mouse, true, "unlocked: it takes the mouse to be dragged")
+    equal(holder.shown, true, "unlocked: it is there to be dragged")
     state.slash("lock")
-    equal(holder.mouse, false)
+    equal(holder.shown, false)
+    -- A live hostile focus with no sheep: the click area and the dimmed bar.
     sheepTarget(state)
+    state.emit("PLAYER_FOCUS_CHANGED")
+    equal(holder.shown, true, "your focus: a click to sheep it")
+    equal(bar.shown, true, "never an unseen click area")
+    equal(bar.name.text, "Defias Pillager")
+    equal(bar.alpha < 1, true, "dimmed: no sheep yet")
     castPolymorph(state)
-    equal(holder.mouse, true, "a sheep to click")
+    equal(bar.alpha, 1, "the sheep")
     advance(state, 56)
-    equal(bar.shown, false)
-    equal(holder.mouse, false, "forgotten: clicks pass through again")
-    -- Forgotten in combat: the secure holder cannot change until combat ends.
-    castPolymorph(state)
-    equal(holder.mouse, true)
+    equal(bar.guid, nil, "forgotten")
+    equal(bar.shown, true, "your focus is still there: dimmed again")
+    equal(bar.alpha < 1, true)
+    -- In combat the game's driver follows your focus; nothing secure changes.
     state.combat = true
-    advance(state, 56)
-    equal(bar.shown, false, "the bar hides at once")
-    equal(holder.mouse, true, "secure: unchanged in combat")
-    state.combat = false
-    state.emit("PLAYER_REGEN_ENABLED")
-    equal(holder.mouse, false, "clicks pass through after combat")
+    state.units.focus.dead = true
+    state.emit("UNIT_HEALTH", "focus")
+    equal(holder.shown, false, "a dead focus: no click area, also in combat")
+    equal(bar.shown, false, "and no bar")
+    state.units.focus = {name = "Defias Bandit", guid = "mob-2", level = 20}
+    state.emit("PLAYER_FOCUS_CHANGED")
+    equal(holder.shown, true, "a new focus in combat: the click is there")
+    equal(bar.name.text, "Defias Bandit")
 end)
 test("the mark switch takes the /tm line out of the macro; the bar's switch hides it", function()
     local state = mage({known = {[POLYMORPH] = true}})
@@ -2212,16 +2234,22 @@ test("the bar forgets the mob once the longest Polymorph is over", function()
     advance(state, 54)
     equal(state.env.MageToolsForeverPolymorphBar.shown, true)
     advance(state, 2)
-    equal(state.env.MageToolsForeverPolymorphBar.shown, false)
+    local bar = state.env.MageToolsForeverPolymorphBar
+    equal(bar.guid, nil, "forgotten")
+    equal(bar.alpha < 1, true, "only your focus's name, dimmed")
+    state.units.focus = nil
+    state.emit("PLAYER_FOCUS_CHANGED")
+    equal(bar.shown, false)
 end)
 test("clicking the bar re-sheeps your focus: no /tm, no targeting, no mouseover", function()
     local state = mage({known = {[POLYMORPH] = true}})
     local holder = state.env.MageToolsForeverPolymorph
     equal(holder.protected, true, "a secure button")
-    equal(holder.attributes.type1, nil, "nothing to re-sheep yet")
+    -- fixedClick: there before any cast, so a first sheep in combat clicks.
+    equal(holder.attributes.type1, "macro", "there once you know Polymorph")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph")
     sheepTarget(state)
     castPolymorph(state)
-    equal(holder.attributes.type1, "macro")
     equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph")
     -- In combat the click cannot change; it follows after combat.
     state.combat = true
@@ -2233,7 +2261,25 @@ test("clicking the bar re-sheeps your focus: no /tm, no targeting, no mouseover"
     equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "still your focus")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
-    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph: Pig", "the same Polymorph you cast")
+    -- John, 2026-11-15: variants come from scrolls in limited supply, and a
+    -- recast of one can fail: the click always casts the learned Polymorph.
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "never the Pig you cast")
+end)
+test("a first Polymorph cast in combat can be clicked at once", function()
+    -- Player report (1.3.3): the click did not work for a sheep cast in combat,
+    -- because the click was written per cast and waited for combat to end.
+    local state = mage({known = {[POLYMORPH] = true}})
+    local holder = state.env.MageToolsForeverPolymorph
+    state.combat = true
+    sheepTarget(state)
+    state.emit("PLAYER_FOCUS_CHANGED")
+    castPolymorph(state)
+    equal(state.env.MageToolsForeverPolymorphBar.name.text, "Defias Pillager", "the bar shows in combat")
+    equal(holder.shown, true, "the click area is there")
+    equal(holder.mouse, true)
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "and its click sheeps your focus")
+    holder.scripts.OnEnter(holder)
+    equal(state.tooltip[1], "Click: Polymorph your focus again.")
 end)
 test("a Polymorph begun before combat sets the click before it lands in combat", function()
     local state = mage({known = {[POLYMORPH] = true}})
@@ -2247,7 +2293,8 @@ test("a Polymorph begun before combat sets the click before it lands in combat",
 end)
 test("the click is there when the client knows Polymorph by its own spell ID", function()
     local state = mage({spellbook = {{spellID = 900118, name = "Polymorph"}}, known = {[900118] = true}})
-    equal(state.env.MageToolsForeverPolymorph.shown, true, "known by its spellbook ID")
+    equal(state.env.MageToolsForeverPolymorph.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph",
+        "known by its spellbook ID")
     state.clear()
     state.slash("debug_polymorph")
     contains(state.messages[1], "known=true")
@@ -2272,21 +2319,24 @@ test("a recast from the bar that lands in combat leaves the click working", func
     equal(holder.scale, 0.8, "the size applies after combat")
     equal(state.env.MageToolsForeverPolymorphBar.scale, 0.8, "the bar with it")
 end)
-test("a Polymorph that fails out of combat gives the click back to the sheep that is up", function()
+test("a variant's cast, landed or failed, never changes the click from the learned Polymorph", function()
     local state = mage({known = {[POLYMORPH] = true}})
     local holder = state.env.MageToolsForeverPolymorph
     sheepTarget(state)
     castPolymorph(state)
     state.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-fail", 28272)
-    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph: Pig", "set as the cast starts")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "not the Pig as it starts")
     state.emit("UNIT_SPELLCAST_INTERRUPTED", "player", "cast-fail", 28272)
-    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "back to the sheep that is up")
-    -- With no sheep up, a failed cast clears the click.
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "nor when it fails")
+    castPolymorph(state, 28272)
+    equal(state.env.MageToolsForeverPolymorphBar.name.text, "Defias Pillager", "the bar tracks the Pig")
+    equal(holder.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph", "nor when it lands")
+    -- With no sheep up, a failed cast keeps the click (fixedClick: always your focus).
     local fresh = mage({known = {[POLYMORPH] = true}})
     sheepTarget(fresh)
     fresh.emit("UNIT_SPELLCAST_SENT", "player", "Defias Pillager", "cast-fail", POLYMORPH)
     fresh.emit("UNIT_SPELLCAST_FAILED", "player", "cast-fail", POLYMORPH)
-    equal(fresh.env.MageToolsForeverPolymorph.attributes.type1, nil)
+    equal(fresh.env.MageToolsForeverPolymorph.attributes.macrotext1, "/use [@focus,exists,harm,nodead] Polymorph")
 end)
 test("\"! Polymorph\" focuses the mob and sheeps your focus, once you know Polymorph", function()
     local state = mage()
@@ -2343,7 +2393,8 @@ test("on Classic, login completes and the Polymorph bar uses the plain-Lua conta
     equal(type(bar.container.AddAuraSlot), "function")
     -- A fresh Classic client has seen no focus yet: the chain macro.
     contains(macroBody(state, "! Polymorph"), "[@focus,harm,nodead][@mouseover,harm,nodead][harm,nodead]")
-    equal(state.env.MageToolsForeverPolymorph.shown, true, "the click area is there")
+    equal(state.env.MageToolsForeverPolymorph.shown, false, "no focus seen yet: no click area")
+    equal(state.env.MageToolsForeverPolymorph.attributes.type1, nil)
     state.clear()
     state.slash("debug_polymorph")
     contains(table.concat(state.messages, "|"), "engine=lua")
@@ -2460,7 +2511,7 @@ test("Era with no focus: the chain macro, a lock from the mouseover or the targe
     contains(bar.name.text, "Defias Pillager")
     equal(bar.container.unit, "none", "never bound to mouseover")
     equal(holder.attributes.type1, nil, "no click without a focus")
-    equal(holder.mouse, false, "clicks pass through to the world")
+    equal(holder.shown, false, "no click area: clicks reach the world")
     state.clear()
     state.slash("debug_polymorph")
     contains(table.concat(state.messages, "|"), "unit=mouseover")
@@ -2577,12 +2628,18 @@ test("/mtf debug_focus prints the flag, and /mtf reset_focus clears it for every
     contains(state.last(), "click=off")
 end)
 test("hovering the Polymorph bar shows its tooltip in every state", function()
-    -- Focus works, nothing to click yet (BugGrabber, 1.3.0: this raised an error).
+    -- Focus works, no sheep yet: the click is there (fixedClick).
     local state = mage({known = {[POLYMORPH] = true}})
     local holder = state.env.MageToolsForeverPolymorph
-    equal(holder.spellName, nil)
+    equal(holder.spellName, "Polymorph")
     holder.scripts.OnEnter(holder)
-    contains(state.tooltip[1], "then click here to sheep your focus again")
+    equal(state.tooltip[1], "Click: Polymorph your focus.", "no \"again\" with no sheep up")
+    -- Before you know Polymorph (BugGrabber, 1.3.0: this raised an error).
+    local fresh = mage()
+    local freshHolder = fresh.env.MageToolsForeverPolymorph
+    equal(freshHolder.spellName, nil)
+    freshHolder.scripts.OnEnter(freshHolder)
+    contains(fresh.tooltip[1], "then click here to sheep your focus again")
     -- With a sheep to click.
     sheepTarget(state)
     castPolymorph(state)
@@ -2753,7 +2810,7 @@ test("the secure Polymorph click area never resizes, moves, or changes its mouse
     advance(state, 1)
     equal(holder.width, 200, "waits")
     equal(holder:GetScale(), 1)
-    equal(holder.mouse, false)
+    equal(holder.mouse, true, "always on (fixedClick), set before combat")
     state.combat = false
     state.emit("PLAYER_REGEN_ENABLED")
     equal(holder.width, 300, "when combat ends")

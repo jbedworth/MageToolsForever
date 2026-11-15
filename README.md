@@ -118,17 +118,20 @@ client, once for every Dyre's AddOn.
 - In dungeons and raids the game hides mob IDs, so the bar finds your sheep
   by its enemy nameplate as you cast (with Dyre's Toolkit 2.6 or later). Keep
   enemy nameplates on there; after the cast, your focus keeps the bar.
-- With no sheep to click, the bar lets your clicks through to the world.
+- With no focus, the bar lets your clicks through to the world. With a live
+  enemy focus and no sheep, the bar shows dimmed with your focus's name: a
+  click there sheeps your focus.
 - **"! Polymorph"** in your character macros (once you know Polymorph) focuses
   the hostile mob under your mouse, else your target, and sheeps your focus.
   With no mob under the mouse, a live enemy focus stays, also in combat; a
   dead focus is cleared, and Shift-click or right-click clears it so you can
   take a new mob (on a key, Shift). The bar follows your focus, so it keeps the
   timer while you fight something else.
-- **Click the bar** to sheep your focus again, with the same Polymorph you
-  cast. The click does not mark or change your target. The game lets the
-  click change only out of combat, so after you sheep with another Polymorph
-  spell (Pig, Turtle) in combat, the click catches up when combat ends.
+- **Click the bar** to sheep your focus again, also when your first sheep
+  was cast in combat. The click always casts your learned Polymorph, never a
+  form from a scroll (Pig, Turtle): those are limited, and a recast can
+  fail. The bar still shows a sheep from a scroll. The click does not mark
+  or change your target.
 - The marker switch and **Bar size** are on the Polymorph settings page. The
   switch takes the `/tm` line out of "! Polymorph" and the bar's click (or
   puts it back). If you mark with your own `/tm` macro, use `!` the same way

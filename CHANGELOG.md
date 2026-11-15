@@ -4,6 +4,13 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.3.4
+
+### Fixes
+
+- Clicking the Polymorph bar now works when your sheep was cast in combat. Before, the click worked only after combat ended. Now the click is ready as soon as you know Polymorph. With a live enemy focus and no sheep, the bar shows dimmed with your focus's name, and a click there sheeps your focus.
+- The Polymorph bar's click now always casts your learned Polymorph, never a form from a scroll (Pig, Turtle, and the others): scrolls are limited, and a recast of a scroll form can fail. The bar still shows a sheep from a scroll.
+
 ## 1.3.3
 
 ### Fixes

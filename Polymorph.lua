@@ -84,10 +84,13 @@ local function ScheduleBuild()
     end)
 end
 
-local function ShowTooltip(holder)
+-- The click is there whenever you know Polymorph (fixedClick), also while
+-- the bar shows only your focus's name: "again" only with a sheep up.
+local function ShowTooltip(holder, row)
     GameTooltip:SetOwner(holder, "ANCHOR_TOP")
     if holder.spellName then
-        GameTooltip:SetText("Click: " .. holder.spellName .. " your focus again.", 1, 1, 1)
+        local again = row and row.guid and " again" or ""
+        GameTooltip:SetText("Click: " .. holder.spellName .. " your focus" .. again .. ".", 1, 1, 1)
     elseif not MTF.toolkit.FocusWorks() then
         GameTooltip:SetText("Sheep again with \"! Polymorph\": mouse over the mob, or target it.",
             0.7, 0.7, 0.7, 1, true)
@@ -120,6 +123,10 @@ local function CreateTracker()
         focusLock = FOCUS_LOCK,
         countdown = true,
         clickThrough = true,
+        -- One click for every cast (John, 2026-11-15: "we always use the
+        -- focus target"): set out of combat once you know Polymorph, so a
+        -- sheep first cast in combat clicks too.
+        fixedClick = "polymorph",
         markerFor = function(key)
             local marker
             for _, def in ipairs(toolkit.ClassSpells(CLASS).control) do
