@@ -998,6 +998,7 @@ local function fixture(options)
     env.UIParent.width, env.UIParent.height = 1000, 800
     env.IsShiftKeyDown = function() return state.shift == true end
     env.IsControlKeyDown = function() return state.ctrl == true end
+    env.IsAltKeyDown = function() return state.alt == true end
     local SPOTS = {CENTER = {0.5, 0.5}, BOTTOMLEFT = {0, 0}, TOP = {0.5, 1}, TOPLEFT = {0, 1}, LEFT = {0, 0.5}}
     -- Screen position of a frame's center, from its last point.
     function state.absCenter(frame)
@@ -1107,16 +1108,35 @@ local function fixture(options)
             end
         end)
     end
-    function state.clickButton(name, mouseButton)
+    -- modifiers: nil, or the client's prefix order, such as "shift" or
+    -- "ctrl-shift". As SecureTemplates.lua: the attribute with exactly that
+    -- prefix, else the plain one; "" (ATTRIBUTE_NOOP) means no action.
+    function state.clickButton(name, mouseButton, modifiers)
         local button = env[name]
         local suffix = mouseButton == "RightButton" and "2" or mouseButton == "MiddleButton" and "3" or "1"
+        local prefix = modifiers and (modifiers .. "-") or ""
+        local function attribute(key)
+            local value = button.attributes[prefix .. key .. suffix]
+            if value == nil then
+                value = button.attributes[key .. suffix]
+            end
+            if value == "" then
+                value = nil
+            end
+            return value
+        end
+        state.shift = prefix:find("shift%-") ~= nil
+        state.ctrl = prefix:find("ctrl%-") ~= nil
+        state.alt = prefix:find("alt%-") ~= nil
         hardware(function()
-            state.used = {type = button.attributes["type" .. suffix], item = button.attributes["item" .. suffix],
-                macrotext = button.attributes["macrotext" .. suffix], spell = button.attributes["spell" .. suffix]}
+            local actionType = attribute("type")
+            state.used = {type = actionType, item = actionType and attribute("item"),
+                macrotext = actionType and attribute("macrotext"), spell = actionType and attribute("spell")}
             -- Secure buttons run PostClick for the press and the release.
             button.scripts.PostClick(button, mouseButton, true)
             button.scripts.PostClick(button, mouseButton, false)
         end)
+        state.shift, state.ctrl, state.alt = false, false, false
     end
     function state.click()
         hardware(function() state.worldHooks.OnMouseDown(env.WorldFrame, "RightButton") end)
@@ -1646,6 +1666,96 @@ test("Food & Water trades what it can, and says when it has nothing they can use
     none.clickButton(BOTH_BUTTON, "LeftButton")
     equal(none.tradeWith, nil)
     contains(none.last(), "You have no conjured food and water a level 10 player can use.")
+end)
+-- Shift + left-click (2026-11-17; a player report: in dungeons a healer or
+-- tank target turned each drink after a pull into a trade).
+test("Shift + left-click eats or drinks your own best, even with a player targeted", function()
+    local state = mage({units = friend(10)})
+    state.put(0, 1, WATER_FRESH, 20)
+    state.put(0, 2, WATER_PURIFIED, 8)
+    state.put(0, 3, 1113, 20)
+    state.emit("BAG_UPDATE_DELAYED")
+    local water = state.env[WATER_BUTTON]
+    equal(water.mode, "trade")
+    state.clickButton(WATER_BUTTON, "LeftButton", "shift")
+    equal(state.tradeWith, nil, "no trade")
+    equal(state.used.type, "item")
+    equal(state.used.item, "item:" .. WATER_PURIFIED, "your own best, not the share rank")
+    state.clickButton(BOTH_BUTTON, "LeftButton", "shift")
+    equal(state.tradeWith, nil, "Food & Water does not trade either")
+    equal(state.used.type, "macro")
+    equal(state.used.macrotext, "/use item:" .. WATER_PURIFIED .. "\n/use item:1113")
+    state.clickButton(WATER_BUTTON, "LeftButton")
+    equal(state.tradeWith, "target", "a plain left-click still trades")
+    equal(state.used.type, nil, "and uses nothing")
+    water.scripts.OnEnter(water)
+    contains(state.tooltip[2], "Left-click: trade up to 10")
+    equal(state.tooltip[3], "Shift-click: use Conjured Purified Water.")
+end)
+test("Shift + left-click with no target is a plain left-click", function()
+    local state = mage()
+    state.put(0, 1, WATER_PURIFIED, 8)
+    state.emit("BAG_UPDATE_DELAYED")
+    local water = state.env[WATER_BUTTON]
+    equal(water.attributes["shift-type1"], nil, "falls back to left-click")
+    state.clickButton(WATER_BUTTON, "LeftButton", "shift")
+    equal(state.used.item, "item:" .. WATER_PURIFIED)
+    water.scripts.OnEnter(water)
+    equal(state.tooltip[2], "Left-click: use Conjured Purified Water.")
+    equal(state.tooltip[3]:find("Shift"), nil, "no Shift line with the setting off")
+end)
+test("Trade only with Shift-click: left-click always drinks, Shift + left-click trades", function()
+    local state = mage({units = friend(10), db = {conjure = {shiftTrade = true}}})
+    equal(state.mtf.db.conjure.shiftTrade, true)
+    state.put(0, 1, WATER_FRESH, 20)
+    state.put(0, 2, WATER_PURIFIED, 8)
+    state.put(0, 3, 1113, 20)
+    state.emit("BAG_UPDATE_DELAYED")
+    local water = state.env[WATER_BUTTON]
+    equal(water.attributes["shift-type1"], "", "ATTRIBUTE_NOOP: Shift does not fall back to the drink")
+    state.clickButton(WATER_BUTTON, "LeftButton")
+    equal(state.tradeWith, nil, "no trade")
+    equal(state.used.item, "item:" .. WATER_PURIFIED, "drinks your best")
+    state.clickButton(WATER_BUTTON, "LeftButton", "ctrl-shift")
+    equal(state.tradeWith, nil, "Ctrl with Shift falls back to the drink, so it does not also trade")
+    state.clickButton(BOTH_BUTTON, "LeftButton")
+    equal(state.tradeWith, nil)
+    equal(state.used.type, "macro", "Food & Water eats and drinks")
+    state.clickButton(WATER_BUTTON, "LeftButton", "shift")
+    equal(state.tradeWith, "target", "Shift + left-click trades")
+    equal(state.used.type, nil, "and uses nothing")
+    state.emit("TRADE_SHOW")
+    equal(state.traded(WATER_FRESH), 10)
+    water.scripts.OnEnter(water)
+    equal(state.tooltip[2], "Left-click: use Conjured Purified Water.")
+    contains(state.tooltip[3], "Shift-click: trade up to 10")
+    local both = state.env[BOTH_BUTTON]
+    equal(both.attributes["shift-type1"], "")
+    both.scripts.OnEnter(both)
+    equal(state.tooltip[2], "Left-click: eat and drink your best.")
+    contains(state.tooltip[3], "Shift-click: trade up to 10 each of")
+end)
+test("Trade only with Shift-click applies at once, waits out combat, and is in the profile", function()
+    local state = mage({units = friend(10)})
+    state.put(0, 1, WATER_PURIFIED, 8)
+    state.emit("BAG_UPDATE_DELAYED")
+    local water = state.env[WATER_BUTTON]
+    equal(water.attributes.type1, nil, "off by default: left-click trades")
+    state.combat = true
+    state.mtf.db.conjure.shiftTrade = true
+    state.mtf.RefreshConjure()
+    equal(water.attributes.type1, nil, "secure actions wait for combat to end")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(water.attributes.type1, "item")
+    local untargeted = mage({db = {conjure = {shiftTrade = true}}})
+    untargeted.put(0, 1, WATER_PURIFIED, 8)
+    untargeted.emit("BAG_UPDATE_DELAYED")
+    local alone = untargeted.env[WATER_BUTTON]
+    equal(alone.attributes["shift-type1"], nil, "untargeted, Shift falls back to the drink")
+    alone.scripts.OnEnter(alone)
+    equal(untargeted.tooltip[3], "Shift-click: trade, with a friendly player targeted.")
+    equal(state.mtf.SanitizeDB({conjure = {shiftTrade = "yes"}}).conjure.shiftTrade, false, "only true counts")
 end)
 test("the Food & Water macro uses one item each and conjures in turn", function()
     local state = mage()

@@ -61,7 +61,8 @@ Your shield display, buff reminders, and cooldown chimes now come from two of Dy
 - Target a friend: right-click conjures the best food or water *they* can use; left-click trades them a share of it (10 by default, you pick stacks of 1 to 20), or all you have if less, and whispers them. The rest stays for the next party member.
 - Someone opens a trade with you? The buttons serve them: left-click puts their share straight into the window.
 - Food & Water gives a share of both in one click, with one whisper; right-click conjures them in turn.
-- No one targeted: left-click eats or drinks your best; right-click conjures your best. Middle-click always eats or drinks your own best, whoever you have targeted.
+- No one targeted: left-click eats or drinks your best; right-click conjures your best. Middle-click and Shift + left-click always eat or drink your own best, whoever you have targeted.
+- Mostly drinking in dungeons? Turn on **Trade only with Shift-click**: left-click always eats or drinks, and Shift + left-click trades.
 - Mana gems: left-click uses your best gem; right-click conjures the best one you don't carry.
 - For your action bars: MTF keeps **! Water**, **! Food**, **! Food & Water**, and **! Mana Gem** macros in your character macros. Left-click uses, right-click conjures, also works in combat.
 

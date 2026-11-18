@@ -4,6 +4,13 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.5.0
+
+### Features
+
+- Conjure bar: **Shift + left-click** on Water, Food, or Food & Water always eats or drinks your own best, even with a player targeted. No more trade windows when you only want to drink after a pull.
+- New setting on the Conjure page: **Trade only with Shift-click** (off by default). With it on, left-click always eats or drinks, and Shift + left-click trades to your target. Middle-click still always eats or drinks.
+
 ## 1.4.0
 
 ### Features

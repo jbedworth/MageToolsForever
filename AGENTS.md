@@ -94,6 +94,19 @@ feature set; do not add speculative features or frameworks without agreement.
   - With no one targeted, right-click conjures your best rank and left-click
     eats or drinks your best.
   - Middle-click always eats or drinks your own best, whatever the target.
+  - Shift + left-click (author-approved, 2026-11-17; a player report: in
+    dungeons a healer or tank target turned each drink after a pull into a
+    trade): `shift-type1` holds the eat or drink action, so it eats or drinks
+    your own best, whatever the target. "Trade only with Shift-click"
+    (`conjure.shiftTrade`, off by default, in the profile) swaps them: with
+    a friendly player targeted, `type1` eats or drinks and Shift + left-click
+    trades (PostClick, only with Shift alone held: Ctrl or Alt with Shift
+    falls back to `type1`, which drinks, so it must not also trade); the
+    trade's `shift-type1` is "" (Blizzard's ATTRIBUTE_NOOP, SecureTemplates.lua),
+    so the trade click does not fall back to the drink. Untargeted, the
+    Shift attributes are cleared and Shift falls back to left-click. Food &
+    Water works the same way. Tooltips list the left- and Shift-click lines
+    in the order the setting gives.
 - Food & Water (author-approved), third on the bar, beside the separate
   buttons, which stay as they are: left-click trades both shares in one click
   (one stack each, one whisper with the `both` text) or, untargeted, eats and

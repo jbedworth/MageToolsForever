@@ -13,6 +13,11 @@ local addonName, MTF = ...
 --   With no one targeted, right-click conjures the best rank you know and
 --   left-click eats or drinks your best.
 --   Middle-click always eats or drinks your best, whatever you target.
+--   Shift + left-click (author-approved, 2026-11-17; a player report: in
+--   dungeons a healer or tank target turned each drink after a pull into a
+--   trade) also eats or drinks your best. The "Trade only with Shift-click"
+--   setting (off by default) swaps the two: left-click always eats or
+--   drinks, and Shift + left-click trades. Food & Water works the same way.
 -- Food & Water (author-approved) does both at once, beside the separate
 -- buttons: left-click trades both shares in one click, with one whisper, or
 -- eats and drinks your best; middle-click always eats and drinks your best.
@@ -98,6 +103,7 @@ local REQUIRED = {
     {"C_Container", "PickupContainerItem"}, {"C_Container", "SplitContainerItem"},
     {"_G", "InitiateTrade"}, {"_G", "ClickTradeButton"}, {"_G", "GetTradePlayerItemLink"},
     {"_G", "GetCursorInfo"}, {"_G", "ClearCursor"},
+    {"_G", "IsShiftKeyDown"}, {"_G", "IsControlKeyDown"}, {"_G", "IsAltKeyDown"},
 }
 
 local conjure = {pending = false, lastMessage = nil, lastMessageTime = 0, tradeLog = {}}
@@ -406,9 +412,18 @@ end
 
 -- Button actions ---------------------------------------------------------------
 
-local function SetItemAction(button, suffix, itemID)
-    button:SetAttribute("type" .. suffix, itemID and "item" or nil)
-    button:SetAttribute("item" .. suffix, itemID and ("item:" .. itemID) or nil)
+-- The Shift prefix of a secure attribute ("shift-type1"); a click with Shift
+-- held finds it before the plain "type1".
+local SHIFT = "shift-"
+-- Blizzard's ATTRIBUTE_NOOP (SecureTemplates.lua): a modified attribute set
+-- to "" makes that click do nothing, instead of falling back to the plain
+-- click's action.
+local NO_ACTION = ""
+
+local function SetItemAction(button, suffix, itemID, prefix)
+    prefix = prefix or ""
+    button:SetAttribute(prefix .. "type" .. suffix, itemID and "item" or nil)
+    button:SetAttribute(prefix .. "item" .. suffix, itemID and ("item:" .. itemID) or nil)
 end
 
 local function SetSpellAction(button, suffix, rank)
@@ -416,9 +431,46 @@ local function SetSpellAction(button, suffix, rank)
     button:SetAttribute("spell" .. suffix, rank and rank.spell or nil)
 end
 
-local function SetMacroAction(button, suffix, text)
-    button:SetAttribute("type" .. suffix, text and "macro" or nil)
-    button:SetAttribute("macrotext" .. suffix, text)
+local function SetMacroAction(button, suffix, text, prefix)
+    prefix = prefix or ""
+    button:SetAttribute(prefix .. "type" .. suffix, text and "macro" or nil)
+    button:SetAttribute(prefix .. "macrotext" .. suffix, text)
+end
+
+-- Whether a trade needs Shift + left-click (the "Trade only with
+-- Shift-click" setting); otherwise a plain left-click trades.
+local function ShiftTrade()
+    return MTF.db.conjure.shiftTrade == true
+end
+
+-- Whether this left-click is the one that trades. With the setting on, Shift
+-- alone: Ctrl or Alt with Shift finds no Shift attribute and falls back to the
+-- plain left-click, which eats or drinks, so it must not also trade.
+local function IsTradeClick()
+    local shift = IsShiftKeyDown()
+    if ShiftTrade() then
+        return shift and not IsControlKeyDown() and not IsAltKeyDown()
+    end
+    return not shift
+end
+
+-- The left-click and Shift + left-click actions of a water, food, or Food &
+-- Water button. The trade click has no secure action (PostClick starts the
+-- trade); the other click eats or drinks your own best. Untargeted, both
+-- eat or drink: the Shift attribute is cleared, so Shift falls back to the
+-- plain left-click.
+local function SetLeftActions(button, setAction, use)
+    if button.mode ~= "trade" then
+        setAction(button, "1", use)
+        setAction(button, "1", nil, SHIFT)
+    elseif ShiftTrade() then
+        setAction(button, "1", use)
+        setAction(button, "1", nil, SHIFT)
+        button:SetAttribute(SHIFT .. "type1", NO_ACTION)
+    else
+        setAction(button, "1", nil)
+        setAction(button, "1", use, SHIFT)
+    end
 end
 
 local function ApplyFoodOrWater(kind, level, createRanks)
@@ -427,17 +479,15 @@ local function ApplyFoodOrWater(kind, level, createRanks)
     local own = BestCarriedItem(ranks)
     local rank
     if level then
-        -- Left-click starts a trade from PostClick, so it has no secure action.
         rank = BestKnownRank(ranks, level)
         button.mode = "trade"
         button.tradeItem = BestCarriedItem(ranks, level)
-        SetItemAction(button, "1", nil)
     else
         rank = BestKnownRank(ranks)
         button.mode = "use"
         button.tradeItem = nil
-        SetItemAction(button, "1", own)
     end
+    SetLeftActions(button, SetItemAction, own)
     button.tradeItems = {[kind] = button.tradeItem}
     SetSpellAction(button, "2", rank)
     -- Middle-click always uses your own best, whatever your target (author-approved).
@@ -460,12 +510,11 @@ local function ApplyBoth(level, createRanks)
     if level then
         button.mode = "trade"
         button.tradeItems = {water = BestCarriedItem(WATER, level), food = BestCarriedItem(FOOD, level)}
-        SetMacroAction(button, "1", nil)
     else
         button.mode = "use"
         button.tradeItems = {}
-        SetMacroAction(button, "1", ownText)
     end
+    SetLeftActions(button, SetMacroAction, ownText)
     SetMacroAction(button, "2", ConjureBothLine(createRanks.water, createRanks.food))
     SetMacroAction(button, "3", ownText)
     button.itemID = water or food
@@ -926,7 +975,7 @@ local function PostClick(button, mouseButton, down)
         if not button.rank then
             ExplainCreate(button)
         end
-    elseif mouseButton == "LeftButton" and button.mode == "trade" then
+    elseif mouseButton == "LeftButton" and button.mode == "trade" and IsTradeClick() then
         if next(button.tradeItems or {}) then
             StartShare(button)
         else
@@ -938,8 +987,35 @@ local function PostClick(button, mouseButton, down)
     end
 end
 
+local function AddClickLine(prefix, line)
+    if line.grey then
+        GameTooltip:AddLine(prefix .. line.text, 0.7, 0.7, 0.7, true)
+    else
+        GameTooltip:AddLine(prefix .. line.text, 1, 1, 1, true)
+    end
+end
+
+-- The left-click and Shift-click lines of a water, food, or Food & Water
+-- button, in the order the "Trade only with Shift-click" setting gives.
+-- trade is nil while no friendly player is targeted.
+local function AddLeftClickLines(trade, use)
+    if not trade then
+        AddClickLine("Left-click: ", use)
+        if ShiftTrade() then
+            AddClickLine("Shift-click: ", {text = "trade, with a friendly player targeted.", grey = true})
+        end
+    elseif ShiftTrade() then
+        AddClickLine("Left-click: ", use)
+        AddClickLine("Shift-click: ", trade)
+    else
+        AddClickLine("Left-click: ", trade)
+        AddClickLine("Shift-click: ", use)
+    end
+end
+
 local function ShowBothTooltip(button)
     GameTooltip:SetText(KINDS.both.label, GOLD[1], GOLD[2], GOLD[3])
+    local trade
     if button.mode == "trade" then
         local names = {}
         for _, kind in ipairs(BOTH_KINDS) do
@@ -949,15 +1025,16 @@ local function ShowBothTooltip(button)
             end
         end
         if #names > 0 then
-            GameTooltip:AddLine(string.format("Left-click: trade up to %d each of %s to your target, in one click.",
-                MTF.db.conjure.shareSize, table.concat(names, " and ")), 1, 1, 1, true)
+            trade = {text = string.format("trade up to %d each of %s to your target, in one click.",
+                MTF.db.conjure.shareSize, table.concat(names, " and "))}
         else
-            GameTooltip:AddLine("Left-click: you carry no food or water your target can use.", 0.7, 0.7, 0.7, true)
+            trade = {text = "you carry no food or water your target can use.", grey = true}
         end
-    elseif button.itemID then
-        GameTooltip:AddLine("Left-click: eat and drink your best.", 1, 1, 1, true)
+    end
+    if button.itemID then
+        AddLeftClickLines(trade, {text = "eat and drink your best."})
     else
-        GameTooltip:AddLine("Left-click: you carry no conjured food or water.", 0.7, 0.7, 0.7, true)
+        AddLeftClickLines(trade, {text = "you carry no conjured food or water.", grey = true})
     end
     if button.rank then
         GameTooltip:AddLine("Right-click: conjure water, then food, in turn (one spell per click).", 1, 1, 1, true)
@@ -987,19 +1064,25 @@ local function ShowTooltip(button)
         GameTooltip:Show()
         return
     end
-    if button.mode == "trade" then
-        if button.tradeItem then
-            GameTooltip:AddLine(string.format("Left-click: trade up to %d %s to your target (you carry %d).",
-                MTF.db.conjure.shareSize, ItemName(button.tradeItem) or kind.noun, Carried(button.tradeItem)),
-                1, 1, 1, true)
-        else
-            GameTooltip:AddLine("Left-click: you carry none your target can use; right-click to conjure some.",
-                0.7, 0.7, 0.7, true)
-        end
-    elseif button.itemID then
-        GameTooltip:AddLine("Left-click: use " .. (ItemName(button.itemID) or kind.noun) .. ".", 1, 1, 1, true)
+    local use
+    if button.itemID then
+        use = {text = "use " .. (ItemName(button.itemID) or kind.noun) .. "."}
     else
-        GameTooltip:AddLine("Left-click: you carry none.", 0.7, 0.7, 0.7, true)
+        use = {text = "you carry none.", grey = true}
+    end
+    if button.kind == "gem" then
+        AddClickLine("Left-click: ", use)
+    elseif button.mode == "trade" then
+        local trade
+        if button.tradeItem then
+            trade = {text = string.format("trade up to %d %s to your target (you carry %d).",
+                MTF.db.conjure.shareSize, ItemName(button.tradeItem) or kind.noun, Carried(button.tradeItem))}
+        else
+            trade = {text = "you carry none your target can use; right-click to conjure some.", grey = true}
+        end
+        AddLeftClickLines(trade, use)
+    else
+        AddLeftClickLines(nil, use)
     end
     if button.rank then
         GameTooltip:AddLine("Right-click: conjure " .. (ItemName(button.rank.item) or kind.noun)

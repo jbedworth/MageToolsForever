@@ -35,9 +35,15 @@ buttons. **Bar size** on the Conjure settings page shrinks or grows it
 | Right | Conjures the best rank *they* can use | Conjures your best rank |
 | Left | Trades them your **share stack size** of the best they can use, or all you have of it if less | Eats or drinks your best |
 | Middle | Eats or drinks your own best | Same |
+| Shift + left | Eats or drinks your own best | Same |
+
+- **Trade only with Shift-click** (Conjure settings, off by default) swaps
+  left-click and Shift + left-click: left-click always eats or drinks, even
+  with a player targeted, and Shift + left-click trades. Good for dungeons,
+  where your target is often the healer or the tank when you want to drink.
 
 - **Share stack size** (Conjure settings, 1 to 20, default 10): how much one
-  left-click trade gives. It never gives more, so the rest stays for the next
+  trade gives. It never gives more, so the rest stays for the next
   party member. As you click, MTF makes one stack of exactly that much, using
   no extra bag space where it can: it tops up a smaller stack you already
   have, or merges small ones. Only when all you carry is bigger stacks does
@@ -61,6 +67,8 @@ buttons. **Bar size** on the Conjure settings page shrinks or grows it
 - **Right-click** conjures water, then food, in turn: the game allows one
   spell per click.
 - **Middle-click** always eats and drinks your own best.
+- **Shift + left-click** eats and drinks your own best too, or trades with
+  **Trade only with Shift-click** on.
 
 **Mana gems**
 

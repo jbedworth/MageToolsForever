@@ -76,6 +76,11 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] Bar size at 60% shrinks the conjure bar; a change in combat applies
       after combat.
 - [ ] Middle-click eats or drinks your own best with someone targeted.
+- [ ] Shift + left-click on Water, Food, and Food & Water eats or drinks with a
+      party member targeted, and opens no trade.
+- [ ] With **Trade only with Shift-click** on: left-click drinks with a party
+      member targeted; Shift + left-click trades the share; Ctrl + Shift +
+      left-click drinks and opens no trade. The tooltip lines follow the setting.
 - [ ] Below level 28 the gem button is greyed out and says level 28; no
       "! Mana Gem" macro.
 - [ ] "! Water" and "! Food" appear in your character macros; left-click uses,

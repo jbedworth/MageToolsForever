@@ -97,7 +97,13 @@ local function AddConjurePage(parent)
             MTF.db.conjure.shareSize = MTF.SanitizeShareSize(value)
         end)
     Settings.CreateSlider(page, share, SliderOptions(MTF.SHARE_SIZE_MIN, MTF.SHARE_SIZE_MAX, 1),
-        "How much food or water one left-click trade gives your target. If you carry less, they get all of it.")
+        "How much food or water one trade gives your target. If you carry less, they get all of it.")
+    Flag(page, "MTF_CONJURE_SHIFT_TRADE", "Trade only with Shift-click", "conjure", "shiftTrade", false,
+        "On: left-click on the Water, Food, and Food & Water buttons always eats or drinks, even with a "
+            .. "player targeted, and Shift + left-click trades to your target. Off: left-click trades to a "
+            .. "targeted player, and Shift + left-click eats or drinks. Middle-click always eats or drinks. "
+            .. "A change in combat applies when combat ends.",
+        RefreshConjure)
     AddWidgetSizes(page, layout, MTF.conjureWidget,
         {scale = "How big the conjure bar is, in percent. A change in combat applies when combat ends."})
 end

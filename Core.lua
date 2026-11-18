@@ -255,6 +255,8 @@ function MTF.SanitizeDB(db)
         position = SanitizePosition(conjure.position),
         macros = conjure.macros ~= false,
         shareSize = MTF.SanitizeShareSize(conjure.shareSize),
+        -- Trade only with Shift + left-click (off by default; 2026-11-17).
+        shiftTrade = conjure.shiftTrade == true,
         scale = MTF.SanitizeScale(conjure.scale),
     }
     local portals = type(db.portals) == "table" and db.portals or {}
