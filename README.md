@@ -168,6 +168,17 @@ locked. The grid and "Snap to the grid" are on the Dyre's AddOns page
 (`/dyre`). Every frame grows and shrinks around its middle, and the size
 sliders on each page have a gold mark at their default.
 
+## Profile
+
+With Dyre's Toolkit 2.10.0 or newer, MTF's settings are part of your Dyre's
+Toolkit profile, one per character: every switch and slider, the frames'
+places and sizes, and your messages. On the Dyre's AddOns settings page
+(`/dyre`), **Copy settings from** takes another character's settings (or
+the Defaults) for every Dyre's AddOn at once, and **Export profile** and
+**Import profile** move them as one line of text. A copy applies at once,
+with no reload, and only out of combat. Each character keeps its own MTF
+macros.
+
 ## Commands
 
 | Command | What it does |

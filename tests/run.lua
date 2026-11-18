@@ -24,7 +24,7 @@ local function contains(actual, fragment, context)
     end
 end
 
-local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua", "Auras.lua", "Units.lua",
+local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua", "Profiles.lua", "Auras.lua", "Units.lua",
     "HealthBars.lua", "Spells.lua", "Macros.lua", "Announce.lua", "ClassData.lua", "Owners.lua", "Control.lua"}
 -- The real Dyre's Toolkit beside this repository when it is there; else (as
 -- in CI, which has only this repository) the copy in tests/toolkit.
@@ -1042,7 +1042,9 @@ local function fixture(options)
     end
     -- Dyre's Toolkit, its real files (TOOLKIT_DIR): MTF requires it. Not the
     -- minimap, which needs the embedded libraries. options.noToolkit leaves it
-    -- out; options.oldToolkit offers contract 1 only.
+    -- out; options.oldToolkit offers contract 1 only; options.noProfiles is a
+    -- Toolkit older than 2.10.0 (no RegisterProfilePart).
+    env.GetRealmName = function() return options.realm or "Forever" end
     if not options.noToolkit then
         state.toolkitNS = {InitializeMinimap = function() end}
         for _, path in ipairs(TOOLKIT_FILES) do
@@ -1051,6 +1053,9 @@ local function fixture(options)
             chunk("DyresToolkit", state.toolkitNS)
         end
         state.toolkit = env.DyresToolkit
+        if options.noProfiles then
+            env.DyresToolkit.RegisterProfilePart = nil
+        end
         if options.oldToolkit then
             local require = env.DyresToolkit.RequireContract
             env.DyresToolkit.RequireContract = function(n)
@@ -3261,6 +3266,146 @@ test("without the Settings API MTF runs and /mtf explains", function()
     equal(state.mtf.available, true)
     state.slash("")
     contains(state.last(), "settings page is unavailable")
+end)
+
+-- Dyre's Toolkit Profile (Toolkit 2.10.0; John, 2026-11-17) ------------------------
+
+local OTHER = "Janelle - Forever"
+
+-- Another character's saved profile, as the Toolkit keeps it.
+local function otherProfile(part)
+    return {snapToGrid = false, profiles = {[OTHER] = {class = "Mage", seen = 1, parts = {MageToolsForever = part},
+        pending = {}}}}
+end
+
+test("profile: MTF registers its part, without the per-character keys", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    equal(state.mtf.profileRegistered, true)
+    local found = false
+    for _, addon in ipairs(state.toolkit.ProfileParts()) do
+        found = found or addon == "MageToolsForever"
+    end
+    equal(found, true, "listed")
+    local entry = state.env.DyresToolkitDB.profiles["Dyre - Forever"]
+    local part = entry.parts.MageToolsForever
+    equal(type(part), "table", "this character's copy is saved at registration")
+    equal(part.conjure.shareSize, 10)
+    for _, key in ipairs(state.mtf.PROFILE_CHARACTER_KEYS) do
+        equal(part[key], nil, key .. " stays with the character")
+    end
+    -- A Toolkit older than 2.10.0: no part, no error, MTF works as before.
+    local old = mage({noProfiles = true, known = {[POLYMORPH] = true}})
+    equal(old.mtf.profileRegistered, false)
+    equal(old.mtf.available, true)
+    equal(old.env.MageToolsForeverConjure.shown, true, "the bars still come up")
+    for _, message in ipairs(old.messages) do
+        equal(message:find("error", 1, true), nil, message)
+    end
+end)
+
+test("profile: sanitize turns any table into full settings and never errors", function()
+    local state = mage()
+    local defaults = state.mtf.SanitizeDB(nil)
+    same(state.mtf.SanitizeDB({}), defaults, "{} gives the defaults")
+    for _, damaged in ipairs({
+        {conjure = "x", portals = 5, polymorph = true, announce = {}, locked = "no"},
+        {conjure = {scale = "big", shareSize = 99.5, position = {point = 1}},
+            polymorph = {width = -4, opacity = 1000, textScale = "x"}, announce = {waterWhisperText = 5}},
+        {futureKey = {deep = {deeper = true}}, conjure = {enabled = false, newSetting = 3}},
+    }) do
+        local result = state.mtf.SanitizeDB(damaged)
+        equal(type(result.conjure.scale), "number")
+        equal(result.conjure.shareSize >= 1 and result.conjure.shareSize <= 20, true)
+        equal(result.polymorph.width >= 120 and result.polymorph.width <= 400, true)
+        equal(type(result.announce.waterWhisperText), "string")
+        equal(result.conjure.newSetting, nil, "unknown keys are dropped")
+    end
+end)
+
+test("profile: a copy from another character changes the settings live and keeps this character's keys", function()
+    local part = {
+        conjure = {enabled = true, macros = true, shareSize = 5, scale = 80,
+            position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 600, y = 250}},
+        portals = {enabled = false, scale = 120},
+        polymorph = {enabled = true, scale = 110, mark = false, macro = true, opacity = 60, width = 300,
+            height = 24, textScale = 150},
+        announce = {polymorphGroupText = "Moo %T", polymorphGroup = false},
+        -- Another character's own keys never arrive.
+        locked = false, ownedMacros = {["! Not Mine"] = true}, shield = {other = true},
+    }
+    local state = mage({known = {[POLYMORPH] = true, [TELEPORT_STORMWIND] = true}, toolkitDB = otherProfile(part)})
+    local db = state.mtf.db
+    local polymorphTable, ownedBefore = db.polymorph, {}
+    for name in pairs(db.ownedMacros) do ownedBefore[name] = true end
+    contains(macroBody(state, "! Polymorph"), "/tm ", "the moon before the copy")
+    local ok, reload = state.toolkitNS.profile:CopyFrom(OTHER)
+    equal(ok, true, tostring(reload))
+    equal(#reload, 0, "live, no reload")
+    -- The values, in the same tables the widgets and the tracker hold.
+    equal(db.conjure.shareSize, 5)
+    equal(db.polymorph, polymorphTable, "written in place")
+    equal(db.polymorph.opacity, 60)
+    equal(db.announce.polymorphGroupText, "Moo %T")
+    same(db.ownedMacros, ownedBefore, "this character's macros")
+    equal(db.locked, true, "the lock is the Toolkit's")
+    equal(db.shield, nil, "MTF 1.1 data stays this character's")
+    -- The frames show them, with no reload.
+    advance(state, 1)
+    local env = state.env
+    equal(env.MageToolsForeverConjure:GetScale(), 0.8, "conjure scale")
+    local point = env.MageToolsForeverConjure.points[#env.MageToolsForeverConjure.points]
+    equal(point[4], 600, "conjure place")
+    equal(env.MageToolsForeverPortals.shown, false, "the portal bar is off")
+    equal(env.MageToolsForeverPolymorph.width, 300, "the Polymorph bar's width")
+    equal(env.MageToolsForeverPolymorphBar.alpha, 0.6, "its opacity")
+    equal(macroBody(state, "! Polymorph"):find("/tm ", 1, true), nil, "the moon line is gone")
+    -- The Defaults: a clean slate, still live.
+    ok, reload = state.toolkitNS.profile:CopyFrom(state.toolkit.PROFILE_DEFAULTS)
+    equal(ok, true, tostring(reload))
+    equal(#reload, 0)
+    advance(state, 1)
+    equal(db.conjure.shareSize, 10)
+    equal(db.announce.polymorphGroupText, state.mtf.ANNOUNCE_DEFAULTS.polymorphGroupText)
+    equal(env.MageToolsForeverConjure:GetScale(), 1)
+    equal(env.MageToolsForeverPortals.shown, true)
+    contains(macroBody(state, "! Polymorph"), "/tm [@focus,harm,nodead] !5")
+end)
+
+test("profile: export and import bring the settings back; a bad line or combat changes nothing", function()
+    local state = mage({known = {[POLYMORPH] = true}})
+    local db = state.mtf.db
+    db.conjure.shareSize = 7
+    db.announce.portalGroupText = "Hop in to %D"
+    local line = state.toolkitNS.profile:Export()
+    contains(line, "DYRE2:profile:")
+    db.conjure.shareSize = 3
+    db.announce.portalGroupText = "Changed %D"
+    local ok, reload = state.toolkitNS.profile:Import(line)
+    equal(ok, true, tostring(reload))
+    equal(#reload, 0)
+    equal(db.conjure.shareSize, 7)
+    equal(db.announce.portalGroupText, "Hop in to %D")
+    -- A damaged line: nothing changes.
+    ok = state.toolkitNS.profile:Import(line:sub(1, -3) .. "zz")
+    equal(ok, nil)
+    equal(db.conjure.shareSize, 7)
+    -- In combat the Toolkit refuses it; nothing changes.
+    state.combat = true
+    db.conjure.shareSize = 4
+    ok = state.toolkitNS.profile:Import(line)
+    equal(ok, nil)
+    equal(db.conjure.shareSize, 4)
+end)
+
+test("profile: a damaged part from another character is repaired, never an error", function()
+    local state = mage({known = {[POLYMORPH] = true}, toolkitDB = otherProfile({conjure = "broken",
+        polymorph = {width = "wide", opacity = -5}, announce = 12})})
+    local ok, reload = state.toolkitNS.profile:CopyFrom(OTHER)
+    equal(ok, true, tostring(reload))
+    equal(#reload, 0)
+    same(state.mtf.db.conjure, state.mtf.SanitizeDB({}).conjure, "repaired to the defaults")
+    equal(state.mtf.db.polymorph.width, 200)
+    equal(state.mtf.db.polymorph.opacity, 10)
 end)
 
 local failed = 0

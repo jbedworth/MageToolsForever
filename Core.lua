@@ -443,6 +443,52 @@ local function RegisterWithToolkit()
     })
 end
 
+-- Dyre's Toolkit Profile (Toolkit 2.10.0; John, 2026-11-17: "one place to go
+-- to persist your profile"). MTF keeps its live settings in MageToolsForeverDB;
+-- the Toolkit keeps this character's copy, copies from another character or
+-- the Defaults, and exports and imports it. Not in the profile (per
+-- character): locked, a copy of the Toolkit's account-wide lock; ownedMacros,
+-- the macros MTF keeps on this character; shield, reminders, and chimes, MTF
+-- 1.1 data that Dyre's Shields Up and Dyre's Buff Reminders copy once per
+-- character. MageToolsForeverAccountDB is account-wide, so it is not in it.
+MTF.PROFILE_CHARACTER_KEYS = {"locked", "ownedMacros", "shield", "reminders", "chimes"}
+
+-- After a copy or import, out of combat (the Toolkit refuses one in combat):
+-- the engine wrote the new values into MTF.db in place, so every widget and
+-- the Polymorph tracker hold the same tables. Each part reads them again.
+function MTF.ApplyProfile()
+    if type(MTF.toolkit.ReapplyWidgets) == "function" then
+        MTF.toolkit.ReapplyWidgets(addonName)
+    end
+    MTF.ApplyConjureMacros()
+    MTF.RefreshConjure()
+    MTF.RefreshPortals()
+    MTF.ApplyPolymorphMacro()
+    MTF.RefreshPolymorph()
+    local page = MTF.announcePage
+    if page and page:IsShown() then
+        page:OnRefresh()
+    end
+end
+
+-- Once, at login, before the modules build their frames, so a part copied
+-- while MTF was not loaded is written first. With a Toolkit older than
+-- 2.10.0 nothing changes.
+local function RegisterProfilePart()
+    local register = MTF.toolkit.RegisterProfilePart
+    if type(register) ~= "function" then
+        return false
+    end
+    return register({
+        addon = addonName,
+        title = DEFAULT_TITLE,
+        current = function() return MTF.db end,
+        sanitize = function(settings) return MTF.SanitizeDB(settings) end,
+        characterKeys = MTF.PROFILE_CHARACTER_KEYS,
+        refresh = function() MTF.ApplyProfile() end,
+    }) == true
+end
+
 SLASH_MAGETOOLSFOREVER1 = PRIMARY_SLASH
 SLASH_MAGETOOLSFOREVER2 = BACKUP_SLASH
 SlashCmdList[SLASH_KEY] = MTF.HandleCommand
@@ -516,6 +562,7 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     InstallInputHooks()
     MTF.db.locked = MTF.toolkit.IsLocked() ~= false
     CarryFocusWorks()
+    MTF.profileRegistered = RegisterProfilePart()
     MTF.InitializeConjure()
     MTF.InitializePortals()
     MTF.InitializePolymorph()

@@ -231,3 +231,12 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       The same for Dyre's Buff Reminders ("buff reminders and cooldown
       chimes").
 - [ ] Settings survive `/reload` and stay separate on a second Mage.
+- [ ] Profile (Toolkit 2.10.0 or newer): on a second Mage, change the share
+      size, a bar's place and size, the Polymorph bar's opacity, the moon
+      switch, and a message; log out. On the first Mage, Dyre's AddOns >
+      Profile > Copy settings from the second Mage > Copy: the bars move and
+      resize at once, "! Polymorph" loses or gains its `/tm` line, the
+      Announce page shows the new text, and no reload is asked for. The
+      first Mage's MTF macros stay. In combat, Copy is refused. Export
+      profile, change a setting, Import profile with that line: the setting
+      comes back. "Defaults" puts every MTF setting back to its default.

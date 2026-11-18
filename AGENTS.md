@@ -186,6 +186,26 @@ feature set; do not add speculative features or frameworks without agreement.
   methods and checks).
 - `/mtf unlock` and `/mtf lock` call the toolkit's `SetLocked`. `/mtf reset`
   calls `ResetWidgets("MageToolsForever")`.
+- Profile (Toolkit 2.10.0; John, 2026-11-17: "one place to go to persist
+  your profile"): at login, before the modules build their frames, Core
+  calls `RegisterProfilePart{addon, title, current = MTF.db, sanitize =
+  MTF.SanitizeDB, characterKeys, refresh = MTF.ApplyProfile}`, only when the
+  toolkit has it (an older toolkit: nothing changes; the minimum stays 2.5).
+  In the profile: `conjure`, `portals`, `polymorph` (switches, places,
+  scales, sizes, opacity, the moon and macro switches), and `announce`.
+  `characterKeys` (never copied, exported, or imported): `locked` (a copy of
+  the toolkit's account-wide lock, set again at login), `ownedMacros` (the
+  macros MTF keeps on this character; macros are per character), and
+  `shield`, `reminders`, `chimes` (MTF 1.1 data that Dyre's Shields Up and
+  Dyre's Buff Reminders copy once per character). MageToolsForeverAccountDB
+  is account-wide, so it is not in the profile (John: "user-centric, not per
+  character"). The engine writes the part into MTF.db in place, so widgets'
+  stores and the Polymorph tracker's store keep their tables.
+  `MTF.ApplyProfile` applies it live (copies are refused in combat):
+  `ReapplyWidgets` (place, scale, sizes, opacity; the Polymorph bar's
+  `onLayout` rebuilds its slot when a size changed), the conjure macros and
+  bar, the portal bar, the Polymorph macro and tracker, and the Announce
+  page when it is open. No part needs a reload.
 - Settings: MTF's page is `RegisterSettingsCategory("Mage Tools Forever")`
   under "Dyre's AddOns", its pages under that; `/mtf` opens it through the
   toolkit's `OpenSettings` (never in combat).
@@ -392,10 +412,10 @@ feature set; do not add speculative features or frameworks without agreement.
   trade placement waits for, and startup; Conjure, Portals, and Polymorph own
   their modules and `/mtf debug_*` commands; Options owns the settings pages.
 - tests/run.lua holds the Lua 5.1 mock suite. It loads Dyre's Toolkit's real
-  files (Core, Layout, Widgets, Settings, Auras, Units, HealthBars, Spells,
-  Macros, Announce, ClassData, Owners, Control) from ../DyresToolkit when that
-  folder is there, else from the copy in tests/toolkit (CI has only this
-  repository); its first line says which. No test compares shared files
+  files (Core, Layout, Widgets, Settings, Profiles, Auras, Units, HealthBars,
+  Spells, Macros, Announce, ClassData, Owners, Control) from ../DyresToolkit
+  when that folder is there, else from the copy in tests/toolkit (CI has
+  only this repository); its first line says which. No test compares shared files
   byte for byte (John: "that's a stupid thing to test for a shared
   resource"); refresh the copy when a toolkit change matters to CI.
   tests/test_*.py cover the release helpers in scripts/. .github/workflows/

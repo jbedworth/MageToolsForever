@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.4.0
+
+### Features
+
+- Your MTF settings, frame places and sizes, and messages are now part of your Dyre's Toolkit profile. On the Dyre's AddOns settings page you can copy them from another character or the Defaults, and export or import them as a line of text. A copy applies at once, with no reload. Your MTF macros stay with each character. Needs Dyre's Toolkit 2.10.0 or newer.
+
 ## 1.3.4
 
 ### Fixes
