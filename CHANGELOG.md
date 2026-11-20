@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.5.1
+
+### Other changes
+
+- The **Conjure bar** switch's tooltip now says how to stop left-click from trading without turning the bar off: turn on **Trade only with Shift-click** on the Conjure page.
+
 ## 1.5.0
 
 ### Features

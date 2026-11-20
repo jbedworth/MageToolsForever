@@ -13,7 +13,8 @@ cooldown chimes, for every class. The CurseForge app installs both with Mage
 Tools Forever, and they take over your MTF settings once. MTF's Shield, Buff
 Reminders, and Cooldown Chimes settings pages each have a button that opens
 their settings. Without one of them, MTF works and says once in chat what to
-install (or enable).
+install (or enable). Proc overlays, such as Missile Barrage and Fingers of
+Frost, are in Dyre's Shields Up.
 
 **Needs Dyre's Toolkit 2.5.** Dyre's Toolkit is the home of all of Dyre's
 AddOns: one layout mode for every Dyre's AddOn's frames, a grid, and one

@@ -308,7 +308,9 @@ function MTF.InitializeOptions()
         category = Settings.RegisterVerticalLayoutCategory(TITLE)
     end
     Flag(category, "MTF_CONJURE_ENABLED", "Conjure bar", "conjure", "enabled", true,
-        "A bar with water, food, and mana gem buttons: left-click uses or trades, right-click conjures.",
+        "A bar with water, food, and mana gem buttons: left-click uses or trades, right-click conjures."
+            .. "\n\nTo stop left-click from trading, keep the bar and turn on \"Trade only with Shift-click\" "
+            .. "on the Conjure page.",
         RefreshConjure)
     Flag(category, "MTF_PORTALS_ENABLED", "Portal bar", "portals", "enabled", true,
         "A bar with a button for each teleport and portal you know, and the runes you carry for them.",

@@ -19,6 +19,8 @@ feature set; do not add speculative features or frameworks without agreement.
   Magic (DBR adds it, off by default) and plays the cooldown chimes. MTF's
   own copies (Shield.lua, Reminders.lua, Chimes.lua, the crescent textures,
   scripts/build_arc.py) are gone, and so is Dyre's Sounds: MTF plays no sound.
+- Proc overlays (Missile Barrage, Fingers of Frost; John, 2026-11-18: "DSU is
+  the right home for our 'spell activation overlays'") are DSU's, never MTF's.
 - TOC `## OptionalDeps: DyresToolkit, DyresShieldsUp, DyresBuffReminders`
   (family rule: no `## Dependencies`), so MTF loads without them; CurseForge lists both as required dependencies, with
   `dyres-toolkit` (`RELATIONS`). Without one, Core says once at login (after

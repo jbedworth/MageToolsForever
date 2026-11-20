@@ -3287,6 +3287,9 @@ test("the settings have a main page and a page per module", function()
     equal(main.parent, state.categories["Dyre's AddOns"], "under Dyre's Toolkit's home")
     equal(state.registered, state.categories["Dyre's AddOns"])
     equal(main.initializers[1].setting.variable, "MTF_CONJURE_ENABLED")
+    -- A player turned the whole bar off to stop trading (2026-11-19): the
+    -- switch's tooltip names the setting that stops it.
+    contains(main.initializers[1].tooltip, "\"Trade only with Shift-click\" on the Conjure page")
     equal(main.initializers[2].setting.variable, "MTF_PORTALS_ENABLED")
     equal(main.initializers[3].setting.variable, "MTF_POLYMORPH_ENABLED")
     equal(main.initializers[4], nil, "no switches for what moved to Dyre's Shields Up and Dyre's Buff Reminders")
