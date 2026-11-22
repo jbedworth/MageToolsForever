@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.6.1
+
+### Other changes
+
+- The **Share stack size** slider on the Conjure page shows a gold mark at its default (10), as the other size sliders do.
+
 ## 1.6.0
 
 ### Other changes

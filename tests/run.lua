@@ -1407,6 +1407,21 @@ test("the share stack size setting changes the trade", function()
     state.settings.MTF_CONJURE_SHARE_SIZE:SetValue(50)
     equal(state.mtf.db.conjure.shareSize, 20, "at most 20")
 end)
+test("the share stack size slider has the Toolkit's gold mark at its default", function()
+    -- John: "set notches on the sliders default values".
+    local state = mage()
+    local mark
+    for _, initializer in ipairs(state.categories.Conjure.initializers) do
+        if initializer.setting and initializer.setting.variable == "MTF_CONJURE_SHARE_SIZE" then
+            mark = initializer.dyreDefault
+        end
+    end
+    equal(type(mark), "table", "a mark")
+    equal(mark.min, state.mtf.SHARE_SIZE_MIN)
+    equal(mark.max, state.mtf.SHARE_SIZE_MAX)
+    equal(mark.default, state.mtf.DEFAULT_SHARE_SIZE)
+    equal(mark.default, 10)
+end)
 test("the best a friend can use is traded, and with none MTF says to conjure first", function()
     local state = mage({units = friend(10)})
     state.put(0, 1, WATER_PURIFIED, 20)

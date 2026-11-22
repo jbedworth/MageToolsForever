@@ -93,8 +93,14 @@ local function AddConjurePage(parent)
         function(value)
             MTF.db.conjure.shareSize = MTF.SanitizeShareSize(value)
         end)
-    Settings.CreateSlider(page, share, SliderOptions(MTF.SHARE_SIZE_MIN, MTF.SHARE_SIZE_MAX, 1),
+    local shareSlider = Settings.CreateSlider(page, share, SliderOptions(MTF.SHARE_SIZE_MIN, MTF.SHARE_SIZE_MAX, 1),
         "How much food or water one trade gives your target. If you carry less, they get all of it.")
+    -- The gold mark at the default, as on the Toolkit's own sliders (John:
+    -- "set notches on the sliders default values"; public since Toolkit 2.2.0).
+    if MTF.toolkit and type(MTF.toolkit.AddDefaultTick) == "function" then
+        MTF.toolkit.AddDefaultTick(shareSlider,
+            {min = MTF.SHARE_SIZE_MIN, max = MTF.SHARE_SIZE_MAX, default = MTF.DEFAULT_SHARE_SIZE})
+    end
     Flag(page, "MTF_CONJURE_SHIFT_TRADE", "Trade only with Shift-click", "conjure", "shiftTrade", false,
         "On: left-click on the Water, Food, and Food & Water buttons always eats or drinks, even with a "
             .. "player targeted, and Shift + left-click trades to your target. Off: left-click trades to a "
