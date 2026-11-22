@@ -39,7 +39,6 @@ MageToolsForever/
     Core.lua
     Conjure.lua
     Portals.lua
-    Polymorph.lua
     Options.lua
     LICENSE
 ```
@@ -54,18 +53,20 @@ list of exclusions. Keep `LICENSE` in the package, but do not load it in the TOC
 MTF ships no media (`MEDIA_FILES` is empty since 1.2.0; the builder would
 require each texture to be an uncompressed 32-bit square TGA with power-of-two
 sides) and no sounds. The shield display, the buff reminders, and the cooldown
-chimes are Dyre's Shields Up's and Dyre's Buff Reminders', listed in the TOC
-as `## OptionalDeps: DyresShieldsUp, DyresBuffReminders`. CurseForge lists
-Dyre's Toolkit, Dyre's Shields Up, and Dyre's Buff Reminders as required
-dependencies (`RELATIONS` in `scripts/publish_curseforge.py`, slugs
-`dyres-toolkit`, `dyres-shields-up`, and `dyres-buff-reminders`, sent with
-every upload's metadata).
+chimes are Dyre's Shields Up's and Dyre's Buff Reminders', and the Polymorph
+bar Dyre's Debuff Tracker's (1.6.0), listed in the TOC as
+`## OptionalDeps: DyresShieldsUp, DyresBuffReminders, DyresDebuffTracker`.
+CurseForge lists Dyre's Toolkit, Dyre's Shields Up, Dyre's Buff Reminders, and
+Dyre's Debuff Tracker as required dependencies (`RELATIONS` in
+`scripts/publish_curseforge.py`, slugs `dyres-toolkit`, `dyres-shields-up`,
+`dyres-buff-reminders`, and `dyres-debuff-tracker`, sent with every upload's
+metadata).
 
 Validate the actual archive, not only the staging folder:
 
 1. Check CRC/integrity, non-empty files, and the exact file list.
 2. Reject absolute paths, traversal paths, symlinks, and extra root folders.
-3. Verify the TOC name, Interface `16001`, and Commands/Core/Conjure/Portals/Polymorph/Options
+3. Verify the TOC name, Interface `16001`, and Commands/Core/Conjure/Portals/Options
    load order. Every listed runtime file must exist inside the archive.
 4. Verify the packaged version matches the selected tag, with one leading `v`
    removed. Verify the packaged MIT copyright/permission notice is intact.

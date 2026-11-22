@@ -4,7 +4,8 @@ local _, MTF = ...
 -- per module for its details, in Blizzard's vertical layout with proxy
 -- settings that read and write MageToolsForeverDB directly. The Shield, Buff
 -- Reminders, and Cooldown Chimes pages link to Dyre's Shields Up's and Dyre's
--- Buff Reminders' own settings (author, 1.2.0: linked, not mirrored).
+-- Buff Reminders' own settings (author, 1.2.0: linked, not mirrored), and the
+-- Polymorph page to Dyre's Debuff Tracker's (1.6.0).
 local TITLE = "Mage Tools Forever"
 local CONJURE_TITLE = "Conjure"
 local SHIELD_TITLE = "Shield"
@@ -70,10 +71,6 @@ local function RefreshPortals()
     MTF.RefreshPortals()
 end
 
-local function RefreshPolymorph()
-    MTF.RefreshPolymorph()
-end
-
 -- A widget's size sliders (Dyre's Toolkit: each with a gold mark at its
 -- default, then "Reset size"), with the label players know.
 local function AddWidgetSizes(page, layout, widget, tooltips, resetTooltip)
@@ -114,30 +111,6 @@ local function AddPortalsPage(parent)
         {scale = "How big the portal bar is, in percent. A change in combat applies when combat ends."})
 end
 
-local function AddPolymorphPage(parent)
-    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, POLYMORPH_TITLE)
-    Flag(page, "MTF_POLYMORPH_MACRO", "Keep the Polymorph macro", "polymorph", "macro", true,
-        "Keep \"! Polymorph\" in your character macros for your action bars, once you know Polymorph: it focuses "
-            .. "the hostile mob under your mouse, else your target, and sheeps your focus (a live focus stays; "
-            .. "Shift-click, right-click, or a dead focus clears it), which the "
-            .. "bar's click recasts on. Turning this off deletes it.", function() MTF.ApplyPolymorphMacro() end)
-    Flag(page, "MTF_POLYMORPH_MARK", "Mark the sheep with the moon", "polymorph", "mark", true,
-        "\"! Polymorph\" puts the moon raid marker on your focus as you press it, also in combat; pressing it "
-            .. "again keeps the moon. A click on the bar and the plain spell button do not mark: the game does not "
-            .. "let AddOns set markers, so use \"! Polymorph\". In a raid the game lets only the leader and "
-            .. "assistants mark.",
-        function() MTF.RefreshPolymorph() end)
-    AddWidgetSizes(page, layout, MTF.polymorphWidget, {
-        scale = "How big the Polymorph bar is, in percent, on top of its width, height, and text size. A change "
-            .. "in combat applies when combat ends.",
-        width = "The Polymorph bar's width. A change in combat applies when combat ends.",
-        barHeight = "The height of the bar line; the icon follows. A change in combat applies when combat ends.",
-        textScale = "The size of the mob's name and the bar's texts. A change in combat applies when combat ends.",
-        opacity = "How solid the whole Polymorph bar is. It fades at once, also in combat; its timer bar follows "
-            .. "when combat ends.",
-    }, "Back to the bar's own width, height, and text size. Bar size and Opacity stay as they are.")
-end
-
 -- A page that links to a companion AddOn's settings (Dyre's Toolkit's
 -- AddSettingsLink: the button is greyed while that AddOn has not joined the
 -- toolkit, and a click then says what to install or enable; never in combat).
@@ -158,6 +131,9 @@ local function AddLinkPages(parent)
     AddLinkPage(parent, CHIMES_TITLE, reminders, "Cooldown chimes", "Open Buff Reminders settings",
         "Dyre's Buff Reminders plays a sound just before Blink, Frost Nova, and your other spells are ready. "
             .. "Open its settings.")
+    AddLinkPage(parent, POLYMORPH_TITLE, MTF.DEBUFF_TRACKER, "Polymorph bar", "Open Debuff Tracker settings",
+        "Dyre's Debuff Tracker draws the Polymorph bar, keeps \"! Polymorph\", and tells your group as you sheep. "
+            .. "Open its settings.")
 end
 
 -- Announce page --------------------------------------------------------------
@@ -169,7 +145,6 @@ local ANNOUNCE_ROWS = {
     {switch = "foodWhisper", label = "Food trade: whisper the player"},
     {switch = "bothWhisper", label = "Food & Water trade: whisper the player"},
     {switch = "portalGroup", label = "Portal: tell the group (raid or party; nothing when alone)"},
-    {switch = "polymorphGroup", label = "Polymorph: tell the group as you start casting (raid or party)"},
     {switch = "teleportEmote", label = "Teleport: emote (starts with your name; sent at your next key press or click)"},
 }
 local PAGE_LEFT = 16
@@ -208,7 +183,7 @@ local function CreateAnnouncePage()
     local title = Text(content, "GameFontHighlightHuge", ANNOUNCE_TITLE)
     title:SetPoint("TOPLEFT", PAGE_LEFT, -16)
     local help = Text(content, "GameFontHighlightSmall",
-        "%C is the count, %I the item (for Food & Water, both of them), %T the player's full name (for Polymorph, the mob), and %D "
+        "%C is the count, %I the item (for Food & Water, both of them), %T the player's full name, and %D "
             .. "the portal's or teleport's city (in the emote, %T is you and %Z your zone when it is sent). Press Enter to keep an edit, Escape to undo it. A player is whispered at "
             .. "most once every 30 seconds.")
     help:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
@@ -315,13 +290,8 @@ function MTF.InitializeOptions()
     Flag(category, "MTF_PORTALS_ENABLED", "Portal bar", "portals", "enabled", true,
         "A bar with a button for each teleport and portal you know, and the runes you carry for them.",
         RefreshPortals)
-    Flag(category, "MTF_POLYMORPH_ENABLED", "Polymorph bar", "polymorph", "enabled", true,
-        "A bar with the time left on your focus's Polymorph and the mob's name; click it to sheep your focus "
-            .. "again. Sheep with \"! Polymorph\": it focuses and marks the mob.",
-        RefreshPolymorph)
     AddConjurePage(category)
     AddPortalsPage(category)
-    AddPolymorphPage(category)
     AddLinkPages(category)
     local announcePage = CreateAnnouncePage()
     MTF.announcePage = announcePage

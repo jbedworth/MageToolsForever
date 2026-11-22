@@ -261,7 +261,8 @@ class ReleaseTests(unittest.TestCase):
         # The shield display and its crescents moved to Dyre's Shields Up (1.2.0);
         # sounds come with Dyre's Shields Up and Dyre's Buff Reminders.
         self.assertEqual(builder.MEDIA_FILES, ())
-        for gone in ("Shield.lua", "Reminders.lua", "Chimes.lua"):
+        # The Polymorph bar moved to Dyre's Debuff Tracker (1.6.0).
+        for gone in ("Shield.lua", "Reminders.lua", "Chimes.lua", "Polymorph.lua"):
             self.assertNotIn(gone, builder.RUNTIME_FILES)
         path, _ = self.build()
         with zipfile.ZipFile(path) as archive:

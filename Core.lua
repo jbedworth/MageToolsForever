@@ -58,10 +58,9 @@ local REQUIRED_NAMESPACE = {
     "ParseCommand", "HandleCommand",
     "CheckConjureCapabilities", "InitializeConjure", "RefreshConjure",
     "ApplyConjureMacros", "ReportConjureStatus", "ReportConjureDebug", "ReportClickDebug",
-    "CharacterMacrosAvailable", "WriteCharacterMacro", "DeleteCharacterMacro", "ApplyPolymorphMacro",
+    "CharacterMacrosAvailable", "WriteCharacterMacro", "DeleteCharacterMacro",
     "AddInputHandler", "RunOnNextInput",
     "InitializePortals", "RefreshPortals", "ReportPortalsDebug",
-    "InitializePolymorph", "RefreshPolymorph", "ReportPolymorphDebug", "ReportFocusDebug", "ResetFocus",
     "InitializeOptions", "OpenSettings",
 }
 
@@ -98,38 +97,21 @@ MTF.SCALE_MAX = 150
 MTF.SCALE_STEP = 5
 MTF.DEFAULT_SCALE = 100
 
--- The Polymorph bar's own sizes and opacity (author-approved, 1.1.0, after
--- WTF's DoT tracker): the defaults draw the bar as it always looked. "Bar
--- size" above stays a scale on top of them.
-MTF.POLYMORPH_SIZE_SPECS = {
-    {key = "width", label = "Bar width", min = 120, max = 400, step = 10, default = 200},
-    {key = "height", label = "Bar height", min = 10, max = 40, step = 1, default = 16},
-    {key = "textScale", label = "Text size", min = 50, max = 200, step = 5, default = 100, percent = true},
-}
-MTF.POLYMORPH_OPACITY_MIN = 10
-MTF.POLYMORPH_OPACITY_MAX = 100
-MTF.POLYMORPH_OPACITY_STEP = 5
-MTF.DEFAULT_POLYMORPH_OPACITY = 100
-
 -- Messages (Announce), each with its own switch and editable text
 -- (author-approved). Trade whispers: %C the count, %I the item (for Food &
 -- Water, the whole list: "10 Conjured Fresh Water and 10 Conjured Bread"), %T
 -- the player's full name. The portal group message and the teleport emote: %D
 -- the city; in the emote, %Z your zone as it is sent and %T your name. Emotes
--- start with your name.
--- The Polymorph group message: %T the mob. The defaults credit MTF, as WTF's
--- do, except the Polymorph line, the author's own classic.
+-- start with your name. The defaults credit MTF, as WTF's do.
 MTF.ANNOUNCE_MAX_LENGTH = 255
 MTF.ANNOUNCE_DEFAULTS = {
     waterWhisperText = "Here's %C %I, conjured from pure arcane energy. Drink up, %T! Courtesy of Mage Tools Forever (MTF)",
     foodWhisperText = "Here's %C %I, conjured from thin air: no crumbs, no calories. Courtesy of Mage Tools Forever (MTF)",
     bothWhisperText = "Here's %I, conjured from pure arcane energy. Eat, drink, and be merry, %T! Courtesy of Mage Tools Forever (MTF)",
     portalGroupText = "A portal to %D shimmers open! Step through before it fades. - via Mage Tools Forever (MTF)",
-    polymorphGroupText = "Sheeping %T; you spank it, you tank it",
     teleportEmoteText = "summons powerful arcane energies to whisk themselves away to %Z. - via Mage Tools Forever (MTF)",
 }
-local ANNOUNCE_SWITCHES = {"waterWhisper", "foodWhisper", "bothWhisper", "portalGroup", "teleportEmote",
-    "polymorphGroup"}
+local ANNOUNCE_SWITCHES = {"waterWhisper", "foodWhisper", "bothWhisper", "portalGroup", "teleportEmote"}
 
 -- A message text: a non-empty single line within the chat limit, else the default.
 function MTF.SanitizeAnnouncement(text, default)
@@ -163,10 +145,17 @@ end
 -- 1.2.0: MTF depends on them, so players get them on their other classes too;
 -- CurseForge installs them with MTF). The TOC lists them as OptionalDeps, so
 -- MTF loads without them and says once per session what to install or enable.
+-- Dyre's Debuff Tracker draws the Polymorph bar since 1.6.0 (John, 2026-11-20:
+-- "Yes, move it"; a feature's settings and effect live in one AddOn).
 MTF.COMPANIONS = {
     {addon = "DyresShieldsUp", title = "Dyre's Shields Up", what = "the shield display"},
     {addon = "DyresBuffReminders", title = "Dyre's Buff Reminders", what = "buff reminders and cooldown chimes"},
+    {addon = "DyresDebuffTracker", title = "Dyre's Debuff Tracker", what = "the Polymorph bar"},
 }
+-- MTF says nothing of its own about the move (lead, 2026-11-20): with Dyre's
+-- Debuff Tracker loaded, its "Copied your Polymorph bar settings ..." line is
+-- the only one; without it, the install line above is.
+MTF.DEBUFF_TRACKER = MTF.COMPANIONS[3]
 
 function MTF.CompanionLoaded(addon)
     if type(C_AddOns) ~= "table" or type(C_AddOns.IsAddOnLoaded) ~= "function" then
@@ -226,15 +215,6 @@ function MTF.SanitizeStepped(value, minValue, maxValue, step, default)
     return math.max(minValue, math.min(maxValue, stepped))
 end
 
-function MTF.SanitizePolymorphSize(spec, value)
-    return MTF.SanitizeStepped(value, spec.min, spec.max, spec.step, spec.default)
-end
-
-function MTF.SanitizePolymorphOpacity(value)
-    return MTF.SanitizeStepped(value, MTF.POLYMORPH_OPACITY_MIN, MTF.POLYMORPH_OPACITY_MAX,
-        MTF.POLYMORPH_OPACITY_STEP, MTF.DEFAULT_POLYMORPH_OPACITY)
-end
-
 local function SanitizePosition(position)
     if type(position) ~= "table" or type(position.point) ~= "string"
         or type(position.relativePoint) ~= "string"
@@ -265,18 +245,12 @@ function MTF.SanitizeDB(db)
         position = SanitizePosition(portals.position),
         scale = MTF.SanitizeScale(portals.scale),
     }
-    local polymorph = type(db.polymorph) == "table" and db.polymorph or {}
-    db.polymorph = {
-        enabled = polymorph.enabled ~= false,
-        position = SanitizePosition(polymorph.position),
-        scale = MTF.SanitizeScale(polymorph.scale),
-        mark = polymorph.mark ~= false,
-        macro = polymorph.macro ~= false,
-        opacity = MTF.SanitizePolymorphOpacity(polymorph.opacity),
-    }
-    for _, spec in ipairs(MTF.POLYMORPH_SIZE_SPECS) do
-        db.polymorph[spec.key] = MTF.SanitizePolymorphSize(spec, polymorph[spec.key])
-    end
+    -- MTF 1.5 and older drew the Polymorph bar: db.polymorph (enabled,
+    -- position, scale, mark, macro, opacity, width, height, textScale) and
+    -- the group message (announce.polymorphGroup, polymorphGroupText) stay
+    -- exactly as saved. Dyre's Debuff Tracker reads them once and never
+    -- writes them.
+    db.polymorph = type(db.polymorph) == "table" and db.polymorph or nil
     local announce = type(db.announce) == "table" and db.announce or {}
     -- Trade whispers once had one switch on the Conjure page.
     local formerWhisper = conjure.whisper
@@ -292,6 +266,12 @@ function MTF.SanitizeDB(db)
     end
     for key, default in pairs(MTF.ANNOUNCE_DEFAULTS) do
         db.announce[key] = MTF.SanitizeAnnouncement(announce[key], default)
+    end
+    if type(announce.polymorphGroup) == "boolean" then
+        db.announce.polymorphGroup = announce.polymorphGroup
+    end
+    if type(announce.polymorphGroupText) == "string" then
+        db.announce.polymorphGroupText = announce.polymorphGroupText
     end
     -- The lock is Dyre's Toolkit's (one for every Dyre's AddOn); MTF keeps a
     -- copy for its modules.
@@ -373,14 +353,12 @@ end
 -- a toolkit widget: the toolkit places, drags, snaps, resizes from the
 -- center, outlines, saves, and resets it, and draws the grid and the size
 -- sliders. MTF only fills the widgets with its content. Without contract 2
--- (no toolkit, or an older one) MTF stays off and says what to install. Since
--- 1.3.0 the Polymorph bar is the toolkit's control engine (2.5.0), which
--- keeps contract 2, so MTF checks for the engine's functions.
+-- (no toolkit, or an older one) MTF stays off and says what to install.
+-- NoteFocusWorks (2.5.0) takes MTF 1.2.3's focus flag.
 local TOOLKIT_CONTRACT = 2
 local TOOLKIT_FUNCTIONS = {
     "RegisterAddOn", "RegisterSettingsCategory", "IsLocked", "SetLocked", "OpenSettings", "CreateWidget",
-    "AddWidgetSettings", "ResetWidgets", "AddSettingsLink",
-    "CreateControlTracker", "ClassSpells", "AuraEngineKind", "FocusWorks", "NoteFocusWorks", "ResetFocusWorks",
+    "AddWidgetSettings", "ResetWidgets", "AddSettingsLink", "NoteFocusWorks",
 }
 local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit 2.5 or later: install or update it from "
     .. "CurseForge. MTF stays off until then."
@@ -403,14 +381,13 @@ function MTF.Toolkit()
     return toolkit
 end
 
--- The toolkit's lock changed: MTF's samples (the Polymorph sample, the portal
--- bar with nothing known) show or hide, quietly; the toolkit says one line for
--- all and draws the outlines.
+-- The toolkit's lock changed: MTF's samples (the portal bar with nothing
+-- known) show or hide, quietly; the toolkit says one line for all and draws
+-- the outlines.
 local function ApplyFramesLocked(locked)
     MTF.db.locked = locked
     MTF.RefreshConjure()
     MTF.RefreshPortals()
-    MTF.RefreshPolymorph()
 end
 
 -- /mtf unlock and /mtf lock: one layout mode for every Dyre's AddOn.
@@ -452,12 +429,13 @@ end
 -- character): locked, a copy of the Toolkit's account-wide lock; ownedMacros,
 -- the macros MTF keeps on this character; shield, reminders, and chimes, MTF
 -- 1.1 data that Dyre's Shields Up and Dyre's Buff Reminders copy once per
--- character. MageToolsForeverAccountDB is account-wide, so it is not in it.
-MTF.PROFILE_CHARACTER_KEYS = {"locked", "ownedMacros", "shield", "reminders", "chimes"}
+-- character; polymorph, MTF 1.5 data that Dyre's Debuff Tracker reads once.
+-- MageToolsForeverAccountDB is account-wide, so it is not in it.
+MTF.PROFILE_CHARACTER_KEYS = {"locked", "ownedMacros", "shield", "reminders", "chimes", "polymorph"}
 
 -- After a copy or import, out of combat (the Toolkit refuses one in combat):
--- the engine wrote the new values into MTF.db in place, so every widget and
--- the Polymorph tracker hold the same tables. Each part reads them again.
+-- the engine wrote the new values into MTF.db in place, so every widget holds
+-- the same tables. Each part reads them again.
 function MTF.ApplyProfile()
     if type(MTF.toolkit.ReapplyWidgets) == "function" then
         MTF.toolkit.ReapplyWidgets(addonName)
@@ -465,8 +443,6 @@ function MTF.ApplyProfile()
     MTF.ApplyConjureMacros()
     MTF.RefreshConjure()
     MTF.RefreshPortals()
-    MTF.ApplyPolymorphMacro()
-    MTF.RefreshPolymorph()
     local page = MTF.announcePage
     if page and page:IsShown() then
         page:OnRefresh()
@@ -567,7 +543,6 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     MTF.profileRegistered = RegisterProfilePart()
     MTF.InitializeConjure()
     MTF.InitializePortals()
-    MTF.InitializePolymorph()
     MTF.InitializeOptions()
     RegisterWithToolkit()
     ReportMissingCompanions()

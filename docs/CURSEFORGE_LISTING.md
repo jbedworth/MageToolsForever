@@ -12,7 +12,7 @@ tested.
 | Class | Addons |
 | Main category | Mage. Keep it identical to the TOC `## Category`, which groups the AddOn in the in-game AddOn list. |
 | Additional categories | Bags & Inventory, Buffs & Debuffs (CurseForge allows up to 4; unrelated ones can send the project back for changes). |
-| Relations | Dyre's Toolkit (`dyres-toolkit`), Dyre's Shields Up (`dyres-shields-up`), and Dyre's Buff Reminders (`dyres-buff-reminders`): required dependencies, set by each CI upload; add them by hand on any file uploaded through the website. |
+| Relations | Dyre's Toolkit (`dyres-toolkit`), Dyre's Shields Up (`dyres-shields-up`), Dyre's Buff Reminders (`dyres-buff-reminders`), and Dyre's Debuff Tracker (`dyres-debuff-tracker`, project 1777574): required dependencies, set by each CI upload; add them by hand on any file uploaded through the website. |
 | Author shown | Dyre, set through the CurseForge account's username |
 | License | MIT License |
 | Logo | artwork/mage-tools-forever-logo.png (1024 x 1024) |
@@ -22,7 +22,7 @@ tested.
 
 ## Summary
 
-Mage tools for World of Warcraft: Forever: conjure and trade food and water by level, a portal bar, and a Polymorph bar. Installs Dyre's Shields Up and Dyre's Buff Reminders for shields, buff tracking, and cooldown chimes.
+Mage tools for World of Warcraft: Forever: conjure and trade food and water by level, and a portal bar. Installs Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker for shields, buff tracking, cooldown chimes, and the Polymorph bar.
 
 ## Screenshots
 
@@ -32,16 +32,16 @@ Upload these from `artwork/screenshots/`, with these captions:
 | --- | --- |
 | conjure-bar.png | The conjure bar: Water, Food, Food & Water, and Mana Gem. |
 | portal-bar.png | The portal bar: every teleport and portal you know, with your runes. |
-| polymorph-bar.png | The Polymorph bar: the sheeped mob and the time left. Click it to sheep again. |
 | settings-conjure.png | Conjure settings: macros, share stack size, and bar size. |
 | settings-announce.png | Every whisper, group message, and emote, each with its own switch and text. |
 
 Not in the gallery since 1.2.0 (they show features that moved, or the old
 lock and grid switches): shield-display.png, settings-shield.png,
-settings-chimes-sounds.png, settings-main.png, and unlocked-grid.png. Retake
-settings-main.png (the main page now has three switches) and unlocked-grid.png
-(Dyre's Toolkit's grid with the conjure, portal, and Polymorph bars) before
-adding them again.
+settings-chimes-sounds.png, settings-main.png, and unlocked-grid.png; since
+1.6.0, polymorph-bar.png (Dyre's Debuff Tracker's bar now). Retake
+settings-main.png (the main page now has two switches) and unlocked-grid.png
+(Dyre's Toolkit's grid with the conjure and portal bars) before adding them
+again.
 
 ## Description
 
@@ -52,9 +52,9 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 `CHANGELOG.md` section, through `release-notes.md`.
 
 ```markdown
-**Mage Tools Forever** is a growing set of quality-of-life tools for Mages: Conjure, Portals, the Polymorph bar, and Announce. Each tool has its own switch and settings page.
+**Mage Tools Forever** is a growing set of quality-of-life tools for Mages: Conjure, Portals, and Announce. Each tool has its own switch and settings page.
 
-Your shield display, buff reminders, and cooldown chimes now come from two of Dyre's AddOns that work for every class: **Dyre's Shields Up** draws the shield display, and **Dyre's Buff Reminders** shows Arcane Intellect, your armor, and Dampen or Amplify Magic, and plays your cooldown chimes. The CurseForge app installs both with Mage Tools Forever.
+Your shield display, buff reminders, cooldown chimes, and Polymorph bar now come from three of Dyre's AddOns that work for every class: **Dyre's Shields Up** draws the shield display, **Dyre's Buff Reminders** shows Arcane Intellect, your armor, and Dampen or Amplify Magic, and plays your cooldown chimes, and **Dyre's Debuff Tracker** draws the Polymorph bar and keeps the "! Polymorph" macro. The CurseForge app installs all three with Mage Tools Forever.
 
 ### Conjure
 - A movable bar with Water, Food, Food & Water, and Mana Gem buttons.
@@ -70,15 +70,8 @@ Your shield display, buff reminders, and cooldown chimes now come from two of Dy
 - A bar with a button for each teleport and portal you know, teleports first, with the runes you carry for each. The count is only information: MTF never stops a cast for lack of runes (legacy talents can make this work without runes).
 - Opening a portal tells your group where it goes. Teleporting yourself emotes it: *"Dyre summons powerful arcane energies to whisk themselves away to Ironforge."* (both on by default; see Announce).
 
-### Polymorph bar
-- Sheep with the **"! Polymorph"** macro: it focuses the mob under your mouse, marks it with the moon, and sheeps it, also in combat.
-- The bar shows your focus's name and the Polymorph's time left while you fight something else. If it breaks early, the bar empties so you see it.
-- Click the bar to sheep your focus again.
-- As you start casting in a group: *"Sheeping Defias Pillager; you spank it, you tank it."*
-- Bar size, Bar width, Bar height, Text size, and Opacity on the Polymorph settings page fit it to your screen; Reset size puts the width, height, and text size back.
-
 ### Announce
-- Every message MTF sends has its own switch and text you can edit: the water, food, and Food & Water trade whispers, the portal and Polymorph group messages, and the teleport emote. The defaults credit Mage Tools Forever (MTF).
+- Every message MTF sends has its own switch and text you can edit: the water, food, and Food & Water trade whispers, the portal group message, and the teleport emote. The defaults credit Mage Tools Forever (MTF).
 
 ### Shields, buff reminders, and cooldown chimes
 - **Dyre's Shields Up** draws the shield display; **Dyre's Buff Reminders** shows the buff reminders and plays the cooldown chimes. Both work for every class, and the CurseForge app installs them with Mage Tools Forever.

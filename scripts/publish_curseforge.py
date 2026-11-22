@@ -32,11 +32,13 @@ MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 RECEIPT_NAME = "curseforge-upload.json"
 # Dyre's Toolkit, Dyre's Shields Up, and Dyre's Buff Reminders are required on
 # CurseForge, so the app installs them with MTF (author, 1.2.0). The TOC needs
-# the toolkit and lists the other two as OptionalDeps, so MTF still loads without
-# them and says what to install.
+# the toolkit and lists the others as OptionalDeps, so MTF still loads without
+# them and says what to install. Dyre's Debuff Tracker (project 1777574) draws
+# the Polymorph bar since 1.6.0 (John, 2026-11-20: "Yes, move it").
 RELATIONS = {"projects": [{"slug": "dyres-toolkit", "type": "requiredDependency"},
                           {"slug": "dyres-shields-up", "type": "requiredDependency"},
-                          {"slug": "dyres-buff-reminders", "type": "requiredDependency"}]}
+                          {"slug": "dyres-buff-reminders", "type": "requiredDependency"},
+                          {"slug": "dyres-debuff-tracker", "type": "requiredDependency"}]}
 
 
 class PublishError(Exception):

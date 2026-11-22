@@ -162,6 +162,8 @@ class CurseForgeTests(unittest.TestCase):
                                                               {"slug": "dyres-shields-up",
                                                                "type": "requiredDependency"},
                                                               {"slug": "dyres-buff-reminders",
+                                                               "type": "requiredDependency"},
+                                                              {"slug": "dyres-debuff-tracker",
                                                                "type": "requiredDependency"}]}})
         self.assertEqual(parts[1].get_filename(), self.archive.name)
         self.assertEqual(parts[1].get_content_type(), "application/zip")
@@ -196,11 +198,13 @@ class CurseForgeTests(unittest.TestCase):
                     self.publish()
                 self.assert_no_network()
 
-    def test_toolkit_shields_up_and_buff_reminders_are_the_only_relations_and_required(self):
-        # Required, so the CurseForge app installs them with MTF (author, 1.2.0);
+    def test_toolkit_shields_up_buff_reminders_and_debuff_tracker_are_the_only_relations_and_required(self):
+        # Required, so the CurseForge app installs them with MTF (author, 1.2.0;
+        # Dyre's Debuff Tracker, which draws the Polymorph bar, since 1.6.0).
         # MTF plays no sound itself, so Dyre's Sounds comes with DSU and DBR.
         projects = publisher.RELATIONS["projects"]
-        self.assertEqual([p["slug"] for p in projects], ["dyres-toolkit", "dyres-shields-up", "dyres-buff-reminders"])
+        self.assertEqual([p["slug"] for p in projects],
+                         ["dyres-toolkit", "dyres-shields-up", "dyres-buff-reminders", "dyres-debuff-tracker"])
         self.assertTrue(all(p["type"] == "requiredDependency" for p in projects))
 
     def test_strict_tag(self):

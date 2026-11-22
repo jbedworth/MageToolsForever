@@ -18,7 +18,7 @@
 
 ```sh
 .tools/luarocks-3.13.0-win32/win32/lua5.1/bin/lua5.1.exe tests/run.lua
-.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Conjure.lua Portals.lua Polymorph.lua Options.lua tests/run.lua
+.tools/luarocks-3.13.0-win32/win32/lua5.1/bin/luac5.1.exe -p Commands.lua Core.lua Conjure.lua Portals.lua Options.lua tests/run.lua
 .tools/python-3.13.7/python.exe -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -91,117 +91,29 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       once, nothing when alone; a teleport emotes at the first key press or
       click after the loading screen; a spell learned in combat joins after combat;
       `/mtf debug_portals` lists the IDs (check Forever's IDs match Classic's).
-- [ ] After `/reload` out of combat, the "! Polymorph" macro (Macros,
-      character tab) has the line `/tm [@focus,harm,nodead] !5` after
-      the `/focus` line.
-- [ ] Every MTF macro (Water, Food, Food & Water, Mana Gem, Polymorph) reads
-      `/use`, not `/cast`; right-click of each conjure macro still conjures
-      the shown rank, and "! Polymorph" and the bar click still sheep (`/use`
-      casts a spell by name).
-- [ ] With BugGrabber (or the taint log) on: sheep in and out of combat with
-      the macro, the bar click, and the plain spell button. No "blocked from
-      an action" popup, no ADDON_ACTION_FORBIDDEN, and no taint line names
-      MageToolsForever.
-- [ ] The moon: "! Polymorph" puts it on your focus as you press it, in
-      and out of combat, and pressing it again keeps it. A bar click and the
-      plain Polymorph spell button give no moon. BugGrabber shows no
-      ADDON_ACTION_FORBIDDEN. `/mtf debug_polymorph` says
-      `moon=from the macro`.
-- [ ] The bar is your focus only (1.2.1): sheep with "! Polymorph", tab to
-      another mob: the bar keeps the timer. Focus another mob or clear your
-      focus: the bar goes. Cast the plain spell at your target with no focus:
-      no bar (`debug_polymorph` says `locked=false`).
-- [ ] "Mark the sheep with the moon" off: after combat (or at once out of
-      combat) "! Polymorph" has no `/tm` line, and no moon goes on; on again
-      puts the line back. The bar's click never has a `/tm` line.
-- [ ] Locked, with no focus: left- and right-click the empty spot where
-      the Polymorph bar sits; the clicks reach the world (target a mob or
-      turn the camera behind it). Focus a live enemy with no sheep: the bar
-      shows dimmed with its name, and a click sheeps it. Clear the focus:
-      the bar goes, and clicks reach the world again.
-- [ ] fixedClick (Toolkit, John 2026-11-15): after `/reload`, out of combat,
-      pull a mob, then sheep a mob for the first time in combat with
-      "! Polymorph". Let it break and click the bar, still in combat: it
-      sheeps your focus again. Kill the focus in combat: the bar and its
-      click area go at once.
-- [ ] Learned Polymorph only (John, 2026-11-15): sheep your focus with a
-      scroll form (Pig, Turtle): the bar shows it. Hover the bar: "Click:
-      Polymorph your focus again."; click it after the sheep breaks: it casts
-      the learned Polymorph, not the scroll form.
-- [ ] Polymorph: in a party, the group message as the cast starts; the moon
-      from the macro (also solo; in a raid as assistant); the bar shows the
-      name and drains, stays when you tab away, empties when it breaks, and
-      goes when the mob dies. Click the bar after the Polymorph breaks: it
-      re-sheeps your focus; your target does not change. `/mtf debug_polymorph` lists the IDs (check Forever's).
-- [ ] Classic Era (1.3.0), a Mage, "Load out of date AddOns" on: no Lua
-      error at login; `/mtf debug_polymorph` says `engine=lua`, and
-      `/mtf debug_focus` says `focusWorks=false`, `click=off`. "! Polymorph"
-      (character macros) has the chain lines, the moon line as
-      `/tm [@focus,harm,nodead][@mouseover,harm,nodead][harm,nodead] !5`. Mouse over a mob and press it:
-      the moon goes on that mob and it is sheeped, also in combat; the bar
-      shows its name, icon, and time left while it is your target or its
-      nameplate shows; tab away with its plate gone: its name and the time
-      left as grey text, counting down. With no mouseover, the macro sheeps
-      your target. Clicks on the bar pass through to the world. It empties
-      when the sheep breaks and goes when the mob dies. `/mtf unlock` and
-      `/dyre unlock` show the sample to drag.
-- [ ] Anniversary (or Forever after `/mtf reset_focus`): the first press of
-      "! Polymorph" that sets a focus makes `debug_focus` say
-      `focusWorks=true` (also in WTF's debug, one flag); out of combat the
-      macro becomes the Forever text and
-      the bar's click sheeps your focus again. After `/reload` and on another
-      character it stays so. On Forever, `engine=engine` and the bar is as
-      before.
-- [ ] Polymorph bar look (1.1.0): the bar looks as in 1.0.0 at the defaults;
-      the Polymorph page has Bar width, Bar height, Text size, and Opacity,
-      each with a gold mark at its default, and Reset size. Out of combat,
-      each slider changes the bar at once (the icon follows the height, the
-      mob name and the timer texts follow the text size), the bar stays
-      centered where it was, and a sheep up stays on the bar and its click.
-      Opacity fades the whole bar, its timer bar and texts too, never twice.
-      In combat: Opacity fades the frame at once and the timer bar follows
-      when combat ends; a size change waits for the end of combat, with no
-      "blocked" popup and no BugGrabber entry. Reset size restores the width,
-      the height, and the text size, and leaves Bar size and Opacity. Drag Text size and Bar
-      width back and forth many times: the texts stay in proportion and
-      never grow (1.1.0 test build: the label grew huge). Drag Bar size,
-      Bar width, and Bar height up and down: the bar grows and shrinks
-      around its middle and does not move (the test build moved it right and
-      up as it grew). The same for Bar size on the Conjure and Portals
-      pages, and for the portal bar when you learn a new teleport or portal.
-      Each Bar size slider has a gold mark at 100. No size slider's name
-      has "(%)": its value shows the % sign. Unlocked, the bar
-      drags and snaps with its new size. Settings survive `/reload`.
-- [ ] "! Polymorph" on a bar: hovering a mob and pressing it focuses and
-      sheeps it, with the moon; the bar keeps its timer while you fight
-      another mob; a bar click sheeps the focus again.
-- [ ] Focus lines (1.3.3, Toolkit 2.9.0): in combat, sheep a mob, kill it,
-      target another with no mouseover, and press "! Polymorph": it focuses,
-      marks, and sheeps the target, and the bar shows it. With a live sheep as
-      focus, pressing it with another target re-sheeps the focus. Shift-press
-      it with another target: that mob becomes the focus and is sheeped.
-      Right-click it on the action bar with another target: the same. With
-      the macro on a key, the key with Shift: the same.
-- [ ] Polymorph out of combat, click the bar to recast (it lands in combat),
-      then click again in combat: each click recasts. A size change in combat
-      applies after it.
-- [ ] The conjure, portal, and Polymorph bars snap to each other; a
-      Shift-dragged group keeps its spacing when it snaps.
+- [ ] Every MTF macro (Water, Food, Food & Water, Mana Gem) reads `/use`,
+      not `/cast`; right-click of each conjure macro still conjures the shown
+      rank (`/use` casts a spell by name).
+- [ ] Bar size on the Conjure and Portals pages: the bar grows and shrinks
+      around its middle and does not move, also for the portal bar when you
+      learn a new teleport or portal. Each Bar size slider has a gold mark at
+      100, and its name has no "(%)". Settings survive `/reload`.
+- [ ] The conjure and portal bars snap to each other; a Shift-dragged group
+      keeps its spacing when it snaps.
 - [ ] Announce page: switches and texts save, Enter keeps, Escape undoes,
       Defaults restores, the page scrolls, and each whisper uses its text.
 - [ ] Dyre's Toolkit 2.0 widgets (MTF 1.1.0): MTF is listed under Dyre's
       Toolkit in the AddOn list; MTF's page is under Options > AddOns >
       Dyre's AddOns, with Conjure, Portals, Polymorph, Shield, Buff
-      Reminders, Cooldown Chimes, and Announce under it; `/mtf` opens it
+      Reminders, Cooldown Chimes, and Announce under it (Polymorph is a link
+      page since 1.6.0); `/mtf` opens it
       (and says out of combat in combat). Every frame is where it was before
-      the update, at the same size (conjure, portal, and Polymorph bars). `/mtf unlock`, `/dyre
+      the update, at the same size (conjure and portal bars). `/mtf unlock`, `/dyre
       unlock`, the minimap button, and the toolkit's "Unlock frames" switch
       outline MTF's frames and the other Dyre's AddOns' with one "Dyre:"
       line and no "MTF:" line, each outline with its name in the hint; the
       toolkit's grid shows. The conjure and portal bars drag from any of
-      their buttons; their buttons still click while locked. The Polymorph
-      bar drags while unlocked and lets clicks through while locked with no
-      sheep. A dropped MTF bar snaps beside another Dyre's AddOn's frame; with "Snap
+      their buttons; their buttons still click while locked. A dropped MTF bar snaps beside another Dyre's AddOn's frame; with "Snap
       to the grid" on, a bar dropped alone centers on a grid point;
       Shift-drag moves a snapped group. In combat, unlock and drag: secure
       frames wait for the end of combat, with no "blocked" popup and no
@@ -210,11 +122,21 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] With Dyre's Toolkit 2.4 or older, or without it: MTF says once at
       login that it needs Dyre's Toolkit 2.5 or later from CurseForge, and
       stays off with no errors.
-- [ ] Toolkit engine (1.3.0): a Mage that had MTF 1.2.3 on Forever starts
-      with `debug_focus` `focusWorks=true` (carried over), the same
-      "! Polymorph" text, and the bar and click as before. With Dyre's
-      Debuff Tracker also on, `debug_polymorph` says `owner=MageToolsForever`,
-      one Polymorph bar shows, and one group message goes out per cast.
+- [ ] Polymorph moved to Dyre's Debuff Tracker (1.6.0): on a Mage that had
+      the Polymorph bar on, with Dyre's Debuff Tracker installed, the first
+      login shows one line about it, Dyre's Debuff Tracker's "Copied your
+      Polymorph bar settings from Mage Tools Forever ...", and no MTF line.
+      Dyre's Debuff Tracker shows one Polymorph bar with the MTF place, sizes,
+      opacity, and moon setting, keeps "! Polymorph" in the same action bar
+      slot, and sends one group message per cast with the MTF text.
+      MTF draws no Polymorph bar and writes no "! Polymorph". `/mtf
+      debug_polymorph`, `/mtf debug_focus`, and `/mtf reset_focus` show the
+      usage. MTF's Polymorph page has one button, "Open Debuff Tracker
+      settings", that opens Dyre's Debuff Tracker's page (not in combat).
+- [ ] Without Dyre's Debuff Tracker: one line at login, "Install Dyre's
+      Debuff Tracker from CurseForge for the Polymorph bar.", and no other
+      MTF line about the Polymorph bar; the Polymorph
+      page's button is greyed and says the same; Conjure and Portals work.
 - [ ] Dyre's Shields Up and Dyre's Buff Reminders (MTF 1.2.0): with both
       enabled, no "Install" or "Enable" line at login. A Mage with MTF 1.1
       shield, reminder, and chime settings gets them in Dyre's Shields Up and
@@ -230,18 +152,17 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       show the usage.
 - [ ] With Dyre's Shields Up disabled in the AddOn list: one line at login,
       "Enable Dyre's Shields Up in the AddOn list for the shield display.";
-      the Shield page's button is greyed and says the same; Conjure,
-      Portals, and Polymorph work. With it uninstalled, the line says
+      the Shield page's button is greyed and says the same; Conjure and
+      Portals work. With it uninstalled, the line says
       "Install Dyre's Shields Up from CurseForge for the shield display."
       The same for Dyre's Buff Reminders ("buff reminders and cooldown
       chimes").
 - [ ] Settings survive `/reload` and stay separate on a second Mage.
 - [ ] Profile (Toolkit 2.10.0 or newer): on a second Mage, change the share
-      size, a bar's place and size, the Polymorph bar's opacity, the moon
-      switch, and a message; log out. On the first Mage, Dyre's AddOns >
-      Profile > Copy settings from the second Mage > Copy: the bars move and
-      resize at once, "! Polymorph" loses or gains its `/tm` line, the
-      Announce page shows the new text, and no reload is asked for. The
+      size, a bar's place and size, and a message; log out. On the first
+      Mage, Dyre's AddOns > Profile > Copy settings from the second Mage >
+      Copy: the bars move and resize at once, the Announce page shows the new
+      text, and no reload is asked for. The
       first Mage's MTF macros stay. In combat, Copy is refused. Export
       profile, change a setting, Import profile with that line: the setting
       comes back. "Defaults" puts every MTF setting back to its default.

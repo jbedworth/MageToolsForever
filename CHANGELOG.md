@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.6.0
+
+### Other changes
+
+- What moved: the Polymorph bar is now in Dyre's Debuff Tracker, so its settings and the bar live in one AddOn. Dyre's Debuff Tracker draws the bar, keeps "! Polymorph", and sends the Polymorph group message; it takes over your MTF Polymorph settings once and says so in chat. The CurseForge app installs Dyre's Debuff Tracker with MTF. MTF's Polymorph settings page now has one button that opens its settings, and `/mtf debug_polymorph`, `/mtf debug_focus`, and `/mtf reset_focus` are gone (use `/ddt reset_focus`).
+
 ## 1.5.1
 
 ### Other changes

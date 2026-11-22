@@ -14,7 +14,8 @@ Tools Forever, and they take over your MTF settings once. MTF's Shield, Buff
 Reminders, and Cooldown Chimes settings pages each have a button that opens
 their settings. Without one of them, MTF works and says once in chat what to
 install (or enable). Proc overlays, such as Missile Barrage and Fingers of
-Frost, are in Dyre's Shields Up.
+Frost, are in Dyre's Shields Up, and the Polymorph bar is in Dyre's Debuff
+Tracker (see [Polymorph bar](#polymorph-bar)).
 
 **Needs Dyre's Toolkit 2.5.** Dyre's Toolkit is the home of all of Dyre's
 AddOns: one layout mode for every Dyre's AddOn's frames, a grid, and one
@@ -103,70 +104,27 @@ page.
 
 ## Polymorph bar
 
-A bar with your Polymorph's time left and the sheeped mob's name, in the same
-style as Warlock Tools Forever's DoT bars. It shows your **focus** while you
-have it sheeped, so it keeps the timer when you change target, and if the
-Polymorph breaks early, the bar empties so you see it. Sheep with the
-**"! Polymorph"** macro: it focuses the mob, marks it with the moon, and
-sheeps it. On WoW Classic Era and Anniversary the bar reads your Polymorph
-directly; it looks the same. Classic Era has no focus target: there
-"! Polymorph" marks and sheeps the mob under your mouse, else your target,
-the bar shows its time through your target or its nameplate (or its name and
-the time left as text), and the bar takes no click; sheep again with the
-macro. Dyre's Toolkit finds out by itself whether focus works on your
-client, once for every Dyre's AddOn.
-
-- As you start casting in a group, MTF tells your party or raid: "Sheeping
-  Defias Pillager; you spank it, you tank it."
-- The moon marker: **"! Polymorph"** marks your focus as you press it, also
-  in combat, and a second press never toggles the moon off. A click on the
-  bar and the plain spell button do not mark: the game does not let AddOns
-  set markers. (In a raid, only the leader and assistants can mark.)
-- A Polymorph at a mob that is not your focus (the plain spell button on
-  your target, for example) shows no bar.
-- In dungeons and raids the game hides mob IDs, so the bar finds your sheep
-  by its enemy nameplate as you cast (with Dyre's Toolkit 2.6 or later). Keep
-  enemy nameplates on there; after the cast, your focus keeps the bar.
-- With no focus, the bar lets your clicks through to the world. With a live
-  enemy focus and no sheep, the bar shows dimmed with your focus's name: a
-  click there sheeps your focus.
-- **"! Polymorph"** in your character macros (once you know Polymorph) focuses
-  the hostile mob under your mouse, else your target, and sheeps your focus.
-  With no mob under the mouse, a live enemy focus stays, also in combat; a
-  dead focus is cleared, and Shift-click or right-click clears it so you can
-  take a new mob (on a key, Shift). The bar follows your focus, so it keeps the
-  timer while you fight something else.
-- **Click the bar** to sheep your focus again, also when your first sheep
-  was cast in combat. The click always casts your learned Polymorph, never a
-  form from a scroll (Pig, Turtle): those are limited, and a recast can
-  fail. The bar still shows a sheep from a scroll. The click does not mark
-  or change your target.
-- The marker switch and **Bar size** are on the Polymorph settings page. The
-  switch takes the `/tm` line out of "! Polymorph" and the bar's click (or
-  puts it back). If you mark with your own `/tm` macro, use `!` the same way
-  (`!5`), or turn MTF's marker off.
-- Make the bar your own on the Polymorph settings page: **Bar width**
-  (120-400, default 200), **Bar height** (10-40, default 16; the icon
-  follows), **Text size** (50-200%), and **Opacity** (10-100%). A gold mark
-  shows each default, and **Reset size** puts the width, height, and text
-  size back. **Bar size** scales the whole bar on top. Opacity fades
-  the bar at once, also in combat; a size change in combat applies when
-  combat ends.
+**The Polymorph bar is in Dyre's Debuff Tracker** since MTF 1.6.0, so its
+settings and the bar live in one AddOn. Dyre's Debuff Tracker draws the bar,
+keeps the **"! Polymorph"** macro, and tells your group as you sheep. It takes
+over your MTF Polymorph settings once (MTF keeps them as they were), and says
+so once in chat. The CurseForge app installs Dyre's Debuff Tracker with
+Mage Tools Forever. MTF's Polymorph settings page has a button that opens its
+settings; without Dyre's Debuff Tracker, MTF says once in chat what to install.
 
 ## Announce
 
 The Announce settings page holds every message MTF sends, each with its own
 switch and an editable text: the whispers for Water, Food, and Food & Water
-trades, the group messages for a portal and a Polymorph, and the teleport
-emote. `%C` is the
+trades, the group message for a portal, and the teleport
+emote. The Polymorph group message is Dyre's Debuff Tracker's now. `%C` is the
 count, `%I` the item, `%T` the player's full name, `%D` the portal's or
 teleport's city, and, in the emote, `%T` is you and `%Z` your zone when it is sent. Press Enter to keep
 an edit or Escape to undo it; **Defaults** restores the page.
 
 ## Moving frames
 
-Dyre's Toolkit moves every MTF frame (the conjure, portal, and Polymorph
-bars), together with the frames of your other Dyre's AddOns. Type `/mtf unlock` or `/dyre unlock`, tick
+Dyre's Toolkit moves every MTF frame (the conjure and portal bars), together with the frames of your other Dyre's AddOns. Type `/mtf unlock` or `/dyre unlock`, tick
 **Unlock frames** on the Dyre's AddOns settings page, or click the minimap
 button: every frame gets a gold outline, and you can drag it; drag the
 conjure and portal bars from any of their buttons. Frames are magnetic: drop one near another and it
@@ -197,11 +155,8 @@ macros.
 | `/mtf unlock` | Unlock every MTF frame, so you can drag them |
 | `/mtf lock` | Lock them again where they are |
 | `/mtf reset` | Move the MTF frames back to their default places |
-| `/mtf reset_focus` | Check again whether focus works on this client, for every Dyre's AddOn (see the Polymorph bar) |
 | `/mtf debug_conjure` | Diagnostics: each conjure rank as the client knows it, macros, recent trades |
 | `/mtf debug_portals` | Diagnostics: each teleport and portal as the client knows it, and your runes |
-| `/mtf debug_polymorph` | Diagnostics: the Polymorph IDs, the sheeped mob, the click, and the moon setting |
-| `/mtf debug_focus` | Diagnostics: whether a focus has been seen to work on this client |
 | `/mtf debug_click` | Diagnostics: what each conjure button does for each mouse button |
 
 `/magetools` works the same, in case another AddOn uses `/mtf`.
@@ -214,7 +169,7 @@ with one chat message. Spell and item IDs are Classic's; `/mtf debug_conjure`
 shows what your client knows.
 
 WowUp users (2.24.0 or later): install from the repository URL, and Dyre's
-Toolkit, Dyre's Shields Up, and Dyre's Buff Reminders the same way; GitHub releases carry
+Toolkit, Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker the same way; GitHub releases carry
 the Forever metadata WowUp needs.
 
 ## Support
