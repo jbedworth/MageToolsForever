@@ -1057,6 +1057,14 @@ local function fixture(options)
         if options.noProfiles then
             env.DyresToolkit.RegisterProfilePart = nil
         end
+        -- options.welcome: "none" is a Toolkit older than 2.14.0 (no
+        -- ShowWelcome); true or false is what ShowWelcome returns.
+        if options.welcome == "none" then
+            env.DyresToolkit.ShowWelcome = nil
+        elseif options.welcome ~= nil then
+            local shown = options.welcome
+            env.DyresToolkit.ShowWelcome = function() return shown end
+        end
         if options.oldToolkit then
             local require = env.DyresToolkit.RequireContract
             env.DyresToolkit.RequireContract = function(n)
@@ -2216,6 +2224,26 @@ test("MTF 1.2.3's own focus flag is carried to the Toolkit once, then cleared", 
     local damaged = mage({classic = true, accountDB = {focusWorks = "yes"}})
     equal(damaged.env.DyresToolkitDB.focusWorks, nil)
     equal(damaged.env.MageToolsForeverAccountDB.focusWorks, nil)
+end)
+
+test("the login banner follows the Toolkit's welcome switch", function()
+    -- John, 2026-11-23: "toggle off our welcome messages unless there is an error/problem".
+    local banner = " by Dyre"
+    for _, options in ipairs({{noToolkit = true}, {welcome = "none"}, {welcome = true}}) do
+        local state = mage(options)
+        equal(countMessages(state, banner), 1, "banner shown")
+    end
+    local shown = mage({welcome = true})
+    equal(countMessages(shown, "Type /mtf to open the settings."), 1, "ready hint shown")
+    local hidden = mage({welcome = false})
+    equal(hidden.mtf.available, true)
+    equal(countMessages(hidden, banner), 0, "no banner")
+    equal(countMessages(hidden, "Type /mtf to open the settings."), 0, "no ready hint")
+    -- A problem still shows with the switch off.
+    local wrong = mage({welcome = false, remove = {"InitiateTrade"}})
+    equal(wrong.mtf.available, false)
+    equal(countMessages(wrong, banner), 0, "no banner")
+    equal(countMessages(wrong, "This client lacks InitiateTrade"), 1, "the problem shows")
 end)
 
 test("without Dyre's Toolkit 2.5 MTF stays off and says once what to install", function()
