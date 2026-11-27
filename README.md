@@ -10,12 +10,14 @@ and Dyre's Buff Reminders.** Since 1.2.0, MTF no longer has its own copies:
 **Dyre's Shields Up** draws the shield display, and **Dyre's Buff Reminders**
 shows Arcane Intellect, your armor, and Dampen or Amplify Magic, and plays the
 cooldown chimes, for every class. The CurseForge app installs both with Mage
-Tools Forever, and they take over your MTF settings once. MTF's Shield, Buff
-Reminders, and Cooldown Chimes settings pages each have a button that opens
-their settings. Without one of them, MTF works and says once in chat what to
-install (or enable). Proc overlays, such as Missile Barrage and Fingers of
-Frost, are in Dyre's Shields Up, and the Polymorph bar is in Dyre's Debuff
-Tracker (see [Polymorph bar](#polymorph-bar)).
+Tools Forever, and they take over your MTF settings once. MTF's Shield display,
+Reminders, Chimes, Procs, and Crowd Control settings pages show their settings
+(with Dyre's Toolkit 2.17.0 or later), or a button that opens them. Without
+one of them, MTF works and says once in chat what to install (or enable).
+Proc arcs, such as Missile Barrage and Fingers of Frost, are in Dyre's Buff
+Reminders, Winter's Chill is in Dyre's Debuff Tracker (on MTF's Procs page),
+and the Polymorph bar is in Dyre's Debuff Tracker (see
+[Polymorph bar](#polymorph-bar)).
 
 **Needs Dyre's Toolkit 2.5.** Dyre's Toolkit is the home of all of Dyre's
 AddOns: one layout mode for every Dyre's AddOn's frames, a grid, and one
@@ -109,8 +111,9 @@ settings and the bar live in one AddOn. Dyre's Debuff Tracker draws the bar,
 keeps the **"! Polymorph"** macro, and tells your group as you sheep. It takes
 over your MTF Polymorph settings once (MTF keeps them as they were), and says
 so once in chat. The CurseForge app installs Dyre's Debuff Tracker with
-Mage Tools Forever. MTF's Polymorph settings page has a button that opens its
-settings; without Dyre's Debuff Tracker, MTF says once in chat what to install.
+Mage Tools Forever. MTF's Crowd Control settings page shows its Polymorph
+settings, or a button that opens them; without Dyre's Debuff Tracker, MTF
+says once in chat what to install.
 
 ## Announce
 

@@ -162,7 +162,8 @@ end
 -- "Yes, move it"; a feature's settings and effect live in one AddOn).
 MTF.COMPANIONS = {
     {addon = "DyresShieldsUp", title = "Dyre's Shields Up", what = "the shield display"},
-    {addon = "DyresBuffReminders", title = "Dyre's Buff Reminders", what = "buff reminders and cooldown chimes"},
+    {addon = "DyresBuffReminders", title = "Dyre's Buff Reminders",
+        what = "buff reminders, cooldown chimes, and proc arcs"},
     {addon = "DyresDebuffTracker", title = "Dyre's Debuff Tracker", what = "the Polymorph bar"},
 }
 -- MTF says nothing of its own about the move (lead, 2026-11-20): with Dyre's
@@ -373,8 +374,8 @@ local TOOLKIT_FUNCTIONS = {
     "RegisterAddOn", "RegisterSettingsCategory", "IsLocked", "SetLocked", "OpenSettings", "CreateWidget",
     "AddWidgetSettings", "ResetWidgets", "AddSettingsLink", "NoteFocusWorks",
 }
-local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit 2.5 or later: install or update it from "
-    .. "CurseForge. MTF stays off until then."
+local TOOLKIT_MISSING = "Mage Tools Forever needs Dyre's Toolkit: install or update it from CurseForge. "
+    .. "MTF stays off until then."
 
 -- Dyre's Toolkit with the contract and functions MTF uses, else nil.
 function MTF.Toolkit()
@@ -534,7 +535,8 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     if available then
         available, message = MTF.CheckConjureCapabilities()
         if not available then
-            message = "This client lacks " .. message .. ", so Mage Tools Forever stays off."
+            message = "Mage Tools Forever does not work with this game client (it lacks " .. message
+                .. "), so MTF stays off."
         end
     end
     MTF.available = available

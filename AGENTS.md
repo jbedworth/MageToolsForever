@@ -28,11 +28,66 @@ feature set; do not add speculative features or frameworks without agreement.
   "Enable <AddOn> in the AddOn list for <what>." when `C_AddOns.GetAddOnInfo`
   says it is installed (its reason is not "MISSING") (`MTF.COMPANIONS`,
   `MTF.CompanionMessage`). Only CurseForge is named.
-- Settings are linked, not mirrored: the Shield, Buff Reminders, and Cooldown
-  Chimes pages hold only the toolkit's `AddSettingsLink` button ("Open Shield
-  settings", "Open Buff Reminders settings"), which opens that AddOn's own
-  page, is greyed while it has not joined the toolkit, says the same
-  install or enable line when clicked then, and never opens in combat.
+- Settings pass through (John, 2026-11-26: MTF "should surface every setting
+  in the wrapped addon's settings, and just pass-through the setting to the
+  wrapped addon"; it replaces the 2026-10-22 "linked, not mirrored" rule).
+  Options.lua `AddCompanionPage`: with Dyre's Toolkit 2.17.0's
+  `AddSettingsSection` (feature test), each companion page asks for the
+  owner's section, `{addon, key, host = "MageToolsForever", link}`: Shield
+  (DyresShieldsUp, "shield"), Reminders (DyresBuffReminders,
+  "reminders"), Chimes (DyresBuffReminders, "chimes"), Procs
+  (DyresBuffReminders, "procs"; John, 2026-11-27: "mage proc arcs from DBR
+  are not in MTF, we should add a Procs panel"; no filter, DBR shows the
+  class's procs: Missile Barrage, Fingers of Frost, Clearcasting; its section
+  needs Toolkit `SETTINGS_SECTIONS_VERSION` 2, else the link; after it, on
+  the same page, DyresDebuffTracker "cues", Winter's Chill), Polymorph
+  (DyresDebuffTracker, "control"). One name per section (John, 2026-11-27:
+  "let's have the same name used consistently everywhere"): each companion
+  page and its link take the owner's title (`SettingsSectionTitle`), which is
+  also the owner's own heading and its switch's label on MTF's top page; a
+  page with two sections takes the first's. While the owner is missing, the
+  same words: Shield display, Reminders, Chimes, Procs, Debuff Cues, Crowd Control
+  (the Polymorph page before; DDT names its sections so).
+  MTF's own pages keep their names (Conjure, Portals, Announce). The owner's rows read and write its own
+  live settings; MTF saves none of them. Without the owner's section (not
+  loaded, older, or its build fails), the Toolkit draws `link` instead; with
+  an older Toolkit, MTF calls `AddSettingsLink` with the same link as before.
+  The link button ("Open Shield settings", "Open Buff Reminders settings",
+  "Open Debuff Tracker settings") opens that AddOn's own page, is greyed
+  while it has not joined the toolkit, says the same install or enable line
+  when clicked then, and never opens in combat. The minimum Toolkit stays 2.5.
+- Primer (John, 2026-11-27: "add a primer-text to tell people what they get
+  if they install it"): each page passes `primer`, `MTF.COMPANION_PRIMERS[key]`,
+  what that AddOn adds for a Mage, ending "Install <AddOn> from CurseForge."
+  (at most 400 characters, the Toolkit's `SETTINGS_PRIMER_MAX`; a test checks).
+  The Toolkit shows it in a box over the greyed link only while the AddOn is
+  not loaded. Passed only when the Toolkit has `AddSettingsPrimer`.
+- Top switches and greying (John, 2026-11-27: "when the top-level is off, the
+  settings that are controlling a disabled feature should be disabled too.
+  Also, the top-level disable for each section should be on the top-level MTF
+  panel."). With Toolkit `SETTINGS_SECTIONS_VERSION` 3 or later, MTF's top
+  page has, after "Conjure bar" and "Portal bar", each companion's top switch
+  (`part = "master"`, `COMPANION_MASTERS`, in the sub-page order: shield,
+  reminders, chimes, procs, control), with the owner's labels; with the owner
+  missing the Toolkit adds none. Each sub-page then asks for `part = "rest"`
+  (greyed by the owner while its switch is off), with the link and primer as
+  before. Below version 3, no `part`: each page has the whole section.
+  MTF's own rows: on the Conjure page, "Share stack size", "Trade only with
+  Shift-click", and the bar's size rows are greyed while "Conjure bar" is
+  off; "Keep conjure macros" is not, because the macros work without the bar
+  (`UpdateMacros` does not read `conjure.enabled`). On the Portals page, the
+  size rows are greyed while "Portal bar" is off. Size rows use
+  `AddWidgetSettings` `opts.modify` (Toolkit 2.17.0; an older one ignores
+  it). The Announce page (a canvas page) is not greyed.
+- Tooltips (John, 2026-11-27: "every one of the tooltips seems to start with
+  a good one sentence description, but then has nonsensical follow-on text
+  that is clearly not meant for users to see"): one plain sentence that says
+  what the setting does or what the player sees. No how-to tips,
+  cross-references to other pages, combat timing, defaults, or history. A
+  short second sentence only when the player loses something without it
+  ("Keep conjure macros": "Turning this off deletes them."). The conjure
+  buttons' tooltips list only what each click does (no macro hint). A test
+  checks every tooltip MTF writes.
 - The saved keys `db.shield`, `db.reminders`, and `db.chimes` (MTF 1.1 and
   older) stay exactly as they were, also through unlock, lock, and reset (a
   test checks): DSU copies the shield settings and DBR the reminder switches,
@@ -163,7 +218,7 @@ feature set; do not add speculative features or frameworks without agreement.
   fallback).
 - Core's `MTF.Toolkit()` is `DyresToolkit.RequireContract(2)` with the
   functions MTF uses checked (the contract stays 2). Without it (no toolkit, or an older one) MTF stays off
-  at login with one line, "needs Dyre's Toolkit 2.5 or later", naming only
+  at login with one line, "needs Dyre's Toolkit: install or update it", naming only
   CurseForge (`TOOLKIT_MISSING`). After the modules start, `RegisterAddOn` with
   `setLocked` (MTF refreshes its samples and visibility, quietly; the
   toolkit says one line for all and draws the outlines) and `openSettings`.
@@ -271,8 +326,8 @@ feature set; do not add speculative features or frameworks without agreement.
 - Dyre's Debuff Tracker is a companion (`MTF.COMPANIONS`, `MTF.DEBUFF_TRACKER`):
   TOC OptionalDeps, the CurseForge required relation `dyres-debuff-tracker`
   (project 1777574), the once-per-login install or enable line, and the
-  Polymorph settings page, one `AddSettingsLink` row ("Open Debuff Tracker
-  settings").
+  Crowd Control settings page (DDT's "control" section, or its link, "Open Debuff
+  Tracker settings"; see the settings rule above).
 - MTF 1.2.3's `MageToolsForeverAccountDB.focusWorks` is still carried to the
   Toolkit once at login (`NoteFocusWorks`) and then cleared.
 

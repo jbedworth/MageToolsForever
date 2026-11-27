@@ -104,9 +104,9 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       Defaults restores, the page scrolls, and each whisper uses its text.
 - [ ] Dyre's Toolkit 2.0 widgets (MTF 1.1.0): MTF is listed under Dyre's
       Toolkit in the AddOn list; MTF's page is under Options > AddOns >
-      Dyre's AddOns, with Conjure, Portals, Polymorph, Shield, Buff
-      Reminders, Cooldown Chimes, and Announce under it (Polymorph is a link
-      page since 1.6.0); `/mtf` opens it
+      Dyre's AddOns, with Conjure, Portals, Shield display, Reminders, Chimes,
+      Procs, Crowd Control, and Announce under it (the companion pages take
+      their AddOn's name for the section); `/mtf` opens it
       (and says out of combat in combat). Every frame is where it was before
       the update, at the same size (conjure and portal bars). `/mtf unlock`, `/dyre
       unlock`, the minimap button, and the toolkit's "Unlock frames" switch
@@ -120,7 +120,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       BugGrabber entry. `/mtf reset` puts every MTF frame back (after
       combat if needed). Positions and sizes survive `/reload`.
 - [ ] With Dyre's Toolkit 2.4 or older, or without it: MTF says once at
-      login that it needs Dyre's Toolkit 2.5 or later from CurseForge, and
+      login that it needs Dyre's Toolkit from CurseForge, and
       stays off with no errors.
 - [ ] Polymorph moved to Dyre's Debuff Tracker (1.6.0): on a Mage that had
       the Polymorph bar on, with Dyre's Debuff Tracker installed, the first
@@ -131,7 +131,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       slot, and sends one group message per cast with the MTF text.
       MTF draws no Polymorph bar and writes no "! Polymorph". `/mtf
       debug_polymorph`, `/mtf debug_focus`, and `/mtf reset_focus` show the
-      usage. MTF's Polymorph page has one button, "Open Debuff Tracker
+      usage. MTF's Crowd Control page (without DDT's section) has one button, "Open Debuff Tracker
       settings", that opens Dyre's Debuff Tracker's page (not in combat).
 - [ ] Without Dyre's Debuff Tracker: one line at login, "Install Dyre's
       Debuff Tracker from CurseForge for the Polymorph bar.", and no other
@@ -145,18 +145,42 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       Dampen; every chime), and they do not change on a later `/reload`.
       MTF draws no shield ring, shows no reminder icons, and plays no chime
       of its own; you see one shield ring and hear each chime once.
-- [ ] MTF's Shield, Buff Reminders, and Cooldown Chimes pages each have one
-      button ("Open Shield settings", "Open Buff Reminders settings") that
-      opens that AddOn's own page; in combat it says the settings open out
-      of combat. `/mtf debug_shield`, `debug_chimes`, and `debug_reminders`
-      show the usage.
+- [ ] With Dyre's Toolkit older than 2.17.0, or a companion that offers no
+      settings section: MTF's Shield display, Reminders, and Chimes pages
+      each have one button ("Open Shield settings", "Open Buff Reminders
+      settings") that opens that AddOn's own page; in combat it says the
+      settings open out of combat. `/mtf debug_shield`, `debug_chimes`, and
+      `debug_reminders` show the usage.
+- [ ] Settings sections (Toolkit 2.17.0, with companions that offer them):
+      the Shield display, Reminders, Chimes, Procs, and Crowd Control pages show that
+      AddOn's own settings, not the button; the Procs page shows Dyre's Buff
+      Reminders' procs, then Dyre's Debuff Tracker's Debuff Cues. Each
+      page's name is the same as the heading on that AddOn's own page and as
+      its switch on MTF's main page. Change one on MTF's page:
+      the same setting on the AddOn's own page shows the change, and the
+      AddOn acts on it at once; change it back there, and MTF's page shows
+      that. No Lua error, and no "previously registered" error.
+- [ ] Top switches (Toolkit 2.17.0, with companions that offer them): MTF's
+      main page shows, after Conjure bar and Portal bar, the Shield display,
+      Reminders, Chimes, Procs, Debuff Cues, and Crowd Control switches, each
+      with its page's name; turn one off, and its page's settings are greyed
+      and the feature stops. Without a companion, no switch for it.
+- [ ] Greying: turn Conjure bar off: on the Conjure page, Share stack size,
+      Trade only with Shift-click, Bar size, and Reset size are greyed; Keep
+      conjure macros is not, and the macros still work. Turn Portal bar off:
+      the Portals page's rows are greyed. Turn them on: usable again.
+- [ ] Primer (Toolkit 2.17.0): with Dyre's Shields Up, Dyre's Buff Reminders,
+      and Dyre's Debuff Tracker disabled, the Shield display, Reminders, Chimes,
+      Procs, and Crowd Control pages each show a box over the greyed
+      button that says what the AddOn adds and "Install ... from
+      CurseForge."; the whole text shows. With each AddOn enabled, no box.
 - [ ] With Dyre's Shields Up disabled in the AddOn list: one line at login,
       "Enable Dyre's Shields Up in the AddOn list for the shield display.";
       the Shield page's button is greyed and says the same; Conjure and
       Portals work. With it uninstalled, the line says
       "Install Dyre's Shields Up from CurseForge for the shield display."
-      The same for Dyre's Buff Reminders ("buff reminders and cooldown
-      chimes").
+      The same for Dyre's Buff Reminders ("buff reminders, cooldown
+      chimes, and proc arcs").
 - [ ] Settings survive `/reload` and stay separate on a second Mage.
 - [ ] Profile (Toolkit 2.10.0 or newer): on a second Mage, change the share
       size, a bar's place and size, and a message; log out. On the first

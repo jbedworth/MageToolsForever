@@ -732,6 +732,10 @@ local function fixture(options)
                 function layout:AddInitializer(heading) page.headings[#page.headings + 1] = heading end
                 return page, layout
             end,
+            -- A template row (the Toolkit's primer box): kept with its data.
+            CreateElementInitializer = function(template, data)
+                return {template = template, data = data}
+            end,
             RegisterCanvasLayoutSubcategory = function(parent, frame, name)
                 local page = newCategory(name, parent)
                 page.frame = frame
@@ -1057,6 +1061,44 @@ local function fixture(options)
         if options.noProfiles then
             env.DyresToolkit.RegisterProfilePart = nil
         end
+        -- options.sections: "none" is a Toolkit older than 2.17.0 (no
+        -- AddSettingsSection); "rows" or "link" is a mock that records each
+        -- call in state.sectionCalls and gives that outcome ("link" draws the
+        -- link row, as the Toolkit's fallback does). A "master" call (only the
+        -- section's top switch) goes in state.masterCalls, the others in
+        -- state.pageCalls; with "link", a master gives nil and draws nothing,
+        -- as the Toolkit does. options.sectionsVersion sets
+        -- SETTINGS_SECTIONS_VERSION (2 by default: no master and rest parts).
+        if options.sections == "none" then
+            env.DyresToolkit.AddSettingsSection = nil
+        elseif options.sections then
+            state.sectionCalls, state.masterCalls, state.pageCalls = {}, {}, {}
+            local outcome, toolkit = options.sections, env.DyresToolkit
+            toolkit.SETTINGS_SECTIONS_VERSION = options.sectionsVersion or 2
+            -- options.sectionTitles: {addon = {key = title}}, the owners' names.
+            toolkit.SettingsSectionTitle = function(addon, key)
+                return options.sectionTitles and options.sectionTitles[addon] and options.sectionTitles[addon][key]
+            end
+            -- The primer box (2.17.0); options.noPrimer is a build without it.
+            if options.noPrimer then
+                toolkit.AddSettingsPrimer = nil
+            elseif type(toolkit.AddSettingsPrimer) ~= "function" then
+                toolkit.AddSettingsPrimer = function() return true end
+            end
+            toolkit.AddSettingsSection = function(category, layout, opts)
+                local call = {category = category, layout = layout, opts = opts}
+                state.sectionCalls[#state.sectionCalls + 1] = call
+                if opts.part == "master" then
+                    state.masterCalls[#state.masterCalls + 1] = call
+                    return outcome == "rows" and "rows" or nil
+                end
+                state.pageCalls[#state.pageCalls + 1] = call
+                if outcome == "link" then
+                    toolkit.AddSettingsLink(category, layout, opts.link)
+                end
+                return outcome
+            end
+        end
         -- options.welcome: "none" is a Toolkit older than 2.14.0 (no
         -- ShowWelcome); true or false is what ShowWelcome returns.
         if options.welcome == "none" then
@@ -1241,7 +1283,7 @@ end)
 test("a missing client API disables MTF with one message naming it", function()
     local state = fixture({remove = {"InitiateTrade"}})
     equal(state.mtf.available, false)
-    contains(state.last(), "This client lacks InitiateTrade")
+    contains(state.last(), "it lacks InitiateTrade")
     equal(state.categories["Mage Tools Forever"], nil, "no settings page")
 end)
 test("a mixed install of old and new files is reported at login", function()
@@ -2243,16 +2285,16 @@ test("the login banner follows the Toolkit's welcome switch", function()
     local wrong = mage({welcome = false, remove = {"InitiateTrade"}})
     equal(wrong.mtf.available, false)
     equal(countMessages(wrong, banner), 0, "no banner")
-    equal(countMessages(wrong, "This client lacks InitiateTrade"), 1, "the problem shows")
+    equal(countMessages(wrong, "it lacks InitiateTrade"), 1, "the problem shows")
 end)
 
 test("without Dyre's Toolkit 2.5 MTF stays off and says once what to install", function()
     for _, options in ipairs({{noToolkit = true}, {oldToolkit = true}}) do
         local state = mage(options)
         equal(state.mtf.available, false)
-        equal(countMessages(state, "needs Dyre's Toolkit 2.5"), 1, "said once")
+        equal(countMessages(state, "needs Dyre's Toolkit:"), 1, "said once")
         for _, message in ipairs(state.messages) do
-            if message:find("Dyre's Toolkit 2.5", 1, true) then
+            if message:find("needs Dyre's Toolkit", 1, true) then
                 contains(message, "MTF: ")
                 contains(message, "CurseForge")
                 equal(message:lower():find("github", 1, true), nil, "CurseForge only")
@@ -2416,24 +2458,25 @@ test("the settings have a main page and a page per module", function()
     equal(main.parent, state.categories["Dyre's AddOns"], "under Dyre's Toolkit's home")
     equal(state.registered, state.categories["Dyre's AddOns"])
     equal(main.initializers[1].setting.variable, "MTF_CONJURE_ENABLED")
-    -- A player turned the whole bar off to stop trading (2026-11-19): the
-    -- switch's tooltip names the setting that stops it.
-    contains(main.initializers[1].tooltip, "\"Trade only with Shift-click\" on the Conjure page")
+    -- One plain sentence (John, 2026-11-27: the follow-on text was "clearly not meant for users").
+    equal(main.initializers[1].tooltip,
+        "A bar with water, food, and mana gem buttons: left-click uses or trades, right-click conjures.")
     equal(main.initializers[2].setting.variable, "MTF_PORTALS_ENABLED")
     equal(main.initializers[3], nil,
         "no switches for what moved to Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker")
-    equal(state.categories.Polymorph.parent, main)
-    equal(state.categories["Buff Reminders"].parent, main)
+    equal(state.categories["Crowd Control"].parent, main)
+    equal(state.categories.Reminders.parent, main)
     equal(state.categories.Portals.parent, main)
     equal(state.categories.Announce.parent, main)
     equal(state.categories.Announce.frame, state.mtf.announcePage, "a canvas page")
     equal(state.categories.Conjure.parent, main)
-    equal(state.categories.Shield.parent, main)
-    equal(state.categories["Cooldown Chimes"].parent, main)
+    equal(state.categories["Shield display"].parent, main)
+    equal(state.categories.Chimes.parent, main)
+    equal(state.categories.Procs.parent, main)
     state.settings.MTF_CONJURE_ENABLED:SetValue(false)
     equal(state.env.MageToolsForeverConjure.shown, false)
 end)
-test("the Shield, Buff Reminders, Cooldown Chimes, and Polymorph pages link to their Dyre's AddOns", function()
+test("the Shield display, Reminders, Chimes, and Polymorph pages link to their Dyre's AddOns", function()
     local function link(state, title)
         local page = state.categories[title]
         equal(#page.initializers, 0, title .. ": no settings of MTF's own")
@@ -2444,18 +2487,18 @@ test("the Shield, Buff Reminders, Cooldown Chimes, and Polymorph pages link to t
         return found
     end
     local state = mage({companions = {"DyresShieldsUp", "DyresBuffReminders"}})
-    local shield = link(state, "Shield")
+    local shield = link(state, "Shield display")
     equal(shield.buttonText, "Open Shield settings")
-    contains(shield.tooltip, "Dyre's Shields Up draws the shield display")
+    contains(shield.tooltip, "Opens Dyre's Shields Up, which shows your shields as rings")
     equal(shield.modifyPredicates[1](), true, "usable: Dyre's Shields Up has joined the toolkit")
     shield.onClick()
     equal(state.openedCompanion[1], "DyresShieldsUp", "opens Dyre's Shields Up's own page")
-    local reminders = link(state, "Buff Reminders")
+    local reminders = link(state, "Reminders")
     equal(reminders.buttonText, "Open Buff Reminders settings")
     contains(reminders.tooltip, "Dampen or Amplify Magic")
     reminders.onClick()
     equal(state.openedCompanion[2], "DyresBuffReminders")
-    local chimes = link(state, "Cooldown Chimes")
+    local chimes = link(state, "Chimes")
     contains(chimes.tooltip, "Blink, Frost Nova")
     chimes.onClick()
     equal(state.openedCompanion[3], "DyresBuffReminders")
@@ -2465,29 +2508,308 @@ test("the Shield, Buff Reminders, Cooldown Chimes, and Polymorph pages link to t
     contains(state.last(), "out of combat")
     -- Without them: greyed, and a click says what to install.
     local alone = mage()
-    local missing = link(alone, "Shield")
+    local missing = link(alone, "Shield display")
     equal(missing.modifyPredicates[1](), false, "greyed out")
     equal(missing.tooltip, "Install Dyre's Shields Up from CurseForge for the shield display.")
     alone.clear()
     missing.onClick()
     contains(alone.last(), "Install Dyre's Shields Up from CurseForge for the shield display.")
-    equal(link(alone, "Cooldown Chimes").tooltip,
-        "Install Dyre's Buff Reminders from CurseForge for buff reminders and cooldown chimes.")
+    equal(link(alone, "Chimes").tooltip,
+        "Install Dyre's Buff Reminders from CurseForge for buff reminders, cooldown chimes, and proc arcs.")
     -- The Polymorph page (1.6.0): one row that opens Dyre's Debuff Tracker's settings.
     local ddt = mage({companions = {"DyresDebuffTracker"}})
-    local polymorph = link(ddt, "Polymorph")
-    equal(polymorph.name, "Polymorph bar")
+    local polymorph = link(ddt, "Crowd Control")
+    equal(polymorph.name, "Crowd Control", "the section's name")
     equal(polymorph.buttonText, "Open Debuff Tracker settings")
-    contains(polymorph.tooltip, "Dyre's Debuff Tracker draws the Polymorph bar")
+    contains(polymorph.tooltip, "Opens Dyre's Debuff Tracker, which shows your Polymorph's time left")
     equal(polymorph.modifyPredicates[1](), true)
     polymorph.onClick()
     equal(ddt.openedCompanion[1], "DyresDebuffTracker", "opens Dyre's Debuff Tracker's own page")
-    local noTracker = link(alone, "Polymorph")
+    local noTracker = link(alone, "Crowd Control")
     equal(noTracker.modifyPredicates[1](), false, "greyed out without it")
     equal(noTracker.tooltip, "Install Dyre's Debuff Tracker from CurseForge for the Polymorph bar.")
     alone.clear()
     noTracker.onClick()
     contains(alone.last(), "Install Dyre's Debuff Tracker from CurseForge for the Polymorph bar.")
+end)
+test("the companion pages show the companions' own settings through the Toolkit", function()
+    -- John, 2026-11-26: "surface every setting in the wrapped addon's settings, and just
+    -- pass-through the setting to the wrapped addon".
+    local function buttons(page)
+        local found = 0
+        for _, item in ipairs(page.headings or {}) do
+            if item.button then found = found + 1 end
+        end
+        return found
+    end
+    local want = {
+        {"Shield display", "DyresShieldsUp", "shield", "Open Shield settings"},
+        {"Reminders", "DyresBuffReminders", "reminders", "Open Buff Reminders settings"},
+        {"Chimes", "DyresBuffReminders", "chimes", "Open Buff Reminders settings"},
+        {"Procs", "DyresBuffReminders", "procs", "Open Buff Reminders settings"},
+        {"Procs", "DyresDebuffTracker", "cues", "Open Debuff Tracker settings"},
+        {"Crowd Control", "DyresDebuffTracker", "control", "Open Debuff Tracker settings"},
+    }
+    -- The link buttons on a page, in order.
+    local function buttonList(page)
+        local found = {}
+        for _, item in ipairs(page.headings or {}) do
+            if item.button then found[#found + 1] = item end
+        end
+        return found
+    end
+    -- Each page's sections, in order: the Procs page holds two.
+    local onPage, place = {}, {}
+    for i, entry in ipairs(want) do
+        onPage[entry[1]] = (onPage[entry[1]] or 0) + 1
+        place[i] = onPage[entry[1]]
+    end
+    -- The companion has its section: its rows, and no link from MTF.
+    local rows = mage({sections = "rows", companions = {"DyresShieldsUp", "DyresBuffReminders", "DyresDebuffTracker"}})
+    equal(#rows.pageCalls, #want, "one section per page")
+    equal(#rows.masterCalls, 0, "no top switches below SETTINGS_SECTIONS_VERSION 3")
+    for i, entry in ipairs(want) do
+        local call = rows.pageCalls[i]
+        equal(call.category, rows.categories[entry[1]], entry[1] .. ": on its own page")
+        equal(call.opts.addon, entry[2])
+        equal(call.opts.key, entry[3])
+        equal(call.opts.host, "MageToolsForever")
+        equal(call.opts.part, nil, entry[1] .. ": the whole section below version 3")
+        equal(call.opts.link.addon, entry[2], "the link as the fallback")
+        equal(call.opts.link.button, entry[4])
+        equal(buttons(rows.categories[entry[1]]), 0, entry[1] .. ": no link drawn by MTF")
+    end
+    equal(rows.pageCalls[1].opts.link.missing, "Install Dyre's Shields Up from CurseForge for the shield display.")
+    -- John, 2026-11-27: "add a primer-text to tell people what they get if they install it".
+    local primers = {
+        {"Ice Barrier, Mana Shield, Fire Ward, and Frost Ward", "Install Dyre's Shields Up from CurseForge."},
+        {"Arcane Intellect, your armor", "Install Dyre's Buff Reminders from CurseForge."},
+        {"Blink, Frost Nova", "Install Dyre's Buff Reminders from CurseForge."},
+        {"Missile Barrage, Fingers of Frost, or Clearcasting", "Install Dyre's Buff Reminders from CurseForge."},
+        {"Winter's Chill", "Install Dyre's Debuff Tracker from CurseForge."},
+        {"\"! Polymorph\"", "Install Dyre's Debuff Tracker from CurseForge."},
+    }
+    for i, entry in ipairs(want) do
+        local primer = rows.pageCalls[i].opts.primer
+        equal(type(primer), "string", entry[1] .. ": a primer")
+        equal(primer, rows.mtf.COMPANION_PRIMERS[entry[3]])
+        contains(primer, primers[i][1])
+        equal(primer:sub(-#primers[i][2]), primers[i][2], entry[1] .. ": ends with what to install")
+        equal(#primer <= 400, true, entry[1] .. ": fits the Toolkit's box (400)")
+        equal(primer:lower():find("github", 1, true), nil, "CurseForge only")
+    end
+    -- The real Toolkit, when it has the primer box: drawn only while the AddOn is not loaded.
+    local function primerRow(page, text)
+        for _, item in ipairs(page.headings or {}) do
+            if item.template and (text == nil or item.data.text == text) then return item end
+        end
+    end
+    local real = mage()
+    if type(real.toolkit.AddSettingsPrimer) == "function" then
+        for _, entry in ipairs(want) do
+            local text = real.mtf.COMPANION_PRIMERS[entry[3]]
+            equal(type(primerRow(real.categories[entry[1]], text)), "table",
+                entry[1] .. " " .. entry[3] .. ": the primer box without the AddOn")
+        end
+        local loaded = mage({companions = {"DyresShieldsUp", "DyresBuffReminders", "DyresDebuffTracker"}})
+        for _, entry in ipairs(want) do
+            equal(primerRow(loaded.categories[entry[1]]), nil, entry[1] .. ": no primer with the AddOn")
+        end
+    end
+    -- A Toolkit build with sections but no primer box: no primer passed.
+    local plain = mage({sections = "rows", noPrimer = true})
+    for i = 1, #want do
+        equal(plain.pageCalls[i].opts.primer, nil)
+    end
+    -- The companion has no section (not loaded, or older): the Toolkit draws the link.
+    local link = mage({sections = "link"})
+    for i, entry in ipairs(want) do
+        local page = link.categories[entry[1]]
+        equal(buttons(page), onPage[entry[1]], entry[1] .. ": a link per section")
+        equal(buttonList(page)[place[i]].buttonText, entry[4])
+    end
+    -- A Toolkit older than 2.17.0: the link, as before.
+    local old = mage({sections = "none"})
+    for i, entry in ipairs(want) do
+        equal(buttons(old.categories[entry[1]]), onPage[entry[1]], entry[1] .. ": the links without AddSettingsSection")
+        equal(buttonList(old.categories[entry[1]])[place[i]].buttonText, entry[4])
+    end
+end)
+test("each companion's top switch is on MTF's top page, the rest on its own page", function()
+    -- John, 2026-11-27: "the top-level disable for each section should be on the top-level MTF panel".
+    local want = {
+        {"Shield display", "DyresShieldsUp", "shield"},
+        {"Reminders", "DyresBuffReminders", "reminders"},
+        {"Chimes", "DyresBuffReminders", "chimes"},
+        {"Procs", "DyresBuffReminders", "procs"},
+        {"Procs", "DyresDebuffTracker", "cues"},
+        {"Crowd Control", "DyresDebuffTracker", "control"},
+    }
+    local state = mage({sections = "rows", sectionsVersion = 3,
+        companions = {"DyresShieldsUp", "DyresBuffReminders", "DyresDebuffTracker"}})
+    local main = state.categories["Mage Tools Forever"]
+    equal(#state.masterCalls, #want, "one top switch per section")
+    equal(#state.pageCalls, #want, "one rest per section")
+    for i, entry in ipairs(want) do
+        local master, rest = state.masterCalls[i], state.pageCalls[i]
+        equal(master.category, main, entry[1] .. ": its switch on MTF's top page")
+        equal(type(master.layout), "table", "with the top page's layout")
+        equal(master.opts.addon, entry[2])
+        equal(master.opts.key, entry[3])
+        equal(master.opts.host, "MageToolsForever")
+        equal(master.opts.part, "master")
+        equal(master.opts.link, nil, "no link on the top page")
+        equal(master.opts.primer, nil, "no primer on the top page")
+        equal(rest.category, state.categories[entry[1]], entry[1] .. ": the rest on its own page")
+        equal(rest.opts.key, entry[3])
+        equal(rest.opts.part, "rest")
+        equal(type(rest.opts.link), "table", "the link as the fallback")
+        equal(rest.opts.primer, state.mtf.COMPANION_PRIMERS[entry[3]])
+    end
+    -- After Conjure bar and Portal bar.
+    equal(main.initializers[1].setting.variable, "MTF_CONJURE_ENABLED")
+    equal(main.initializers[2].setting.variable, "MTF_PORTALS_ENABLED")
+    -- Without the companions, the Toolkit adds no top switch; each page has the link.
+    local alone = mage({sections = "link", sectionsVersion = 3})
+    equal(#alone.masterCalls, #want, "asked for each")
+    equal(#alone.categories["Mage Tools Forever"].initializers, 2, "only MTF's own switches")
+    for _, entry in ipairs(want) do
+        local found = 0
+        for _, item in ipairs(alone.categories[entry[1]].headings) do
+            if item.button then found = found + 1 end
+        end
+        equal(found, entry[1] == "Procs" and 2 or 1, entry[1] .. ": a link per section")
+    end
+end)
+test("each companion page and its link take the owner's name for the section", function()
+    -- John, 2026-11-27: "let's have the same name used consistently everywhere".
+    local titles = {DyresShieldsUp = {shield = "Shields"}, DyresBuffReminders = {reminders = "Buffs",
+        chimes = "Cooldowns", procs = "Proc alerts"}, DyresDebuffTracker = {cues = "Chill", control = "Crowd control"}}
+    local state = mage({sections = "link", sectionTitles = titles})
+    for _, title in ipairs({"Shields", "Buffs", "Cooldowns", "Proc alerts", "Crowd control"}) do
+        equal(type(state.categories[title]), "table", title .. ": the owner's name")
+    end
+    local names = {}
+    for _, item in ipairs(state.categories["Proc alerts"].headings) do
+        if item.button then names[#names + 1] = item.name end
+    end
+    equal(names[1], "Proc alerts", "the link has the same name")
+    equal(names[2], "Chill", "each section its own name")
+    equal(state.categories.Conjure.parent, state.categories["Mage Tools Forever"], "MTF's own names stay")
+    equal(type(state.categories.Portals), "table")
+    -- Without the owners (or SettingsSectionTitle), the same words as fallbacks.
+    local alone = mage({sections = "link"})
+    for _, title in ipairs({"Shield display", "Reminders", "Chimes", "Procs", "Crowd Control"}) do
+        equal(type(alone.categories[title]), "table", title .. ": the fallback name")
+    end
+    equal(alone.categories["Buff Reminders"], nil, "the old name is gone")
+    equal(alone.categories["Cooldown Chimes"], nil)
+    -- Each fallback link has its section's name, not an older label.
+    local linkNames = {
+        ["Shield display"] = {"Shield display"}, Reminders = {"Reminders"}, Chimes = {"Chimes"},
+        Procs = {"Procs", "Debuff Cues"}, ["Crowd Control"] = {"Crowd Control"},
+    }
+    for page, want in pairs(linkNames) do
+        local names = {}
+        for _, item in ipairs(alone.categories[page].headings) do
+            if item.button then names[#names + 1] = item.name end
+        end
+        equal(#names, #want, page .. ": a link per section")
+        for i, name in ipairs(want) do
+            equal(names[i], name, page .. ": the link's name")
+        end
+    end
+end)
+test("the conjure and portal bars' rows are greyed while the bar is off", function()
+    -- John, 2026-11-27: "when the top-level is off, the settings that are controlling a disabled
+    -- feature should be disabled too".
+    local state = mage()
+    local function rows(title)
+        local found = {}
+        for _, initializer in ipairs(state.categories[title].initializers) do
+            if initializer.setting then found[initializer.setting.variable] = initializer end
+        end
+        return found
+    end
+    local function greyed(initializer)
+        for _, predicate in ipairs(initializer.modifyPredicates or {}) do
+            if predicate() == false then return true end
+        end
+        return false
+    end
+    local conjure = rows("Conjure")
+    local share, shift, macros = conjure.MTF_CONJURE_SHARE_SIZE, conjure.MTF_CONJURE_SHIFT_TRADE,
+        conjure.MTF_CONJURE_MACROS
+    equal(greyed(share), false)
+    equal(greyed(shift), false)
+    state.settings.MTF_CONJURE_ENABLED:SetValue(false)
+    equal(greyed(share), true, "share size greyed with the bar off")
+    equal(greyed(shift), true, "Shift-click greyed with the bar off")
+    equal(greyed(macros), false, "the macros work without the bar")
+    state.settings.MTF_CONJURE_ENABLED:SetValue(true)
+    equal(greyed(share), false, "usable again")
+    -- The bars' size rows: the Toolkit's AddWidgetSettings opts.modify (2.17.0).
+    local function sizeRow(title)
+        for _, initializer in ipairs(state.categories[title].initializers) do
+            if initializer.setting and initializer.setting.name == "Bar size" then
+                return initializer
+            end
+        end
+    end
+    local conjureSize, portalSize = sizeRow("Conjure"), sizeRow("Portals")
+    equal(type(conjureSize), "table", "a Bar size row")
+    equal(type(portalSize), "table", "a Bar size row")
+    if #conjureSize.modifyPredicates > 0 then
+        state.settings.MTF_CONJURE_ENABLED:SetValue(false)
+        equal(greyed(conjureSize), true, "the conjure bar's size greyed with it off")
+        equal(greyed(portalSize), false, "the portal bar's size follows its own switch")
+        state.settings.MTF_PORTALS_ENABLED:SetValue(false)
+        equal(greyed(portalSize), true)
+    end
+end)
+test("every tooltip MTF writes is one plain sentence", function()
+    -- John, 2026-11-27: "every one of the tooltips seems to start with a good one sentence
+    -- description, but then has nonsensical follow-on text that is clearly not meant for users".
+    -- Only "Keep conjure macros" keeps a short second sentence: turning it off deletes the macros.
+    local state = mage({companions = {"DyresShieldsUp", "DyresBuffReminders", "DyresDebuffTracker"}})
+    local function sentences(text)
+        local count = 0
+        for _ in (text .. " "):gmatch("[%.%?]%s") do count = count + 1 end
+        return count
+    end
+    local checked = 0
+    local function check(text, label, allowed)
+        equal(type(text), "string", label .. ": a tooltip")
+        equal(text:find("\n", 1, true), nil, label .. ": one paragraph")
+        equal(sentences(text) <= (allowed or 1), true, label .. ": " .. text)
+        for _, word in ipairs({"combat", "Toolkit", "page", "default"}) do
+            equal(text:find(word, 1, true), nil, label .. ": no \"" .. word .. "\"")
+        end
+        checked = checked + 1
+    end
+    local main = state.categories["Mage Tools Forever"]
+    check(main.initializers[1].tooltip, "Conjure bar")
+    check(main.initializers[2].tooltip, "Portal bar")
+    for _, initializer in ipairs(state.categories.Conjure.initializers) do
+        local setting = initializer.setting
+        if setting and setting.variable == "MTF_CONJURE_MACROS" then
+            check(initializer.tooltip, "Keep conjure macros", 2)
+        elseif setting and (setting.variable == "MTF_CONJURE_SHARE_SIZE"
+                or setting.variable == "MTF_CONJURE_SHIFT_TRADE" or setting.name == "Bar size") then
+            check(initializer.tooltip, setting.name)
+        end
+    end
+    for _, initializer in ipairs(state.categories.Portals.initializers) do
+        if initializer.setting and initializer.setting.name == "Bar size" then
+            check(initializer.tooltip, "Portals: Bar size")
+        end
+    end
+    for _, title in ipairs({"Shield display", "Reminders", "Chimes", "Procs", "Crowd Control"}) do
+        for _, item in ipairs(state.categories[title].headings) do
+            if item.button then check(item.tooltip, title .. ": link") end
+        end
+    end
+    equal(checked, 13, "every tooltip MTF writes")
 end)
 test("without Dyre's Shields Up or Dyre's Buff Reminders MTF says once what to install or enable", function()
     local function lines(state, fragment)
@@ -2504,7 +2826,7 @@ test("without Dyre's Shields Up or Dyre's Buff Reminders MTF says once what to i
     equal(shield[1], "MTF: Install Dyre's Shields Up from CurseForge for the shield display.")
     local reminders = lines(state, "Dyre's Buff Reminders")
     equal(#reminders, 1)
-    equal(reminders[1], "MTF: Install Dyre's Buff Reminders from CurseForge for buff reminders and cooldown chimes.")
+    equal(reminders[1], "MTF: Install Dyre's Buff Reminders from CurseForge for buff reminders, cooldown chimes, and proc arcs.")
     for _, message in ipairs(state.messages) do
         equal(message:lower():find("github", 1, true), nil, "CurseForge only")
     end

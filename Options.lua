@@ -2,18 +2,21 @@ local _, MTF = ...
 
 -- The AddOn settings: a main page with one switch per module, and a subpage
 -- per module for its details, in Blizzard's vertical layout with proxy
--- settings that read and write MageToolsForeverDB directly. The Shield, Buff
--- Reminders, and Cooldown Chimes pages link to Dyre's Shields Up's and Dyre's
--- Buff Reminders' own settings (author, 1.2.0: linked, not mirrored), and the
--- Polymorph page to Dyre's Debuff Tracker's (1.6.0).
+-- settings that read and write MageToolsForeverDB directly. The Shield,
+-- Reminders, Chimes, Procs, and Polymorph pages show the settings of
+-- Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker through
+-- Dyre's Toolkit, or a link to them (see AddCompanionPage).
 local TITLE = "Mage Tools Forever"
 local CONJURE_TITLE = "Conjure"
-local SHIELD_TITLE = "Shield"
-local CHIMES_TITLE = "Cooldown Chimes"
 local PORTALS_TITLE = "Portals"
-local POLYMORPH_TITLE = "Polymorph"
-local REMINDERS_TITLE = "Buff Reminders"
 local ANNOUNCE_TITLE = "Announce"
+-- The companion sections' names while their owners are missing (see SectionTitle).
+local SHIELD_TITLE = "Shield display"
+local REMINDERS_TITLE = "Reminders"
+local CHIMES_TITLE = "Chimes"
+local PROCS_TITLE = "Procs"
+local CUES_TITLE = "Debuff Cues"
+local POLYMORPH_TITLE = "Crowd Control"
 local UNAVAILABLE = "The AddOn settings page is unavailable on this client. Use /mtf conjure for status."
 
 local REQUIRED_SETTINGS = {
@@ -71,21 +74,42 @@ local function RefreshPortals()
     MTF.RefreshPortals()
 end
 
+-- A row is greyed while the switch for its feature is off (John, 2026-11-27:
+-- "when the top-level is off, the settings that are controlling a disabled
+-- feature should be disabled too"). The settings list runs the predicate each
+-- time it draws the row.
+local function ConjureOn()
+    return MTF.db.conjure.enabled == true
+end
+
+local function PortalsOn()
+    return MTF.db.portals.enabled == true
+end
+
+local function WhileOn(initializer, predicate)
+    if type(initializer) == "table" and type(initializer.AddModifyPredicate) == "function" then
+        initializer:AddModifyPredicate(predicate)
+    end
+    return initializer
+end
+
 -- A widget's size sliders (Dyre's Toolkit: each with a gold mark at its
--- default, then "Reset size"), with the label players know.
-local function AddWidgetSizes(page, layout, widget, tooltips, resetTooltip)
+-- default, then "Reset size"), with the label players know, greyed while
+-- modify gives false (opts.modify, Toolkit 2.17.0; an older one ignores it).
+local function AddWidgetSizes(page, layout, widget, tooltips, modify)
     if widget then
         MTF.toolkit.AddWidgetSettings(page, layout, widget,
-            {labels = {scale = "Bar size", width = "Bar width"}, tooltips = tooltips, resetTooltip = resetTooltip})
+            {labels = {scale = "Bar size", width = "Bar width"}, tooltips = tooltips, modify = modify})
     end
 end
 
+-- "Keep conjure macros" stays usable with the bar off: the macros work
+-- without it. The share size, Shift-click, and the bar's size are the bar's.
 local function AddConjurePage(parent)
     local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, CONJURE_TITLE)
     Flag(page, "MTF_CONJURE_MACROS", "Keep conjure macros", "conjure", "macros", true,
-        "Keep \"! Water\", \"! Food\", and \"! Mana Gem\" in your character macros for your action bars: "
-            .. "left-click eats, drinks, or uses; right-click conjures. Each appears once you know its spell. "
-            .. "Turning this off deletes them.",
+        "Keeps \"! Water\", \"! Food\", and \"! Mana Gem\" macros for your action bars: left-click eats, "
+            .. "drinks, or uses, and right-click conjures. Turning this off deletes them.",
         function() MTF.ApplyConjureMacros() end)
     local share = Proxy(page, "MTF_CONJURE_SHARE_SIZE", Settings.VarType.Number, "Share stack size",
         MTF.DEFAULT_SHARE_SIZE,
@@ -94,52 +118,170 @@ local function AddConjurePage(parent)
             MTF.db.conjure.shareSize = MTF.SanitizeShareSize(value)
         end)
     local shareSlider = Settings.CreateSlider(page, share, SliderOptions(MTF.SHARE_SIZE_MIN, MTF.SHARE_SIZE_MAX, 1),
-        "How much food or water one trade gives your target. If you carry less, they get all of it.")
+        "How much food or water one trade gives your target.")
+    WhileOn(shareSlider, ConjureOn)
     -- The gold mark at the default, as on the Toolkit's own sliders (John:
     -- "set notches on the sliders default values"; public since Toolkit 2.2.0).
     if MTF.toolkit and type(MTF.toolkit.AddDefaultTick) == "function" then
         MTF.toolkit.AddDefaultTick(shareSlider,
             {min = MTF.SHARE_SIZE_MIN, max = MTF.SHARE_SIZE_MAX, default = MTF.DEFAULT_SHARE_SIZE})
     end
-    Flag(page, "MTF_CONJURE_SHIFT_TRADE", "Trade only with Shift-click", "conjure", "shiftTrade", false,
-        "On: left-click on the Water, Food, and Food & Water buttons always eats or drinks, even with a "
-            .. "player targeted, and Shift + left-click trades to your target. Off: left-click trades to a "
-            .. "targeted player, and Shift + left-click eats or drinks. Middle-click always eats or drinks. "
-            .. "A change in combat applies when combat ends.",
-        RefreshConjure)
+    WhileOn(Flag(page, "MTF_CONJURE_SHIFT_TRADE", "Trade only with Shift-click", "conjure", "shiftTrade", false,
+        "Left-click on Water, Food, and Food & Water always eats or drinks, and Shift + left-click trades "
+            .. "to your target.",
+        RefreshConjure), ConjureOn)
     AddWidgetSizes(page, layout, MTF.conjureWidget,
-        {scale = "How big the conjure bar is, in percent. A change in combat applies when combat ends."})
+        {scale = "How big the conjure bar is, in percent."},
+        ConjureOn)
 end
 
 local function AddPortalsPage(parent)
     local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, PORTALS_TITLE)
     AddWidgetSizes(page, layout, MTF.portalWidget,
-        {scale = "How big the portal bar is, in percent. A change in combat applies when combat ends."})
+        {scale = "How big the portal bar is, in percent."},
+        PortalsOn)
 end
 
--- A page that links to a companion AddOn's settings (Dyre's Toolkit's
--- AddSettingsLink: the button is greyed while that AddOn has not joined the
--- toolkit, and a click then says what to install or enable; never in combat).
-local function AddLinkPage(parent, title, companion, name, button, tooltip)
-    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, title)
-    MTF.toolkit.AddSettingsLink(page, layout, {addon = companion.addon, name = name, button = button,
-        tooltip = tooltip, missing = MTF.CompanionMessage(companion)})
+-- A page for a companion AddOn's settings. With Dyre's Toolkit 2.17.0's
+-- AddSettingsSection, the page shows the companion's own rows, which read and
+-- write its live settings (John, 2026-11-26: "surface every setting in the
+-- wrapped addon's settings, and just pass-through the setting to the wrapped
+-- addon"). Without the companion's section (not loaded, or older), and with an
+-- older Toolkit, the page has the link instead (AddSettingsLink: the button is
+-- greyed while that AddOn has not joined the toolkit, and a click then says
+-- what to install or enable; never in combat). While the companion is not
+-- loaded, a primer box over the link says what it would add for a Mage (John,
+-- 2026-11-27: "add a primer-text to tell people what they get if they install
+-- it"); a Toolkit without AddSettingsPrimer draws none.
+local SETTINGS_HOST = "MageToolsForever"
+
+-- Toolkit 2.17.0's SETTINGS_SECTIONS_VERSION 3 (John, 2026-11-27: "the
+-- top-level disable for each section should be on the top-level MTF panel"):
+-- each companion's top switch (part "master") goes on MTF's top page, and the
+-- rest (part "rest") on its own page, greyed while that switch is off. With
+-- an older Toolkit, each page shows the whole section, as before.
+local function SplitSections()
+    local version = MTF.toolkit.SETTINGS_SECTIONS_VERSION
+    return type(version) == "number" and version >= 3
+end
+
+-- One name per section (John, 2026-11-27: "let's have the same name used
+-- consistently everywhere"): the owner's title (Toolkit 2.17.0's
+-- SettingsSectionTitle) names the sub-page and the link, as it names the
+-- owner's own heading and its top switch here; while the owner is missing or
+-- older, the same word as a fallback.
+local function SectionTitle(section)
+    local title = type(MTF.toolkit.SettingsSectionTitle) == "function"
+        and MTF.toolkit.SettingsSectionTitle(section.companion.addon, section.key)
+    return type(title) == "string" and title ~= "" and title or section.title
+end
+
+local function AddSection(page, layout, section)
+    local companion = section.companion
+    local link = {addon = companion.addon, name = SectionTitle(section), button = section.button,
+        tooltip = section.tooltip, missing = MTF.CompanionMessage(companion)}
+    local toolkit = MTF.toolkit
+    if type(toolkit.AddSettingsSection) == "function" then
+        local primer = type(toolkit.AddSettingsPrimer) == "function" and MTF.COMPANION_PRIMERS[section.key] or nil
+        toolkit.AddSettingsSection(page, layout, {addon = companion.addon, key = section.key, host = SETTINGS_HOST,
+            link = link, primer = primer, part = SplitSections() and "rest" or nil})
+    else
+        toolkit.AddSettingsLink(page, layout, link)
+    end
+end
+
+-- A page holds one or more sections; it is named after the first.
+local function AddCompanionPage(parent, sections)
+    local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, SectionTitle(sections[1]))
+    for _, section in ipairs(sections) do
+        AddSection(page, layout, section)
+    end
     return page
 end
 
-local function AddLinkPages(parent)
-    local shields, reminders = MTF.COMPANIONS[1], MTF.COMPANIONS[2]
-    AddLinkPage(parent, SHIELD_TITLE, shields, "Shield display", "Open Shield settings",
-        "Dyre's Shields Up draws the shield display for every class. Open its settings.")
-    AddLinkPage(parent, REMINDERS_TITLE, reminders, "Buff reminders", "Open Buff Reminders settings",
-        "Dyre's Buff Reminders shows Arcane Intellect, your armor, and Dampen or Amplify Magic for every class. "
-            .. "Open its settings.")
-    AddLinkPage(parent, CHIMES_TITLE, reminders, "Cooldown chimes", "Open Buff Reminders settings",
-        "Dyre's Buff Reminders plays a sound just before Blink, Frost Nova, and your other spells are ready. "
-            .. "Open its settings.")
-    AddLinkPage(parent, POLYMORPH_TITLE, MTF.DEBUFF_TRACKER, "Polymorph bar", "Open Debuff Tracker settings",
-        "Dyre's Debuff Tracker draws the Polymorph bar, keeps \"! Polymorph\", and tells your group as you sheep. "
-            .. "Open its settings.")
+-- At most 400 characters each (the Toolkit's SETTINGS_PRIMER_MAX); a test checks.
+MTF.COMPANION_PRIMERS = {
+    shield = "Dyre's Shields Up shows your Ice Barrier, Mana Shield, Fire Ward, and Frost Ward as rings that "
+        .. "drain as each shield wears down, with the amount left and an optional sound when one breaks. "
+        .. "Install Dyre's Shields Up from CurseForge.",
+    reminders = "Dyre's Buff Reminders shows an icon when Arcane Intellect, your armor, or Dampen or Amplify "
+        .. "Magic is missing, and warns when your Arcane Powder runs low. Install Dyre's Buff Reminders "
+        .. "from CurseForge.",
+    chimes = "Dyre's Buff Reminders plays a sound just before Blink, Frost Nova, and your other important "
+        .. "spells are ready again, so you know without watching your action bars. Install Dyre's Buff "
+        .. "Reminders from CurseForge.",
+    procs = "Dyre's Buff Reminders draws an arc on each side of your character and plays a sound when "
+        .. "Missile Barrage, Fingers of Frost, or Clearcasting comes up. Install Dyre's Buff Reminders "
+        .. "from CurseForge.",
+    cues = "Dyre's Debuff Tracker shows an ice arc above your target's nameplate that fills with each stack "
+        .. "of your Winter's Chill, and can play a note as the stacks go on. Install Dyre's Debuff Tracker "
+        .. "from CurseForge.",
+    control = "Dyre's Debuff Tracker shows a bar with the time left on your Polymorph, keeps a \"! Polymorph\" "
+        .. "macro up to date, and can tell your group when you sheep a target. Install Dyre's Debuff Tracker "
+        .. "from CurseForge.",
+}
+
+-- Every companion section, by key, with its fallback name and its link.
+local SECTIONS = {
+    shield = {companion = MTF.COMPANIONS[1], key = "shield", title = SHIELD_TITLE,
+        button = "Open Shield settings",
+        tooltip = "Opens Dyre's Shields Up, which shows your shields as rings that drain as they wear down."},
+    reminders = {companion = MTF.COMPANIONS[2], key = "reminders", title = REMINDERS_TITLE,
+        button = "Open Buff Reminders settings",
+        tooltip = "Opens Dyre's Buff Reminders, which shows an icon when Arcane Intellect, your armor, or "
+            .. "Dampen or Amplify Magic is missing."},
+    chimes = {companion = MTF.COMPANIONS[2], key = "chimes", title = CHIMES_TITLE,
+        button = "Open Buff Reminders settings",
+        tooltip = "Opens Dyre's Buff Reminders, which plays a sound just before Blink, Frost Nova, and your "
+            .. "other spells are ready."},
+    -- John, 2026-11-27: "mage proc arcs from DBR are not in MTF, we should add a
+    -- Procs panel". No filter: DBR shows the player's class's procs.
+    procs = {companion = MTF.COMPANIONS[2], key = "procs", title = PROCS_TITLE,
+        button = "Open Buff Reminders settings",
+        tooltip = "Opens Dyre's Buff Reminders, which shows arcs and plays a sound for Missile Barrage, "
+            .. "Fingers of Frost, and Clearcasting."},
+    -- Dyre's Debuff Tracker's Winter's Chill, on the Procs page after the procs.
+    cues = {companion = MTF.COMPANIONS[3], key = "cues", title = CUES_TITLE,
+        button = "Open Debuff Tracker settings",
+        tooltip = "Opens Dyre's Debuff Tracker, which shows the stacks of your Winter's Chill above your "
+            .. "target's nameplate."},
+    control = {companion = MTF.COMPANIONS[3], key = "control", title = POLYMORPH_TITLE,
+        button = "Open Debuff Tracker settings",
+        tooltip = "Opens Dyre's Debuff Tracker, which shows your Polymorph's time left and keeps your "
+            .. "\"! Polymorph\" macro up to date."},
+}
+
+-- The pages, in order, each with its sections; the top switches follow the
+-- same order. None for a companion that is not loaded (its page has the link
+-- and the primer).
+local COMPANION_PAGES = {
+    {"shield"},
+    {"reminders"},
+    {"chimes"},
+    {"procs", "cues"},
+    {"control"},
+}
+
+local function AddCompanionMasters(page, layout)
+    if not layout or not SplitSections() or type(MTF.toolkit.AddSettingsSection) ~= "function" then
+        return
+    end
+    for _, keys in ipairs(COMPANION_PAGES) do
+        for _, key in ipairs(keys) do
+            MTF.toolkit.AddSettingsSection(page, layout, {addon = SECTIONS[key].companion.addon,
+                key = key, host = SETTINGS_HOST, part = "master"})
+        end
+    end
+end
+
+local function AddCompanionPages(parent)
+    for _, keys in ipairs(COMPANION_PAGES) do
+        local sections = {}
+        for _, key in ipairs(keys) do
+            sections[#sections + 1] = SECTIONS[key]
+        end
+        AddCompanionPage(parent, sections)
+    end
 end
 
 -- Announce page --------------------------------------------------------------
@@ -281,24 +423,24 @@ function MTF.InitializeOptions()
     end
     -- With Dyre's Toolkit, MTF's page sits under its "Dyre's AddOns" home,
     -- and MTF's pages under that (the settings list draws any depth).
+    local layout
     if MTF.toolkit then
-        category = MTF.toolkit.RegisterSettingsCategory(TITLE)
+        category, layout = MTF.toolkit.RegisterSettingsCategory(TITLE)
     end
     local ownCategory = category == nil
     if ownCategory then
-        category = Settings.RegisterVerticalLayoutCategory(TITLE)
+        category, layout = Settings.RegisterVerticalLayoutCategory(TITLE)
     end
     Flag(category, "MTF_CONJURE_ENABLED", "Conjure bar", "conjure", "enabled", true,
-        "A bar with water, food, and mana gem buttons: left-click uses or trades, right-click conjures."
-            .. "\n\nTo stop left-click from trading, keep the bar and turn on \"Trade only with Shift-click\" "
-            .. "on the Conjure page.",
+        "A bar with water, food, and mana gem buttons: left-click uses or trades, right-click conjures.",
         RefreshConjure)
     Flag(category, "MTF_PORTALS_ENABLED", "Portal bar", "portals", "enabled", true,
         "A bar with a button for each teleport and portal you know, and the runes you carry for them.",
         RefreshPortals)
+    AddCompanionMasters(category, layout)
     AddConjurePage(category)
     AddPortalsPage(category)
-    AddLinkPages(category)
+    AddCompanionPages(category)
     local announcePage = CreateAnnouncePage()
     MTF.announcePage = announcePage
     Settings.RegisterCanvasLayoutSubcategory(category, announcePage, ANNOUNCE_TITLE)

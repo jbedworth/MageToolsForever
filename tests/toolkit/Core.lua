@@ -22,6 +22,8 @@ local addonName, ns = ...
 -- Contract 2 (2.0.0) adds widgets, which own all placement for an AddOn:
 --   CreateWidget(spec), AddWidgetSettings(category, layout, widget, opts),
 --   ResetWidgets(addon), Widgets(addon); see Widgets.lua.
+-- 2.14.0 adds ShowWelcome(): false when the player turned off the welcome
+-- line at login. Test for the function; without it, print the line.
 local DyresToolkit = {}
 _G.DyresToolkit = DyresToolkit
 ns.toolkit = DyresToolkit
@@ -55,6 +57,9 @@ function ns.SanitizeDB(db)
     end
     if type(db.snapToGrid) ~= "boolean" then
         db.snapToGrid = true
+    end
+    if type(db.welcome) ~= "boolean" then
+        db.welcome = true
     end
     local size = tonumber(db.gridSize)
     if not size or size ~= size then
@@ -159,6 +164,20 @@ function ns.SetSnapToGrid(snap)
     ns.db.snapToGrid = snap == true
 end
 
+-- The welcome line at login (2.14.0; John, 2026-11-23: "toggle off our
+-- welcome messages unless there is an error/problem"). One account-wide
+-- switch for every Dyre's AddOn. An AddOn asks before it prints its
+-- title-and-version line (and any "ready" line); it always prints errors
+-- and problems. Without this function (an older toolkit, or none), it
+-- prints the welcome line as before.
+function DyresToolkit.ShowWelcome()
+    return ns.db.welcome ~= false
+end
+
+function ns.SetWelcome(shown)
+    ns.db.welcome = shown == true
+end
+
 function ns.SetGridSize(size)
     ns.db.gridSize = ns.SanitizeDB({gridSize = size}).gridSize
     ns.RefreshGrid(true)
@@ -166,14 +185,22 @@ end
 
 -- /dyre, and /dyretoolkit in case another AddOn uses /dyre.
 local USAGE = "Use /dyre (settings), /dyre unlock, /dyre lock, /dyre grid, /dyre snap, /dyre minimap, "
-    .. "/dyre debug, /dyre pull [seconds], /dyre tank_reset, /dyre tank_debug, or /dyre debug_threat."
+    .. "or /dyre debug."
+-- The threat, tank, and swing words moved to Dyre's Threat and Combat Tools
+-- in 2.16.0 (John, 2026-11-26). Its own command is /dct.
+ns.MOVED_WORDS = {pull = true, tank_reset = true, tank_debug = true, debug_threat = true, debug_taunts = true,
+    debug_dots = true, threat_debug = true, taunt_debug = true, swing_reset = true, debug_swing = true}
+ns.MOVED = "The threat labels, tank tools, and swing timer are now in Dyre's Threat and Combat Tools: "
+    .. "install it from CurseForge, then use /dct."
 
 function ns.HandleCommand(message)
-    -- The tank and threat words (Tank.lua), some with an argument.
-    if ns.HandleTankCommand and ns.HandleTankCommand(message) then
+    local command = type(message) == "string" and message:match("^%s*(%S*)")
+    command = command and command:lower()
+    if command and ns.MOVED_WORDS[command] then
+        ns.Report(ns.MOVED)
         return
     end
-    local command = type(message) == "string" and message:match("^%s*(%S*)%s*$")
+    command = type(message) == "string" and message:match("^%s*(%S*)%s*$")
     command = command and command:lower()
     if command == "" then
         DyresToolkit.OpenSettings()
@@ -224,8 +251,12 @@ events:SetScript("OnEvent", function(self, event, name)
     self:UnregisterEvent("PLAYER_LOGIN")
     ns.InitializeSettings()
     ns.InitializeMinimap()
-    -- Group warnings and tank tools (2.9.0), after the toolkit's own settings.
-    if ns.InitializeTank then
-        ns.InitializeTank()
-    end
+    -- The toolkit page's end: the link to Dyre's Threat and Combat Tools
+    -- (where its sections were before 2.16.0), then the Profile section.
+    local category, layout = ns.HomeCategory()
+    DyresToolkit.AddSettingsLink(category, layout, {addon = "DyresCombatTools",
+        name = "Threat, tank tools, and swing timer", button = "Open",
+        tooltip = "Dyre's Threat and Combat Tools: threat labels and sounds, tank tools, and the swing timer.",
+        missing = "These are now in Dyre's Threat and Combat Tools: install it from CurseForge."})
+    ns.AddProfileSettings(category, layout)
 end)

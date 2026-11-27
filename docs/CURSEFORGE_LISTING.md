@@ -76,7 +76,7 @@ Your shield display, buff reminders, cooldown chimes, and Polymorph bar now come
 ### Shields, buff reminders, and cooldown chimes
 - **Dyre's Shields Up** draws the shield display; **Dyre's Buff Reminders** shows the buff reminders and plays the cooldown chimes. Both work for every class, and the CurseForge app installs them with Mage Tools Forever.
 - Coming from MTF 1.1 or older? They take over your MTF settings for these once.
-- MTF's Shield, Buff Reminders, and Cooldown Chimes settings pages each have a button that opens their settings.
+- MTF's Shield display, Reminders, Chimes, Procs, and Crowd Control settings pages show their settings, or a button that opens them.
 - Without one of them, MTF still works and says once in chat what to install or enable.
 
 ### Needs Dyre's Toolkit

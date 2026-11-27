@@ -4,6 +4,20 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.7.0
+
+### Features
+
+- The **Shield display** (before: Shield), **Reminders**, **Chimes**, **Procs**, and **Crowd Control** (before: Polymorph) pages (each named as on that AddOn's own page) show the settings of Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker, so you can change them in Mage Tools Forever. A change there is the same as a change on that AddOn's own page. This needs Dyre's Toolkit 2.17.0 or later and a version of each AddOn that offers its settings. Otherwise the page shows the button that opens that AddOn's settings, as before.
+- A new **Procs** page shows Dyre's Buff Reminders' proc arcs and sounds for Missile Barrage, Fingers of Frost, and Clearcasting, then Dyre's Debuff Tracker's Winter's Chill cues (or a button that opens each one's settings, as above).
+- The main **Mage Tools Forever** page has the on and off switch of each of those pages, after **Conjure bar** and **Portal bar** (Dyre's Toolkit 2.17.0 or later, with AddOns that offer them).
+- A setting is greyed while the switch for its feature is off: on the Conjure page, the share size, **Trade only with Shift-click**, and the bar's size while **Conjure bar** is off (**Keep conjure macros** stays, as the macros work without the bar); on the Portals page, the bar's size while **Portal bar** is off; and the other pages' settings while their switch is off.
+- When one of those AddOns is not installed, its page says what it adds for a Mage and where to get it (Dyre's Toolkit 2.17.0 or later).
+
+### Other changes
+
+- Clearer text: each setting's tooltip is one short sentence, the conjure buttons' tooltips list only what each click does, the buttons that open the other AddOns' settings say what you get, the install line for Dyre's Buff Reminders names the proc arcs, and the login problems say plainly what is wrong.
+
 ## 1.6.2
 
 ### Other changes

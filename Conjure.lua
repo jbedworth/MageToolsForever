@@ -1042,10 +1042,6 @@ local function ShowBothTooltip(button)
         GameTooltip:AddLine("Right-click: you know no rank to conjure here.", 0.7, 0.7, 0.7, true)
     end
     GameTooltip:AddLine("Middle-click: eat and drink your own best.", 1, 1, 1, true)
-    if MTF.db.conjure.macros then
-        GameTooltip:AddLine("For your action bars: the \"" .. MTF.CONJURE_MACROS.both
-            .. "\" macro in your character macros does the same.", 0.7, 0.7, 0.7, true)
-    end
     GameTooltip:Show()
 end
 
@@ -1093,11 +1089,6 @@ local function ShowTooltip(button)
         GameTooltip:AddLine("Right-click: you know no rank your target can use.", 0.7, 0.7, 0.7, true)
     end
     GameTooltip:AddLine("Middle-click: use your best " .. kind.noun .. " yourself.", 1, 1, 1, true)
-    if MTF.db.conjure.macros then
-        GameTooltip:AddLine("For your action bars: the \"" .. MTF.CONJURE_MACROS[button.kind]
-            .. "\" macro in your character macros eats, drinks, or uses on left-click and conjures on right-click.",
-            0.7, 0.7, 0.7, true)
-    end
     GameTooltip:Show()
 end
 
@@ -1211,7 +1202,7 @@ function MTF.InitializeConjure()
     end
     macros.available = macros.missing == nil
     if not macros.available and MTF.db.conjure.macros then
-        MTF.Report("Conjure macros stay off: this client lacks " .. macros.missing .. ".")
+        MTF.Report("MTF cannot keep conjure macros on this game client (it lacks " .. macros.missing .. ").")
     end
     local bar = CreateFrame("Frame", "MageToolsForeverConjure", UIParent, "BackdropTemplate")
     bar:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
