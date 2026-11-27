@@ -30,7 +30,9 @@ to install.
 
 A small bar with **Water**, **Food**, **Food & Water**, and **Mana Gem**
 buttons. **Bar size** on the Conjure settings page shrinks or grows it
-(50-150%); see [Moving frames](#moving-frames) to put it where you want.
+(50-150%), and **Layout** puts the buttons side by side (**Horizontal**) or
+top to bottom (**Vertical**; Dyre's Toolkit 2.18.0 or later); see
+[Moving frames](#moving-frames) to put it where you want.
 
 **Water and food**
 
@@ -101,8 +103,8 @@ joins the bar when combat ends. When you open a portal in a group, MTF tells
 your raid or party where it goes, and when you teleport yourself, you emote
 it ("Dyre summons powerful arcane energies to whisk themselves away to
 Ironforge.") at your next key press or click, since the game allows emotes
-only then. **Bar size** is on the Portals settings
-page.
+only then. **Bar size** and **Layout** (**Horizontal** or **Vertical**;
+Dyre's Toolkit 2.18.0 or later) are on the Portals settings page.
 
 ## Polymorph bar
 

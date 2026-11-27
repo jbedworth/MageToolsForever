@@ -65,7 +65,7 @@ local function ShowTooltip(button)
     if not button.entry then
         return
     end
-    GameTooltip:SetOwner(button, "ANCHOR_TOP")
+    GameTooltip:SetOwner(button, MTF.BarTooltipAnchor(bar, MTF.portalWidget))
     GameTooltip:SetText(C_Spell.GetSpellName(button.entry.spell) or button.entry.city, GOLD[1], GOLD[2], GOLD[3])
     local rune = C_Item.GetItemInfo(button.entry.rune)
     GameTooltip:AddLine(string.format("%s carried: %d", rune or "Runes", Carried(button.entry.rune)), 1, 1, 1, true)
@@ -92,9 +92,19 @@ local function ApplySpells()
             button:Hide()
         end
     end
-    -- One button per spell you know: the toolkit resizes the bar from its center.
-    local count = math.max(1, #known)
-    bar:SetContentSize(PADDING * 2 + BUTTON_SIZE * count + BUTTON_GAP * (count - 1), PADDING * 2 + BUTTON_SIZE)
+    -- One button per spell you know: the toolkit resizes the bar from its
+    -- center. Dyre's Toolkit 2.18.0 lays the shown ones out as a row or a
+    -- column; an older one, the row placed in CreateButton.
+    if MTF.HasBarLayout() then
+        local shown = {}
+        for index = 1, #known do
+            shown[index] = portals.buttons[index]
+        end
+        MTF.portalWidget:LayoutButtons(shown, {size = BUTTON_SIZE, gap = BUTTON_GAP, padding = PADDING})
+    else
+        local count = math.max(1, #known)
+        bar:SetContentSize(PADDING * 2 + BUTTON_SIZE * count + BUTTON_GAP * (count - 1), PADDING * 2 + BUTTON_SIZE)
+    end
     -- Shown while unlocked even with nothing known, so it can be placed.
     if MTF.db.portals.enabled and (#known > 0 or not MTF.db.locked) then
         bar:Show()
@@ -124,7 +134,9 @@ end
 local function CreateButton(index)
     local button = CreateFrame("Button", "MageToolsForeverPortal" .. index, bar, "SecureActionButtonTemplate")
     button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
-    button:SetPoint("LEFT", bar, "LEFT", PADDING + (index - 1) * (BUTTON_SIZE + BUTTON_GAP), 0)
+    if not MTF.HasBarLayout() then
+        button:SetPoint("LEFT", bar, "LEFT", PADDING + (index - 1) * (BUTTON_SIZE + BUTTON_GAP), 0)
+    end
     button:RegisterForClicks("AnyUp", "AnyDown")
     button:SetAttribute("useOnKeyDown", false)
     button.icon = button:CreateTexture(nil, "ARTWORK")

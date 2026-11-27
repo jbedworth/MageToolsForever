@@ -57,7 +57,7 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 Your shield display, buff reminders, cooldown chimes, and Polymorph bar now come from three of Dyre's AddOns that work for every class: **Dyre's Shields Up** draws the shield display, **Dyre's Buff Reminders** shows Arcane Intellect, your armor, and Dampen or Amplify Magic, and plays your cooldown chimes, and **Dyre's Debuff Tracker** draws the Polymorph bar and keeps the "! Polymorph" macro. The CurseForge app installs all three with Mage Tools Forever.
 
 ### Conjure
-- A movable bar with Water, Food, Food & Water, and Mana Gem buttons.
+- A movable bar with Water, Food, Food & Water, and Mana Gem buttons, side by side or top to bottom.
 - Target a friend: right-click conjures the best food or water *they* can use; left-click trades them a share of it (10 by default, you pick stacks of 1 to 20), or all you have if less, and whispers them. The rest stays for the next party member.
 - Someone opens a trade with you? The buttons serve them: left-click puts their share straight into the window.
 - Food & Water gives a share of both in one click, with one whisper; right-click conjures them in turn.
@@ -67,7 +67,7 @@ Your shield display, buff reminders, cooldown chimes, and Polymorph bar now come
 - For your action bars: MTF keeps **! Water**, **! Food**, **! Food & Water**, and **! Mana Gem** macros in your character macros. Left-click uses, right-click conjures, also works in combat.
 
 ### Portals
-- A bar with a button for each teleport and portal you know, teleports first, with the runes you carry for each. The count is only information: MTF never stops a cast for lack of runes (legacy talents can make this work without runes).
+- A bar, side by side or top to bottom, with a button for each teleport and portal you know, teleports first, with the runes you carry for each. The count is only information: MTF never stops a cast for lack of runes (legacy talents can make this work without runes).
 - Opening a portal tells your group where it goes. Teleporting yourself emotes it: *"Dyre summons powerful arcane energies to whisk themselves away to Ironforge."* (both on by default; see Announce).
 
 ### Announce

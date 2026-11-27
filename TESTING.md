@@ -94,6 +94,14 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
 - [ ] Every MTF macro (Water, Food, Food & Water, Mana Gem) reads `/use`,
       not `/cast`; right-click of each conjure macro still conjures the shown
       rank (`/use` casts a spell by name).
+- [ ] Layout on the Conjure and Portals pages (Toolkit 2.18.0): Vertical puts the buttons
+      top to bottom in the same order (Water, Food, Food & Water, Mana Gem;
+      teleports before portals), the bar keeps its middle, and Horizontal
+      puts it back. A tooltip shows beside a vertical bar, on the side of the
+      screen with more room. Changed in combat, the bar changes when combat
+      ends, with no error. Each bar's Layout is its own, survives `/reload`,
+      and is greyed while that bar is off. With Toolkit 2.17.0, no Layout
+      row, and both bars are rows as before.
 - [ ] Bar size on the Conjure and Portals pages: the bar grows and shrinks
       around its middle and does not move, also for the portal bar when you
       learn a new teleport or portal. Each Bar size slider has a gold mark at
@@ -166,7 +174,7 @@ ubuntu-24.04's `lua5.1` package and native `python3`.
       with its page's name; turn one off, and its page's settings are greyed
       and the feature stops. Without a companion, no switch for it.
 - [ ] Greying: turn Conjure bar off: on the Conjure page, Share stack size,
-      Trade only with Shift-click, Bar size, and Reset size are greyed; Keep
+      Trade only with Shift-click, Layout, Bar size, and Reset size are greyed; Keep
       conjure macros is not, and the macros still work. Turn Portal bar off:
       the Portals page's rows are greyed. Turn them on: usable again.
 - [ ] Primer (Toolkit 2.17.0): with Dyre's Shields Up, Dyre's Buff Reminders,

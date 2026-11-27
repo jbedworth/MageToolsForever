@@ -110,6 +110,33 @@ MTF.SCALE_MAX = 150
 MTF.SCALE_STEP = 5
 MTF.DEFAULT_SCALE = 100
 
+-- The bars' layout (MTF 1.8.0; a CurseForge player asked: "Is it possible to
+-- add an option to change the portal and conjure bars from horizontal to
+-- vertical?"; John, 2026-11-27: "Yes, Toolkit feature"): Dyre's Toolkit
+-- 2.18.0's button bars place the buttons as a row or a column and save the
+-- choice as the widget store's `orientation`. With an older Toolkit, the bars
+-- stay rows, placed by MTF as before.
+function MTF.HasBarLayout()
+    local toolkit = MTF.toolkit
+    return type(toolkit) == "table" and type(toolkit.BAR_LAYOUT_VERSION) == "number"
+        and toolkit.BAR_LAYOUT_VERSION >= 1
+end
+
+-- Where a bar button's tooltip goes: over a row; beside a column, on the side
+-- of the screen with more room, so it does not cover the other buttons.
+function MTF.BarTooltipAnchor(bar, widget)
+    if not (widget and type(widget.GetOrientation) == "function" and widget:GetOrientation() == "vertical") then
+        return "ANCHOR_TOP"
+    end
+    local x = bar:GetCenter()
+    local width = UIParent:GetWidth()
+    if type(x) == "number" and type(width) == "number"
+        and x * bar:GetEffectiveScale() > width * UIParent:GetEffectiveScale() / 2 then
+        return "ANCHOR_LEFT"
+    end
+    return "ANCHOR_RIGHT"
+end
+
 -- Messages (Announce), each with its own switch and editable text
 -- (author-approved). Trade whispers: %C the count, %I the item (for Food &
 -- Water, the whole list: "10 Conjured Fresh Water and 10 Conjured Bread"), %T
@@ -252,12 +279,15 @@ function MTF.SanitizeDB(db)
         -- Trade only with Shift + left-click (off by default; 2026-11-17).
         shiftTrade = conjure.shiftTrade == true,
         scale = MTF.SanitizeScale(conjure.scale),
+        -- Dyre's Toolkit 2.18.0's bar layout: "vertical", else a row (nil).
+        orientation = conjure.orientation == "vertical" and "vertical" or nil,
     }
     local portals = type(db.portals) == "table" and db.portals or {}
     db.portals = {
         enabled = portals.enabled ~= false,
         position = SanitizePosition(portals.position),
         scale = MTF.SanitizeScale(portals.scale),
+        orientation = portals.orientation == "vertical" and "vertical" or nil,
     }
     -- MTF 1.5 and older drew the Polymorph bar: db.polymorph (enabled,
     -- position, scale, mark, macro, opacity, width, height, textScale) and
@@ -455,6 +485,8 @@ function MTF.ApplyProfile()
         MTF.toolkit.ReapplyWidgets(addonName)
     end
     MTF.ApplyConjureMacros()
+    -- The Toolkit does not lay the buttons out again for a copied orientation.
+    MTF.LayoutConjureBar()
     MTF.RefreshConjure()
     MTF.RefreshPortals()
     local page = MTF.announcePage

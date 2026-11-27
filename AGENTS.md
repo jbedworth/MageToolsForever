@@ -73,10 +73,10 @@ feature set; do not add speculative features or frameworks without agreement.
   (greyed by the owner while its switch is off), with the link and primer as
   before. Below version 3, no `part`: each page has the whole section.
   MTF's own rows: on the Conjure page, "Share stack size", "Trade only with
-  Shift-click", and the bar's size rows are greyed while "Conjure bar" is
+  Shift-click", "Layout", and the bar's size rows are greyed while "Conjure bar" is
   off; "Keep conjure macros" is not, because the macros work without the bar
-  (`UpdateMacros` does not read `conjure.enabled`). On the Portals page, the
-  size rows are greyed while "Portal bar" is off. Size rows use
+  (`UpdateMacros` does not read `conjure.enabled`). On the Portals page,
+  "Layout" and the size rows are greyed while "Portal bar" is off. Size rows use
   `AddWidgetSettings` `opts.modify` (Toolkit 2.17.0; an older one ignores
   it). The Announce page (a canvas page) is not greyed.
 - Tooltips (John, 2026-11-27: "every one of the tooltips seems to start with
@@ -175,6 +175,26 @@ feature set; do not add speculative features or frameworks without agreement.
   letters. Its icon is half water, half food.
 - Size setting (author-approved): Bar size, 50-150% in steps of 5, default
   100; it applies out of combat (secure buttons).
+- Layout (1.8.0; a CurseForge player asked: "Is it possible to add an
+  option to change the portal and conjure bars from horizontal to
+  vertical?"; John, 2026-11-27: "Yes, Toolkit feature"): Dyre's Toolkit
+  2.18.0's button bars, feature-tested with `BAR_LAYOUT_VERSION` >= 1
+  (`MTF.HasBarLayout`). The bars call `widget:LayoutButtons(buttons, {size,
+  gap, padding})` (the conjure bar its four buttons in order,
+  `MTF.LayoutConjureBar`; the portal bar only the shown ones, at each
+  `ApplySpells`), with no anchor, so the bar keeps its center on a switch.
+  The Toolkit moves the secure buttons only out of combat. "Layout" on each
+  page is `AddBarLayoutSetting` (Horizontal or Vertical), greyed while that
+  bar's switch on the top page is off (`modify`). Saved as the widget
+  store's `orientation` ("vertical", else nil) in `conjure` and `portals`;
+  `SanitizeDB` keeps it, so it is in the profile, and `ApplyProfile` lays
+  the conjure bar out again (`ReapplyWidgets` does not). With an older
+  Toolkit: no Layout row, and MTF places the buttons as a row, as before
+  (the saved choice stays). A button's tooltip goes over a row, and beside
+  a column on the side of the screen with more room
+  (`MTF.BarTooltipAnchor`). Nothing else depends on the layout: the bars
+  have no menus or flyouts, the Food & Water icon is split inside its
+  button, and the unlocked outline follows the bar's size.
 - Mana gems (author-approved): like WTF's Healthstones without trading.
   Left- and middle-click use your best gem; right-click conjures the best rank
   you do not carry (each rank is unique in your bags). Before a gem rank is
@@ -227,10 +247,10 @@ feature set; do not add speculative features or frameworks without agreement.
   `store` = its saved table, so the saved keys carry over unchanged
   (`position` as {point, relativePoint, x, y}, `scale`):
   - the conjure bar `MageToolsForeverConjure`: mouse "always", content 174 x
-    48, Bar size 50-150%; it holds secure buttons, so the toolkit changes it
-    only out of combat;
+    48 (48 x 174 vertical, `LayoutButtons`), Bar size 50-150%; it holds
+    secure buttons, so the toolkit changes it only out of combat;
   - the portal bar `MageToolsForeverPortals`: mouse "always", Bar size,
-    `SetContentSize` with one button per known spell;
+    `SetContentSize` with one button per known spell, in its layout;
   Every conjure and portal button is a drag handle of its bar
   (`widget:AddDragHandle(button)`: the buttons cover most of it; clicks
   still reach them).

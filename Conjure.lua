@@ -1048,11 +1048,11 @@ end
 local function ShowTooltip(button)
     local kind = KINDS[button.kind]
     if button.kind == "both" then
-        GameTooltip:SetOwner(button, "ANCHOR_TOP")
+        GameTooltip:SetOwner(button, MTF.BarTooltipAnchor(buttons.bar, MTF.conjureWidget))
         ShowBothTooltip(button)
         return
     end
-    GameTooltip:SetOwner(button, "ANCHOR_TOP")
+    GameTooltip:SetOwner(button, MTF.BarTooltipAnchor(buttons.bar, MTF.conjureWidget))
     GameTooltip:SetText(kind.label, GOLD[1], GOLD[2], GOLD[3])
     if button.kind == "gem" and not BestKnownRank(GEMS) then
         GameTooltip:AddLine(string.format("You learn %s at level %d.", kind.spellName, FIRST_GEM_LEVEL),
@@ -1099,7 +1099,9 @@ local function CreateConjureButton(bar, name, kind)
     local button = CreateFrame("Button", name, bar, "SecureActionButtonTemplate")
     button.kind = kind
     button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
-    button:SetPoint("LEFT", bar, "LEFT", PADDING + (KINDS[kind].order - 1) * (BUTTON_SIZE + BUTTON_GAP), 0)
+    if not MTF.HasBarLayout() then
+        button:SetPoint("LEFT", bar, "LEFT", PADDING + (KINDS[kind].order - 1) * (BUTTON_SIZE + BUTTON_GAP), 0)
+    end
     button:RegisterForClicks("AnyUp", "AnyDown")
     -- Act on the release, as WTF's buttons do; mouse clicks are unaffected.
     button:SetAttribute("useOnKeyDown", false)
@@ -1129,6 +1131,20 @@ local function CreateConjureButton(bar, name, kind)
     button:SetScript("OnEnter", ShowTooltip)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return button
+end
+
+-- The buttons as a row or a column (Dyre's Toolkit 2.18.0, which moves them
+-- only out of combat and keeps the bar's center on a switch); with an older
+-- Toolkit, the row placed in CreateConjureButton.
+function MTF.LayoutConjureBar()
+    if not MTF.conjureWidget or not MTF.HasBarLayout() then
+        return
+    end
+    local list = {}
+    for _, kind in ipairs(BUTTON_ORDER) do
+        list[#list + 1] = buttons[kind]
+    end
+    MTF.conjureWidget:LayoutButtons(list, {size = BUTTON_SIZE, gap = BUTTON_GAP, padding = PADDING})
 end
 
 -- /mtf conjure: what you carry and the share stack size.
@@ -1227,6 +1243,7 @@ function MTF.InitializeConjure()
     for _, kind in ipairs(BUTTON_ORDER) do
         MTF.conjureWidget:AddDragHandle(buttons[kind])
     end
+    MTF.LayoutConjureBar()
     -- Level requirements need item data, which arrives later on first use.
     if type(C_Item.RequestLoadItemDataByID) == "function" then
         for _, kind in ipairs(KIND_ORDER) do

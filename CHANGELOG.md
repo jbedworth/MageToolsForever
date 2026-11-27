@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.8.0
+
+### Features
+
+- Conjure and Portal bars: horizontal or vertical. Thanks to a player on CurseForge for the idea. **Layout** on the Conjure and Portals settings pages puts the buttons side by side (**Horizontal**, as before) or top to bottom (**Vertical**), in the same order, and the bar stays where it is. A change in combat applies when combat ends. This needs Dyre's Toolkit 2.18.0 or later.
+
 ## 1.7.0
 
 ### Features

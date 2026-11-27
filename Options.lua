@@ -103,6 +103,14 @@ local function AddWidgetSizes(page, layout, widget, tooltips, modify)
     end
 end
 
+-- "Layout": Horizontal or Vertical (Dyre's Toolkit 2.18.0; none with an
+-- older one), greyed while the bar is off.
+local function AddBarLayout(page, layout, widget, tooltip, modify)
+    if widget and MTF.HasBarLayout() and type(MTF.toolkit.AddBarLayoutSetting) == "function" then
+        MTF.toolkit.AddBarLayoutSetting(page, layout, widget, {tooltip = tooltip, modify = modify})
+    end
+end
+
 -- "Keep conjure macros" stays usable with the bar off: the macros work
 -- without it. The share size, Shift-click, and the bar's size are the bar's.
 local function AddConjurePage(parent)
@@ -130,6 +138,8 @@ local function AddConjurePage(parent)
         "Left-click on Water, Food, and Food & Water always eats or drinks, and Shift + left-click trades "
             .. "to your target.",
         RefreshConjure), ConjureOn)
+    AddBarLayout(page, layout, MTF.conjureWidget,
+        "Whether the conjure bar's buttons go side by side or top to bottom.", ConjureOn)
     AddWidgetSizes(page, layout, MTF.conjureWidget,
         {scale = "How big the conjure bar is, in percent."},
         ConjureOn)
@@ -137,6 +147,8 @@ end
 
 local function AddPortalsPage(parent)
     local page, layout = Settings.RegisterVerticalLayoutSubcategory(parent, PORTALS_TITLE)
+    AddBarLayout(page, layout, MTF.portalWidget,
+        "Whether the portal bar's buttons go side by side or top to bottom.", PortalsOn)
     AddWidgetSizes(page, layout, MTF.portalWidget,
         {scale = "How big the portal bar is, in percent."},
         PortalsOn)

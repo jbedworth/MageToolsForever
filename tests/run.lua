@@ -465,7 +465,7 @@ local function fixture(options)
         end
     end
     env.GameTooltip = {
-        SetOwner = function() state.tooltip = {} end,
+        SetOwner = function(_, owner, anchor) state.tooltip = {owner = owner, anchor = anchor} end,
         SetText = function(_, text, r, g, b, alpha, wrap)
             checkColor("SetText", r, g, b)
             if alpha ~= nil and (type(alpha) ~= "number" or alpha < 0 or alpha > 1) then
@@ -1060,6 +1060,10 @@ local function fixture(options)
         state.toolkit = env.DyresToolkit
         if options.noProfiles then
             env.DyresToolkit.RegisterProfilePart = nil
+        end
+        -- options.noBarLayout: a Toolkit older than 2.18.0 (no button bar layout).
+        if options.noBarLayout then
+            env.DyresToolkit.BAR_LAYOUT_VERSION = nil
         end
         -- options.sections: "none" is a Toolkit older than 2.17.0 (no
         -- AddSettingsSection); "rows" or "link" is a mock that records each
@@ -2742,6 +2746,18 @@ test("the conjure and portal bars' rows are greyed while the bar is off", functi
         conjure.MTF_CONJURE_MACROS
     equal(greyed(share), false)
     equal(greyed(shift), false)
+    if type(state.toolkit.BAR_LAYOUT_VERSION) == "number" then
+        local conjureLayout = conjure.DYRE_MAGETOOLSFOREVER_CONJURE_ORIENTATION
+        local portalLayout = rows("Portals").DYRE_MAGETOOLSFOREVER_PORTALS_ORIENTATION
+        equal(greyed(conjureLayout), false)
+        state.settings.MTF_CONJURE_ENABLED:SetValue(false)
+        equal(greyed(conjureLayout), true, "Layout greyed with the bar off")
+        equal(greyed(portalLayout), false, "the portal bar's Layout follows its own switch")
+        state.settings.MTF_PORTALS_ENABLED:SetValue(false)
+        equal(greyed(portalLayout), true)
+        state.settings.MTF_PORTALS_ENABLED:SetValue(true)
+        state.settings.MTF_CONJURE_ENABLED:SetValue(true)
+    end
     state.settings.MTF_CONJURE_ENABLED:SetValue(false)
     equal(greyed(share), true, "share size greyed with the bar off")
     equal(greyed(shift), true, "Shift-click greyed with the bar off")
@@ -2766,6 +2782,135 @@ test("the conjure and portal bars' rows are greyed while the bar is off", functi
         state.settings.MTF_PORTALS_ENABLED:SetValue(false)
         equal(greyed(portalSize), true)
     end
+end)
+-- Dyre's Toolkit 2.18.0's button bars (BAR_LAYOUT_VERSION 1); the copy in
+-- tests/toolkit may be older, so these run only with the feature.
+local CONJURE_LAYOUT, PORTALS_LAYOUT = "DYRE_MAGETOOLSFOREVER_CONJURE_ORIENTATION",
+    "DYRE_MAGETOOLSFOREVER_PORTALS_ORIENTATION"
+local function hasBarLayout(state)
+    return type(state.toolkit.BAR_LAYOUT_VERSION) == "number"
+end
+test("Layout Vertical stacks each bar's buttons top to bottom, in the same order, from the bar's center", function()
+    -- A CurseForge player asked; John, 2026-11-27: "Yes, Toolkit feature".
+    local state = mage({known = {[TELEPORT_STORMWIND] = true, [TELEPORT_IRONFORGE] = true, [PORTAL_IRONFORGE] = true},
+        db = {conjure = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 700, y = 300}},
+            portals = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 200, y = 150}}}})
+    if not hasBarLayout(state) then return end
+    local function near(a, b, what) equal(math.abs(a - b) < 0.01, true, what .. ": " .. a .. " vs " .. b) end
+    local function at(frame, x, y, what)
+        local fx, fy = state.absCenter(frame)
+        near(fx, x, what .. " x")
+        near(fy, y, what .. " y")
+    end
+    local conjure, portals = state.env.MageToolsForeverConjure, state.env.MageToolsForeverPortals
+    local long, thick = 6 * 2 + 36 * 4 + 6 * 3, 6 * 2 + 36
+    equal(state.mtf.db.conjure.orientation, nil, "a row by default")
+    equal(conjure.width, long)
+    equal(conjure.height, thick)
+    state.settings[CONJURE_LAYOUT]:SetValue("vertical")
+    equal(state.mtf.db.conjure.orientation, "vertical", "saved in MTF's settings")
+    equal(conjure.width, thick, "one button wide")
+    equal(conjure.height, long, "four buttons tall")
+    for index, name in ipairs({WATER_BUTTON, FOOD_BUTTON, BOTH_BUTTON, GEM_BUTTON}) do
+        local button = state.env[name]
+        equal(#button.points, 1, name .. ": one point")
+        local point = button.points[1]
+        equal(point[1], "TOPLEFT", name)
+        equal(point[2], conjure)
+        equal(point[4], 6)
+        equal(point[5], -(6 + (index - 1) * 42), name .. ": in the same order")
+    end
+    at(conjure, 700, 300, "the conjure bar keeps its center")
+    state.settings[CONJURE_LAYOUT]:SetValue("horizontal")
+    equal(conjure.width, long, "back to a row")
+    equal(state.env[BOTH_BUTTON].points[1][4], 6 + 2 * 42)
+    equal(state.env[BOTH_BUTTON].points[1][5], -6)
+    at(conjure, 700, 300, "and still there")
+    -- Portals: only the shown buttons, one per spell you know.
+    equal(portals.width, 6 * 2 + 36 * 3 + 6 * 2)
+    state.settings[PORTALS_LAYOUT]:SetValue("vertical")
+    equal(portals.width, thick)
+    equal(portals.height, 6 * 2 + 36 * 3 + 6 * 2)
+    local buttons = portalButtons(state)
+    equal(buttons[1].attributes.spell1, TELEPORT_STORMWIND, "teleports still first")
+    for index, button in ipairs(buttons) do
+        equal(button.points[#button.points][5], -(6 + (index - 1) * 42))
+    end
+    at(portals, 200, 150, "the portal bar keeps its center")
+    state.known[TELEPORT_STORMWIND] = nil
+    state.emit("SPELLS_CHANGED")
+    equal(portals.height, 6 * 2 + 36 * 2 + 6, "shorter with fewer spells")
+    equal(portals.width, thick)
+    state.settings[CONJURE_LAYOUT]:SetValue("vertical")
+    equal(state.mtf.db.portals.orientation, "vertical", "each bar has its own")
+end)
+test("a saved Vertical layout is drawn at login and survives the settings repair", function()
+    local state = mage({known = {[TELEPORT_STORMWIND] = true, [TELEPORT_IRONFORGE] = true},
+        db = {conjure = {orientation = "vertical"}, portals = {orientation = "vertical"}}})
+    equal(state.mtf.db.conjure.orientation, "vertical", "kept by SanitizeDB")
+    equal(state.mtf.db.portals.orientation, "vertical")
+    if not hasBarLayout(state) then return end
+    equal(state.env.MageToolsForeverConjure.width, 6 * 2 + 36)
+    equal(state.env.MageToolsForeverConjure.height, 6 * 2 + 36 * 4 + 6 * 3)
+    equal(state.env.MageToolsForeverPortals.height, 6 * 2 + 36 * 2 + 6)
+end)
+test("Layout is saved as vertical or nothing", function()
+    local db = mage().mtf.SanitizeDB({conjure = {orientation = "diagonal"}, portals = {orientation = 5}})
+    equal(db.conjure.orientation, nil)
+    equal(db.portals.orientation, nil)
+end)
+test("a Layout change in combat waits for combat to end", function()
+    local state = mage({known = {[TELEPORT_STORMWIND] = true, [TELEPORT_IRONFORGE] = true}})
+    if not hasBarLayout(state) then return end
+    state.combat = true
+    state.settings[CONJURE_LAYOUT]:SetValue("vertical")
+    state.settings[PORTALS_LAYOUT]:SetValue("vertical")
+    equal(state.mtf.db.conjure.orientation, "vertical", "saved at once")
+    equal(state.env[FOOD_BUTTON].points[1][5], -6, "the conjure buttons wait")
+    equal(portalButtons(state)[2].points[1][5], -6, "the portal buttons wait")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(state.env[FOOD_BUTTON].points[1][5], -(6 + 42), "applied after combat")
+    equal(portalButtons(state)[2].points[1][5], -(6 + 42))
+    equal(state.env.MageToolsForeverConjure.width, 6 * 2 + 36)
+    equal(state.env.MageToolsForeverPortals.width, 6 * 2 + 36)
+end)
+test("a profile copy with another Layout lays the conjure bar out again", function()
+    local state = mage()
+    if not hasBarLayout(state) then return end
+    state.mtf.db.conjure.orientation = "vertical"
+    state.mtf.ApplyProfile()
+    equal(state.env.MageToolsForeverConjure.width, 6 * 2 + 36)
+    equal(state.env[GEM_BUTTON].points[1][5], -(6 + 3 * 42))
+end)
+test("with a Toolkit older than 2.18.0 the bars stay rows, with no Layout row", function()
+    local state = mage({noBarLayout = true, known = {[TELEPORT_STORMWIND] = true, [TELEPORT_IRONFORGE] = true},
+        db = {conjure = {orientation = "vertical"}}})
+    equal(state.settings[CONJURE_LAYOUT], nil, "no Layout row")
+    equal(state.settings[PORTALS_LAYOUT], nil)
+    equal(state.env.MageToolsForeverConjure.width, 6 * 2 + 36 * 4 + 6 * 3, "a row")
+    equal(state.env[BOTH_BUTTON].points[1][1], "LEFT", "placed by MTF, as before")
+    equal(state.env[BOTH_BUTTON].points[1][4], 6 + 2 * 42)
+    equal(portalButtons(state)[2].points[1][1], "LEFT")
+    equal(state.env.MageToolsForeverPortals.width, 6 * 2 + 36 * 2 + 6)
+    equal(state.mtf.db.conjure.orientation, "vertical", "the saved choice stays for a newer Toolkit")
+end)
+test("a vertical bar's tooltips go beside it, on the side with more room", function()
+    local state = mage({known = {[TELEPORT_STORMWIND] = true},
+        db = {conjure = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 200, y = 300}},
+            portals = {position = {point = "CENTER", relativePoint = "BOTTOMLEFT", x = 900, y = 300}}}})
+    local function anchor(button)
+        button.scripts.OnEnter(button)
+        return state.tooltip and state.tooltip.anchor
+    end
+    local water, portal = state.env[WATER_BUTTON], portalButtons(state)[1]
+    equal(anchor(water), "ANCHOR_TOP", "over a row")
+    equal(anchor(portal), "ANCHOR_TOP")
+    if not hasBarLayout(state) then return end
+    state.settings[CONJURE_LAYOUT]:SetValue("vertical")
+    state.settings[PORTALS_LAYOUT]:SetValue("vertical")
+    equal(anchor(water), "ANCHOR_RIGHT", "a bar on the left: to its right")
+    equal(anchor(portal), "ANCHOR_LEFT", "a bar on the right: to its left")
 end)
 test("every tooltip MTF writes is one plain sentence", function()
     -- John, 2026-11-27: "every one of the tooltips seems to start with a good one sentence
@@ -2795,13 +2940,15 @@ test("every tooltip MTF writes is one plain sentence", function()
         if setting and setting.variable == "MTF_CONJURE_MACROS" then
             check(initializer.tooltip, "Keep conjure macros", 2)
         elseif setting and (setting.variable == "MTF_CONJURE_SHARE_SIZE"
-                or setting.variable == "MTF_CONJURE_SHIFT_TRADE" or setting.name == "Bar size") then
+                or setting.variable == "MTF_CONJURE_SHIFT_TRADE" or setting.variable == CONJURE_LAYOUT
+                or setting.name == "Bar size") then
             check(initializer.tooltip, setting.name)
         end
     end
     for _, initializer in ipairs(state.categories.Portals.initializers) do
-        if initializer.setting and initializer.setting.name == "Bar size" then
-            check(initializer.tooltip, "Portals: Bar size")
+        if initializer.setting and (initializer.setting.name == "Bar size"
+                or initializer.setting.variable == PORTALS_LAYOUT) then
+            check(initializer.tooltip, "Portals: " .. initializer.setting.name)
         end
     end
     for _, title in ipairs({"Shield display", "Reminders", "Chimes", "Procs", "Crowd Control"}) do
@@ -2809,7 +2956,7 @@ test("every tooltip MTF writes is one plain sentence", function()
             if item.button then check(item.tooltip, title .. ": link") end
         end
     end
-    equal(checked, 13, "every tooltip MTF writes")
+    equal(checked, hasBarLayout(state) and 15 or 13, "every tooltip MTF writes")
 end)
 test("without Dyre's Shields Up or Dyre's Buff Reminders MTF says once what to install or enable", function()
     local function lines(state, fragment)
