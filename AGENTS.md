@@ -136,7 +136,11 @@ feature set; do not add speculative features or frameworks without agreement.
     retried once on the next key press or world click. MTF never presses Trade.
   - Whisper (author-approved, on by default): on `TRADE_SHOW` for an MTF
     trade, to the target's "First-Last" name, with `%C` count, `%I` item, `%T`
-    full name; default texts credit MTF. Water, Food, and Food & Water each
+    full name; default texts name no AddOn (1.8.1; John, 2026-11-28: a player
+    uninstalled WTF over messages that "advertised the addon", and "Tone
+    down the flair a bit too"). A saved text equal to an earlier default
+    becomes the new one (`OLD_ANNOUNCE_DEFAULTS` in Core); a player's own
+    text stays. Water, Food, and Food & Water each
     have their own switch and editable text on the Announce page. At most one
     whisper per player every 30 s (author-approved), so water then food in one
     trade whispers once.
@@ -301,9 +305,9 @@ feature set; do not add speculative features or frameworks without agreement.
   the one frame lock.
 - A portal you open (`UNIT_SPELLCAST_SUCCEEDED`, matched by name) is told
   to your raid or party once (5 s), never to Say and never when alone.
-- A teleport you cast emotes (author-approved, on by default; "summons
-  powerful arcane energies to whisk themselves away to %Z"; `%T` your name, `%Z` your
-  zone when sent: after the loading screen, the destination). Emotes are blocked
+- A teleport you cast emotes (author-approved, on by default; "teleports to
+  %D."; `%D` the teleport's city, `%T` your name, `%Z` your zone when sent:
+  after the loading screen, the destination). Emotes are blocked
   outside a hardware event, so it is sent at your next key press or click
   within 60 s of the cast (after the loading screen), as WTF's emotes.
 
@@ -353,7 +357,7 @@ feature set; do not add speculative features or frameworks without agreement.
 
 ### Planned (pass 2, agreed)
 
-- Conjure emotes on the next hardware input, with flavor and credit. (Proc
+- Conjure emotes on the next hardware input, naming no AddOn. (Proc
   sounds are DBR's, and Arcane Powder is counted by DBR's Consumables.)
 
 ### Resizing (built; author's rule, 1.1.0)

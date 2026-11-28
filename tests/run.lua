@@ -1527,8 +1527,7 @@ test("the player is whispered as the trade window opens, and the switch turns it
     equal(#state.sent, 1)
     equal(state.sent[1].chatType, "WHISPER")
     equal(state.sent[1].target, "Lowbie-Smith")
-    equal(state.sent[1].message, "Here's 10 Conjured Fresh Water, conjured from pure arcane energy. "
-        .. "Drink up, Lowbie Smith! Courtesy of Mage Tools Forever (MTF)")
+    equal(state.sent[1].message, "Here's 10 Conjured Fresh Water. Enjoy, Lowbie Smith!")
     state.emit("TRADE_CLOSED")
     state.mtf.announcePage:OnRefresh()
     local waterRow = state.mtf.announcePage.rows[1]
@@ -1606,7 +1605,7 @@ test("when someone opens a trade with you, the buttons serve them, straight into
     equal(state.traded(WATER_FRESH), 10, "into the open window")
     equal(state.traded(WATER_PURIFIED), 0, "only what they can use")
     equal(state.sent[1].target, "Runner-Uppe")
-    contains(state.sent[1].message, "Drink up, Runner Uppe!")
+    contains(state.sent[1].message, "Enjoy, Runner Uppe!")
     state.emit("TRADE_CLOSED")
     state.units.NPC = nil
     equal(water.mode, "use", "back to following your target")
@@ -1719,8 +1718,7 @@ test("Food & Water trades both shares in one click, with one whisper", function(
     equal(state.traded(WATER_FRESH), 10)
     equal(state.traded(1113), 10)
     equal(#state.sent, 1, "one whisper for both")
-    equal(state.sent[1].message, "Here's 10 Conjured Fresh Water and 10 Conjured Bread, conjured from pure arcane "
-        .. "energy. Eat, drink, and be merry, Lowbie Smith! Courtesy of Mage Tools Forever (MTF)")
+    equal(state.sent[1].message, "Here's 10 Conjured Fresh Water and 10 Conjured Bread. Enjoy, Lowbie Smith!")
     equal(state.last(), "MTF: 10 Conjured Fresh Water and 10 Conjured Bread in the trade window. Press Trade to give it.")
 end)
 test("Food & Water trades what it can, and says when it has nothing they can use", function()
@@ -2061,8 +2059,7 @@ test("an opened portal is told to the group once, and never when alone", functio
     state.cast(PORTAL_IRONFORGE)
     equal(#state.sent, 1)
     equal(state.sent[1].chatType, "PARTY")
-    equal(state.sent[1].message, "A portal to Ironforge shimmers open! Step through before it fades. "
-        .. "- via Mage Tools Forever (MTF)")
+    equal(state.sent[1].message, "A portal to Ironforge is open. Step through before it closes.")
     state.cast(PORTAL_IRONFORGE)
     equal(#state.sent, 1, "once per cast, not repeated")
     advance(state, 6)
@@ -2085,8 +2082,7 @@ test("a teleport emotes at your next key press or click, and its switch turns it
     state.press()
     equal(#state.sent, 1)
     equal(state.sent[1].chatType, "EMOTE")
-    equal(state.sent[1].message, "summons powerful arcane energies to whisk themselves away to Ironforge. "
-        .. "- via Mage Tools Forever (MTF)")
+    equal(state.sent[1].message, "teleports to Ironforge.")
     state.press()
     equal(#state.sent, 1, "once per cast")
     state.mtf.db.announce.teleportEmoteText = "brings %T to %Z"
@@ -2143,6 +2139,47 @@ test("an old single whisper switch carries over to each trade whisper", function
     equal(state.mtf.db.announce.bothWhisper, false)
     equal(state.mtf.db.announce.portalGroup, true, "the portal message is new")
     equal(state.mtf.db.conjure.whisper, nil)
+end)
+test("the default messages are plain and name no AddOn", function()
+    local state = mage()
+    local defaults = state.mtf.ANNOUNCE_DEFAULTS
+    equal(defaults.waterWhisperText, "Here's %C %I. Enjoy, %T!")
+    equal(defaults.foodWhisperText, "Here's %C %I. Enjoy, %T!")
+    equal(defaults.bothWhisperText, "Here's %I. Enjoy, %T!")
+    equal(defaults.portalGroupText, "A portal to %D is open. Step through before it closes.")
+    equal(defaults.teleportEmoteText, "teleports to %D.")
+    local count = 0
+    for key, text in pairs(defaults) do
+        count = count + 1
+        equal(text:find("Mage Tools Forever", 1, true), nil, key .. " names the AddOn")
+        equal(text:find("(MTF)", 1, true), nil, key .. " names the AddOn")
+        equal(state.mtf.db.announce[key], text, key .. " is the default on a new character")
+    end
+    equal(count, 5)
+end)
+test("an unedited old default becomes the new one, and a player's own text stays", function()
+    local state = mage({db = {announce = {
+        waterWhisperText = "Here's %C %I, conjured from pure arcane energy. Drink up, %T! Courtesy of Mage Tools Forever (MTF)",
+        foodWhisperText = "Here's %C %I, conjured from thin air: no crumbs, no calories. Courtesy of Mage Tools Forever (MTF)",
+        bothWhisperText = "Here's %I, conjured from pure arcane energy. Eat, drink, and be merry, %T! "
+            .. "Courtesy of Mage Tools Forever (MTF)",
+        portalGroupText = "A portal to %D shimmers open! Step through before it fades. - via Mage Tools Forever (MTF)",
+        teleportEmoteText = "My own emote to %D",
+        portalGroup = false,
+    }}})
+    local announce, defaults = state.mtf.db.announce, state.mtf.ANNOUNCE_DEFAULTS
+    equal(announce.waterWhisperText, defaults.waterWhisperText)
+    equal(announce.foodWhisperText, defaults.foodWhisperText)
+    equal(announce.bothWhisperText, defaults.bothWhisperText)
+    equal(announce.portalGroupText, defaults.portalGroupText)
+    equal(announce.teleportEmoteText, "My own emote to %D", "the player's own text stays")
+    equal(announce.portalGroup, false, "the switches stay")
+    local old = state.mtf.SanitizeDB({announce = {
+        teleportEmoteText = "summons powerful arcane energies to whisk themselves away to %Z. - via Mage Tools Forever (MTF)",
+        waterWhisperText = "Here's %C %I. Courtesy of Mage Tools Forever (MTF)",
+    }}).announce
+    equal(old.teleportEmoteText, "teleports to %D.")
+    equal(old.waterWhisperText, "Here's %C %I. Courtesy of Mage Tools Forever (MTF)", "an edited text stays as typed")
 end)
 
 -- Dyre's Toolkit widgets (2.0) -------------------------------------------------------

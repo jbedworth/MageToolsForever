@@ -22,7 +22,7 @@ tested.
 
 ## Summary
 
-Mage tools for World of Warcraft: Forever: conjure and trade food and water by level, and a portal bar. Installs Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker for shields, buff tracking, cooldown chimes, and the Polymorph bar.
+One-click food and water for your group, a portal bar, and with my companion AddOns, shields, buff reminders, procs, chimes, and a Polymorph bar. For WoW: Forever.
 
 ## Screenshots
 
@@ -52,50 +52,80 @@ Per-file changelogs need no manual text: each CI upload uses the version's
 `CHANGELOG.md` section, through `release-notes.md`.
 
 ```markdown
-**Mage Tools Forever** is a growing set of quality-of-life tools for Mages: Conjure, Portals, and Announce. Each tool has its own switch and settings page.
+I play a Mage, and in every group I spent half my time on chores instead of casting. I'd conjure water, open a trade with each person, count out a stack, and then remember my armor had dropped. Finding the right portal in a spellbook full of teleports didn't help either. Mage Tools Forever is my answer, and you control all of it from one place: Mage Tools Forever's settings (`/mtf`).
 
-Your shield display, buff reminders, cooldown chimes, and Polymorph bar now come from three of Dyre's AddOns that work for every class: **Dyre's Shields Up** draws the shield display, **Dyre's Buff Reminders** shows Arcane Intellect, your armor, and Dampen or Amplify Magic, and plays your cooldown chimes, and **Dyre's Debuff Tracker** draws the Polymorph bar and keeps the "! Polymorph" macro. The CurseForge app installs all three with Mage Tools Forever.
+Some of it comes from my other AddOns that work for every class: Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker. The CurseForge app installs all three with Mage Tools Forever, and their Mage settings show right on MTF's pages. Each part has its own on/off switch on MTF's main page, so you can turn on only what you want.
 
-### Conjure
-- A movable bar with Water, Food, Food & Water, and Mana Gem buttons, side by side or top to bottom.
-- Target a friend: right-click conjures the best food or water *they* can use; left-click trades them a share of it (10 by default, you pick stacks of 1 to 20), or all you have if less, and whispers them. The rest stays for the next party member.
-- Someone opens a trade with you? The buttons serve them: left-click puts their share straight into the window.
-- Food & Water gives a share of both in one click, with one whisper; right-click conjures them in turn.
-- No one targeted: left-click eats or drinks your best; right-click conjures your best. Middle-click and Shift + left-click always eat or drink your own best, whoever you have targeted.
-- Mostly drinking in dungeons? Turn on **Trade only with Shift-click**: left-click always eats or drinks, and Shift + left-click trades.
-- Mana gems: left-click uses your best gem; right-click conjures the best one you don't carry.
-- For your action bars: MTF keeps **! Water**, **! Food**, **! Food & Water**, and **! Mana Gem** macros in your character macros. Left-click uses, right-click conjures, also works in combat.
+### Conjure bar
+- One small bar with **Water**, **Food**, **Food & Water**, and **Mana Gem** buttons, each showing how many you carry.
+- **Feed your group in one click.** Target a friend and right-click to conjure the best food or water they can use. Left-click trades them a share and whispers them. A share is 10 by default, and you can pick 1 to 20, so the rest stays in your bags for the next person.
+- When someone opens a trade with you, the buttons serve that person, and left-click puts their share straight into the trade window.
+- **Food & Water** gives a share of both in one click, with one whisper.
+- With no one targeted, left-click eats or drinks your best and right-click conjures your best. Middle-click and Shift + left-click always eat or drink, whoever you have targeted.
+- **Trade only with Shift-click** is for dungeons, where your target is usually the tank or the healer. Left-click then always drinks, and Shift + left-click trades.
+- The **Mana Gem** button uses your best gem on a left-click, and a right-click conjures the best gem you don't carry. Before you learn Conjure Mana Agate, the button is there and greyed out.
+- MTF keeps **! Water**, **! Food**, **! Food & Water**, and **! Mana Gem** macros for your action bars. Left-click uses, right-click conjures, and they work in combat too.
 
-### Portals
-- A bar, side by side or top to bottom, with a button for each teleport and portal you know, teleports first, with the runes you carry for each. The count is only information: MTF never stops a cast for lack of runes (legacy talents can make this work without runes).
-- Opening a portal tells your group where it goes. Teleporting yourself emotes it: *"Dyre summons powerful arcane energies to whisk themselves away to Ironforge."* (both on by default; see Announce).
+### Portal bar
+- The **portal bar** has a button for each teleport and portal you know, teleports first, with the runes you carry for each. The count is just information, and MTF never stops a cast because of it.
+- When you open a portal, MTF tells your group where it goes.
+- When you teleport yourself, MTF sends an emote like *"Dyre teleports to Ironforge."*
+
+### Side by side or top to bottom
+- **Layout** is new in 1.8.0. On the Conjure and Portals pages, set each bar to Horizontal or Vertical. Thanks to user_kegtgryr84rvp31h on CurseForge for the idea.
+- **Bar size** makes each bar smaller or bigger, from 50% to 150%.
 
 ### Announce
-- Every message MTF sends has its own switch and text you can edit: the water, food, and Food & Water trade whispers, the portal group message, and the teleport emote. The defaults credit Mage Tools Forever (MTF).
+- Every message MTF sends has its own switch and text you can edit: the trade whispers, the portal message to your group, and the teleport emote.
 
-### Shields, buff reminders, and cooldown chimes
-- **Dyre's Shields Up** draws the shield display; **Dyre's Buff Reminders** shows the buff reminders and plays the cooldown chimes. Both work for every class, and the CurseForge app installs them with Mage Tools Forever.
-- Coming from MTF 1.1 or older? They take over your MTF settings for these once.
-- MTF's Shield display, Reminders, Chimes, Procs, and Crowd Control settings pages show their settings, or a button that opens them.
-- Without one of them, MTF still works and says once in chat what to install or enable.
+### Shield display, with Dyre's Shields Up installed
+- Your shields show as rings around your character, and each ring drains as the shield absorbs damage.
+- **Fire Ward** and **Frost Ward** show the damage they can still absorb. **Mana Shield** is a thinner ring that drains with its time left, and Frost Mages see **Ice Barrier** too.
 
-### Needs Dyre's Toolkit
-**Dyre's Toolkit** (2.3 or later) is the home of all of Dyre's AddOns; the CurseForge app installs it for you. MTF's settings sit under Options > AddOns > Dyre's AddOns, and the frames of every Dyre's AddOn unlock, lock, snap, and resize together.
+### Buff reminders and chimes, with Dyre's Buff Reminders installed
+- An icon shows when **Arcane Intellect** or your **armor** is missing, and a click casts it again. Frost Armor, Ice Armor, and Mage Armor all count.
+- Arcane Intellect also checks the group members who use mana.
+- There's a reminder for **Dampen Magic** or **Amplify Magic** too. It's off until you turn it on.
+- After you learn Arcane Brilliance, you get a count of your **Arcane Powder**.
+- **Cooldown chimes** play a sound just before Blink, Frost Nova, Counterspell, and your other key spells are ready.
+
+### Procs, with Dyre's Buff Reminders and Dyre's Debuff Tracker installed
+- **Missile Barrage** and **Fingers of Frost** each show an arc on each side of your character and play a sound. **Clearcasting** can play a sound too.
+- An arc of ice crystals shows over an enemy's nameplate while it's **frozen**, so you know your Shatter talent works on it.
+- A thin frost arc shows while your **chill** is on the enemy.
+- The **Winter's Chill** arc over your target's nameplate fills with each stack, and it can play a note as each stack goes on.
+
+### Crowd control, with Dyre's Debuff Tracker installed
+- The **Polymorph bar** shows the time left on your sheep, and it empties if the sheep breaks early.
+- Dyre's Debuff Tracker keeps a **! Polymorph** macro up to date for you, and it can tell your group when you sheep a target.
+- It also tracks the burn damage from your Fireball, Pyroblast, and Frostfire Bolt on every mob.
 
 ### Moving frames
-- `/mtf unlock` (or Dyre's Toolkit's Unlock frames switch or its minimap button) outlines every MTF frame so you can drag it, over Dyre's Toolkit's grid. Frames snap to each other, Shift-drag moves a snapped group, and every frame grows and shrinks around its middle. Drag the conjure and portal bars from any of their buttons.
-- `/mtf lock` locks them again; `/mtf reset` puts MTF's frames back in their default places.
+- Type `/mtf unlock`, or click Dyre's Toolkit's minimap button, and drag any frame over a grid.
+- Frames snap to each other, and Shift-drag moves a group of snapped frames. Drag the conjure and portal bars from any of their buttons.
+- `/mtf lock` locks the frames again, and `/mtf reset` puts them back where they started.
+
+### Profiles
+- Your settings are part of your Dyre's Toolkit profile. Copy them from another character, or export and import them as one line of text.
 
 ### Commands
-- `/mtf` or `/mtf options` opens the settings (Options > AddOns > Dyre's AddOns > Mage Tools Forever).
+- `/mtf` opens the settings, in Options > AddOns > Dyre's AddOns > Mage Tools Forever.
 - `/mtf conjure` shows the food, water, and gems you carry.
 - `/mtf unlock`, `/mtf lock`, and `/mtf reset` move your frames.
-- `/magetools` works the same, in case another AddOn uses `/mtf`.
+- `/magetools` does the same as `/mtf`, in case another AddOn uses `/mtf`.
+
+### What gets installed with it
+- Dyre's Toolkit is the home of all my AddOns, and the CurseForge app installs it for you. Keep it up to date, because the Layout setting needs 2.18.0 or later.
+- Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker come with it for the parts marked above. If one is missing, MTF still works and tells you once in chat what to install.
 
 ### Compatibility
-For World of Warcraft: Forever 1.60.1 (tested on build 70450). If a client update removes an API MTF needs, MTF turns off what it cannot run and says so once in chat.
+For World of Warcraft: Forever 1.60.1, tested on build 70888. If a game update removes something MTF needs, MTF turns that part off and tells you once in chat.
 
-WowUp users (2.24.0 or later): install from the repository URL, and Dyre's Toolkit, Dyre's Shields Up, and Dyre's Buff Reminders the same way; GitHub releases carry the Forever metadata WowUp needs.
+WowUp users need WowUp 2.24.0 or later. Install MTF from the repository URL, and Dyre's Toolkit, Dyre's Shields Up, Dyre's Buff Reminders, and Dyre's Debuff Tracker the same way.
+
+Let me know what you think!
+
+Dyre's AddOns are free. If you enjoy them, you can support them on Ko-fi: https://ko-fi.com/dyre_janelle
 
 Source, issues, and license (MIT): https://github.com/jbedworth/MageToolsForever
 ```

@@ -142,15 +142,35 @@ end
 -- Water, the whole list: "10 Conjured Fresh Water and 10 Conjured Bread"), %T
 -- the player's full name. The portal group message and the teleport emote: %D
 -- the city; in the emote, %Z your zone as it is sent and %T your name. Emotes
--- start with your name. The defaults credit MTF, as WTF's do.
+-- start with your name. The defaults name no AddOn (John, 2026-11-28: a
+-- player uninstalled WTF over messages that "advertised the addon"; "Tone down
+-- the flair a bit too").
 MTF.ANNOUNCE_MAX_LENGTH = 255
 MTF.ANNOUNCE_DEFAULTS = {
-    waterWhisperText = "Here's %C %I, conjured from pure arcane energy. Drink up, %T! Courtesy of Mage Tools Forever (MTF)",
-    foodWhisperText = "Here's %C %I, conjured from thin air: no crumbs, no calories. Courtesy of Mage Tools Forever (MTF)",
-    bothWhisperText = "Here's %I, conjured from pure arcane energy. Eat, drink, and be merry, %T! Courtesy of Mage Tools Forever (MTF)",
-    portalGroupText = "A portal to %D shimmers open! Step through before it fades. - via Mage Tools Forever (MTF)",
-    teleportEmoteText = "summons powerful arcane energies to whisk themselves away to %Z. - via Mage Tools Forever (MTF)",
+    waterWhisperText = "Here's %C %I. Enjoy, %T!",
+    foodWhisperText = "Here's %C %I. Enjoy, %T!",
+    bothWhisperText = "Here's %I. Enjoy, %T!",
+    portalGroupText = "A portal to %D is open. Step through before it closes.",
+    teleportEmoteText = "teleports to %D.",
 }
+-- Earlier defaults: a saved text equal to one was never edited, so it becomes
+-- the current default. A player's own text stays.
+local OLD_ANNOUNCE_DEFAULTS = {
+    waterWhisperText = {"Here's %C %I, conjured from pure arcane energy. Drink up, %T! Courtesy of Mage Tools Forever (MTF)"},
+    foodWhisperText = {"Here's %C %I, conjured from thin air: no crumbs, no calories. Courtesy of Mage Tools Forever (MTF)"},
+    bothWhisperText = {"Here's %I, conjured from pure arcane energy. Eat, drink, and be merry, %T! Courtesy of Mage Tools Forever (MTF)"},
+    portalGroupText = {"A portal to %D shimmers open! Step through before it fades. - via Mage Tools Forever (MTF)"},
+    teleportEmoteText = {"summons powerful arcane energies to whisk themselves away to %Z. - via Mage Tools Forever (MTF)"},
+}
+
+local function IsOldDefault(key, text)
+    for _, old in ipairs(OLD_ANNOUNCE_DEFAULTS[key] or {}) do
+        if text == old then
+            return true
+        end
+    end
+    return false
+end
 local ANNOUNCE_SWITCHES = {"waterWhisper", "foodWhisper", "bothWhisper", "portalGroup", "teleportEmote"}
 
 -- A message text: a non-empty single line within the chat limit, else the default.
@@ -309,7 +329,11 @@ function MTF.SanitizeDB(db)
         end
     end
     for key, default in pairs(MTF.ANNOUNCE_DEFAULTS) do
-        db.announce[key] = MTF.SanitizeAnnouncement(announce[key], default)
+        if IsOldDefault(key, announce[key]) then
+            db.announce[key] = default
+        else
+            db.announce[key] = MTF.SanitizeAnnouncement(announce[key], default)
+        end
     end
     if type(announce.polymorphGroup) == "boolean" then
         db.announce.polymorphGroup = announce.polymorphGroup

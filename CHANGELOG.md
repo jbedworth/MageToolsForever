@@ -4,6 +4,12 @@ Player-facing changes for each Mage Tools Forever release, newest first. The
 release builder copies the section for the TOC version into the GitHub release
 notes and the CurseForge changelog, and fails if that section is missing.
 
+## 1.8.1
+
+### Other changes
+
+- I toned down the default whispers, portal message, and teleport emote, and they no longer name Mage Tools Forever. Your group shouldn't hear an ad every time you hand out water. A water whisper now reads "Here's 10 Conjured Fresh Water. Enjoy, Lowbie!", and the teleport emote reads "Dyre teleports to Ironforge." If you never edited a message, you get the new text. If you wrote your own, it stays as you wrote it.
+
 ## 1.8.0
 
 ### Features

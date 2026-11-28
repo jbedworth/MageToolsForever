@@ -101,7 +101,7 @@ The count is only information: MTF never stops a cast because it is zero, and
 the game decides. The buttons work in combat; a spell you learn in combat
 joins the bar when combat ends. When you open a portal in a group, MTF tells
 your raid or party where it goes, and when you teleport yourself, you emote
-it ("Dyre summons powerful arcane energies to whisk themselves away to
+it ("Dyre teleports to
 Ironforge.") at your next key press or click, since the game allows emotes
 only then. **Bar size** and **Layout** (**Horizontal** or **Vertical**;
 Dyre's Toolkit 2.18.0 or later) are on the Portals settings page.
@@ -168,7 +168,7 @@ macros.
 
 ## Compatibility
 
-Tested on the Forever beta client 1.60.1, build 70450. MTF keeps working on later beta
+Tested on the Forever beta client 1.60.1, build 70888. MTF keeps working on later beta
 builds; if a client update removes an API it needs, it turns that feature off
 with one chat message. Spell and item IDs are Classic's; `/mtf debug_conjure`
 shows what your client knows.
